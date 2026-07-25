@@ -19,7 +19,9 @@ $config = is_file($configFile) ? require $configFile : require dirname(__DIR__) 
 require_once __DIR__ . '/Support.php';
 require_once __DIR__ . '/Database.php';
 require_once __DIR__ . '/HouseholdContext.php';
+require_once __DIR__ . '/Auth.php';
 
 $database = new Homestead\Database($config['database'] ?? []);
 $pdo = $database->connection();
 $householdContext = new Homestead\HouseholdContext($pdo);
+$auth = new Homestead\Auth($pdo);
