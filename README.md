@@ -68,7 +68,7 @@ The repository-wide audit and repair record is maintained in:
 docs/WHOLE_APP_AUDIT.md
 ```
 
-The initial whole-application score was **5.9/10**. The current source-review score is provisional and the application is not certified as 10/10. A final score requires completed code review, passing CI, clean SQL imports, database-backed end-to-end tests, protected health validation, and deployed smoke testing.
+The initial whole-application score was **5.9/10**. The current provisional source-review score is **8.4/10** after three repair passes. The application is not certified as 10/10. A final score requires completed code review, passing CI, clean SQL imports, database-backed end-to-end tests, protected health validation, and deployed smoke testing.
 
 CI currently includes:
 
