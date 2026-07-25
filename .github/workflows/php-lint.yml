@@ -241,7 +241,18 @@ jobs:
         run: bash tests/phase6_http_smoke.sh
 
       - name: Run Phase 7 authenticated HTTP smoke suite
-        run: bash tests/phase7_http_smoke.sh
+        run: |
+          set -o pipefail
+          bash tests/phase7_http_smoke.sh 2>&1 | tee "$RUNNER_TEMP/phase7-http-${{ matrix.database }}.txt"
+
+      - name: Upload Phase 7 HTTP report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase7-http-combined-${{ matrix.database }}
+          path: ${{ runner.temp }}/phase7-http-${{ matrix.database }}.txt
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Run Phase 8 authenticated HTTP smoke suite
         run: bash tests/phase8_http_smoke.sh
