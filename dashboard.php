@@ -13,6 +13,7 @@ $canViewInventory = $auth->can($user, 'inventory.view') || $auth->can($user, 'in
 $canViewRecipes = $auth->can($user, 'recipes.view') || $auth->can($user, 'recipes.manage') || $auth->can($user, 'recipes.complete');
 $canViewGarden = $auth->can($user, 'garden.view') || $auth->can($user, 'garden.manage') || $auth->can($user, 'harvest.record');
 $canViewPreservation = $auth->can($user, 'preservation.view') || $auth->can($user, 'preservation.manage');
+$canViewPlanning = $auth->can($user, 'tasks.manage') || $auth->can($user, 'tasks.complete');
 $canManageAccess = $auth->can($user, 'members.manage') || $auth->can($user, 'members.invite') || $auth->can($user, 'permissions.manage');
 $isPlatformAdmin = !empty($user['is_platform_admin']);
 
@@ -23,6 +24,20 @@ $scalar = static function (PDO $pdo, string $sql, array $params = []): int {
 };
 
 $metrics = [];
+if ($canViewPlanning) {
+    $taskScope = $auth->can($user, 'tasks.manage') ? '' : ' AND (assigned_member_id IS NULL OR assigned_member_id = ?)';
+    $taskParams = $auth->can($user, 'tasks.manage') ? [$householdId] : [$householdId, (int)$user['member_id']];
+    $metrics[] = [
+        'label' => 'Active tasks',
+        'value' => $scalar($pdo, "SELECT COUNT(*) FROM household_tasks WHERE household_id = ? AND status IN ('planned','ready','in_progress')" . $taskScope, $taskParams),
+        'href' => '/phase7.php',
+    ];
+    $metrics[] = [
+        'label' => 'Overdue tasks',
+        'value' => $scalar($pdo, "SELECT COUNT(*) FROM household_tasks WHERE household_id = ? AND status IN ('planned','ready','in_progress') AND due_at < UTC_TIMESTAMP()" . $taskScope, $taskParams),
+        'href' => '/phase7.php',
+    ];
+}
 if ($canViewInventory) {
     $metrics[] = [
         'label' => 'Active inventory',
@@ -103,7 +118,7 @@ if ($canViewInventory) {
     <div>
         <p class="eyebrow">Household food operating system</p>
         <h1>Welcome, <?= e((string)$user['display_name']) ?></h1>
-        <p class="page-description">Plan, stock, grow, cook, preserve, track, and restock from one permission-aware workspace.</p>
+        <p class="page-description">Plan, assign, stock, grow, cook, preserve, track, and restock from one permission-aware workspace.</p>
     </div>
     <div class="toolbar">
         <a class="button secondary" href="/account.php">Account</a>
@@ -116,6 +131,7 @@ if ($canViewInventory) {
 </section><?php endif; ?>
 
 <section class="content-grid">
+    <?php if ($canViewPlanning): ?><a class="panel" href="/phase7.php"><p class="eyebrow">Coordinate</p><h2>Daily planning & tasks</h2><p class="page-description" style="margin-top:12px">Assignments, recurring duties, meal preparation, harvest windows, preservation follow-up, and shopping suggestions.</p></a><?php endif; ?>
     <?php if ($canViewInventory): ?><a class="panel" href="/phase2.php?section=inventory"><p class="eyebrow">Stock</p><h2>Household & inventory</h2><p class="page-description" style="margin-top:12px">Family profiles, storage locations, pantry quantities, reorder levels, and the food ledger.</p></a><?php endif; ?>
     <?php if ($canViewRecipes): ?><a class="panel" href="/phase4.php"><p class="eyebrow">Cook</p><h2>Recipes & meal planning</h2><p class="page-description" style="margin-top:12px">Connected recipes, ingredient deductions, family servings, meal plans, and prepared food.</p></a><?php endif; ?>
     <?php if ($canViewGarden): ?><a class="panel" href="/phase6.php"><p class="eyebrow">Grow</p><h2>Garden & harvest</h2><p class="page-description" style="margin-top:12px">Zones, crop stages, environmental readings, harvest destinations, and field-to-pantry provenance.</p></a><?php endif; ?>
