@@ -136,8 +136,7 @@ final class Auth
                 $requestUri = '/phase3.php';
             }
             $_SESSION['intended_url'] = $requestUri;
-            header('Location: /login.php', true, 303);
-            exit;
+            redirect('/login.php');
         }
         return $user;
     }

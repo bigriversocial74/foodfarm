@@ -13,6 +13,56 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  compatibility:
+    name: php-compatibility (${{ matrix.php }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.1', '8.3']
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: pdo_mysql, mbstring
+          coverage: none
+
+      - name: Lint every PHP file
+        run: |
+          set -euo pipefail
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
+
+      - name: Validate every shell script
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' file; do
+            bash -n "$file"
+          done < <(find tests -type f -name '*.sh' -print0)
+
+      - name: Run complete static audit suite
+        run: |
+          set -euo pipefail
+          php tests/application_static_audit.php
+          php tests/phase5_static_audit.php
+          php tests/recipe_workflow_static_audit.php
+          php tests/phase6_static_audit.php
+          php tests/phase7_static_audit.php
+          php tests/phase8_static_audit.php
+          php tests/whole_codebase_audit.php | tee "$RUNNER_TEMP/whole-codebase-audit-php-${{ matrix.php }}.txt"
+
+      - name: Upload whole-codebase audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: whole-codebase-audit-php-${{ matrix.php }}
+          path: ${{ runner.temp }}/whole-codebase-audit-php-${{ matrix.php }}.txt
+          if-no-files-found: warn
+          retention-days: 7
+
   application-validation:
     name: application-validation (${{ matrix.database }})
     runs-on: ubuntu-latest
@@ -52,7 +102,9 @@ jobs:
       HOMESTEAD_HOUSEHOLD_SLUG: ci-homestead
       HOMESTEAD_HOUSEHOLD_TIMEZONE: America/Phoenix
       HOMESTEAD_PLATFORM_ADMIN: '1'
-      HOMESTEAD_HEALTH_KEY: ci-health-key-2026
+      HOMESTEAD_HEALTH_KEY: ci-health-key-2026-very-long-random-test-value
+      HOMESTEAD_BASE_URL: http://127.0.0.1:8080
+      BASE_URL: http://127.0.0.1:8080
 
     steps:
       - name: Check out repository
@@ -65,69 +117,28 @@ jobs:
           extensions: pdo_mysql, mbstring
           coverage: none
 
-      - name: Lint PHP files
-        run: |
-          set +e
-          report="$RUNNER_TEMP/php-lint-${{ matrix.database }}.txt"
-          : > "$report"
-          result=0
-          while IFS= read -r -d '' file; do
-            echo "=== $file ===" >> "$report"
-            php -l "$file" >> "$report" 2>&1 || result=1
-          done < <(find . -type f -name '*.php' -not -path './vendor/*' -print0)
-          cat "$report"
-          exit "$result"
-
-      - name: Upload PHP lint report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: php-lint-${{ matrix.database }}
-          path: ${{ runner.temp }}/php-lint-${{ matrix.database }}.txt
-          if-no-files-found: error
-          retention-days: 3
-
-      - name: Validate shell scripts
-        run: bash -n tests/http_smoke.sh
-
-      - name: Run whole-application security audit
-        run: |
-          set -o pipefail
-          php tests/application_static_audit.php 2>&1 | tee "$RUNNER_TEMP/application-static-audit-${{ matrix.database }}.txt"
-
-      - name: Upload static audit report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: application-static-audit-${{ matrix.database }}
-          path: ${{ runner.temp }}/application-static-audit-${{ matrix.database }}.txt
-          if-no-files-found: warn
-          retention-days: 3
-
-      - name: Run Phase 5 security audit
-        run: php tests/phase5_static_audit.php
-
-      - name: Run recipe workflow audit
-        run: php tests/recipe_workflow_static_audit.php
-
       - name: Install database client
         run: sudo apt-get update && sudo apt-get install -y default-mysql-client
 
       - name: Import clean database migrations
         run: |
           set -euo pipefail
-          for file in \
-            database/schema.sql \
-            database/phase2_install.sql \
-            database/phase3_install.sql \
-            database/household_owner_integrity_hardening.sql \
-            database/phase4_install.sql \
-            database/phase4_hardening.sql \
-            database/phase5_install.sql \
-            database/phase5_shopping_extension.sql \
-            database/phase5_hardening.sql \
+          migrations=(
+            database/schema.sql
+            database/phase2_install.sql
+            database/phase3_install.sql
+            database/household_owner_integrity_hardening.sql
+            database/phase4_install.sql
+            database/phase4_hardening.sql
+            database/phase5_install.sql
+            database/phase5_shopping_extension.sql
+            database/phase5_hardening.sql
             database/phase5_snapshot_storage_hardening.sql
-          do
+            database/phase6_grow_harvest_preserve.sql
+            database/phase7_planning_tasks_automation.sql
+            database/phase8_forecasting_seasonal_self_sufficiency.sql
+          )
+          for file in "${migrations[@]}"; do
             echo "Importing ${file}"
             mysql --host=127.0.0.1 --port=3306 --user=root homestead < "${file}"
           done
@@ -135,17 +146,21 @@ jobs:
       - name: Replay incremental migrations
         run: |
           set -euo pipefail
-          for file in \
-            database/phase2_install.sql \
-            database/phase3_install.sql \
-            database/household_owner_integrity_hardening.sql \
-            database/phase4_install.sql \
-            database/phase4_hardening.sql \
-            database/phase5_install.sql \
-            database/phase5_shopping_extension.sql \
-            database/phase5_hardening.sql \
+          migrations=(
+            database/phase2_install.sql
+            database/phase3_install.sql
+            database/household_owner_integrity_hardening.sql
+            database/phase4_install.sql
+            database/phase4_hardening.sql
+            database/phase5_install.sql
+            database/phase5_shopping_extension.sql
+            database/phase5_hardening.sql
             database/phase5_snapshot_storage_hardening.sql
-          do
+            database/phase6_grow_harvest_preserve.sql
+            database/phase7_planning_tasks_automation.sql
+            database/phase8_forecasting_seasonal_self_sufficiency.sql
+          )
+          for file in "${migrations[@]}"; do
             echo "Replaying ${file}"
             mysql --host=127.0.0.1 --port=3306 --user=root homestead < "${file}"
           done
@@ -154,43 +169,23 @@ jobs:
         run: php tests/database_integration_audit.php
 
       - name: Bootstrap secure test owner
-        run: php bin/create-owner.php
-
-      - name: Verify owner bootstrap is idempotent
-        run: php bin/create-owner.php
-
-      - name: Run database-backed workflow integration suite
         run: |
-          set +e
-          report="$RUNNER_TEMP/workflow-integration-${{ matrix.database }}.txt"
-          php tests/workflow_integration.php > "$report" 2>&1
-          result=$?
-          cat "$report"
-          exit "$result"
+          php bin/create-owner.php
+          php bin/create-owner.php
 
-      - name: Upload workflow integration report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: workflow-integration-${{ matrix.database }}
-          path: ${{ runner.temp }}/workflow-integration-${{ matrix.database }}.txt
-          if-no-files-found: warn
-          retention-days: 3
-
-      - name: Run prepared-food lifecycle integration suite
-        run: php tests/prepared_food_integration.php
-
-      - name: Run immutable Starter Kit recipe snapshot suite
-        run: php tests/starter_kit_snapshot_integration.php
-
-      - name: Run Starter Kit lifecycle integration suite
-        run: php tests/starter_kit_lifecycle_integration.php
-
-      - name: Run Starter Kit activation administration suite
-        run: php tests/starter_kit_activation_admin_integration.php
-
-      - name: Run household owner integrity suite
-        run: php tests/owner_integrity_integration.php
+      - name: Run complete database integration suite
+        run: |
+          set -euo pipefail
+          php tests/auth_login_integration.php
+          php tests/owner_integrity_integration.php
+          php tests/workflow_integration.php
+          php tests/prepared_food_integration.php
+          php tests/starter_kit_snapshot_integration.php
+          php tests/starter_kit_lifecycle_integration.php
+          php tests/starter_kit_activation_admin_integration.php
+          php tests/phase6_integration.php
+          php tests/phase7_integration.php
+          php tests/phase8_integration.php
 
       - name: Create CI application configuration
         run: |
@@ -215,7 +210,7 @@ jobs:
               ],
               'security' => [
                   'session_name' => 'homestead_ci_session',
-                  'health_key' => 'ci-health-key-2026',
+                  'health_key' => 'ci-health-key-2026-very-long-random-test-value',
               ],
               'features' => [
                   'simulated_sensors' => true,
@@ -239,23 +234,28 @@ jobs:
           cat /tmp/homestead-server.log
           exit 1
 
-      - name: Run authenticated HTTP smoke suite
-        run: |
-          set +e
-          report="$RUNNER_TEMP/http-smoke-${{ matrix.database }}.txt"
-          bash tests/http_smoke.sh > "$report" 2>&1
-          result=$?
-          cat "$report"
-          exit "$result"
+      - name: Run core authenticated HTTP smoke suite
+        run: bash tests/http_smoke.sh
 
-      - name: Upload HTTP smoke report
+      - name: Run Phase 6 authenticated HTTP smoke suite
+        run: bash tests/phase6_http_smoke.sh
+
+      - name: Run Phase 7 authenticated HTTP smoke suite
+        run: |
+          set -o pipefail
+          bash tests/phase7_http_smoke.sh 2>&1 | tee "$RUNNER_TEMP/phase7-http-${{ matrix.database }}.txt"
+
+      - name: Upload Phase 7 HTTP report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: http-smoke-${{ matrix.database }}
-          path: ${{ runner.temp }}/http-smoke-${{ matrix.database }}.txt
+          name: phase7-http-combined-${{ matrix.database }}
+          path: ${{ runner.temp }}/phase7-http-${{ matrix.database }}.txt
           if-no-files-found: warn
-          retention-days: 3
+          retention-days: 7
+
+      - name: Run Phase 8 authenticated HTTP smoke suite
+        run: bash tests/phase8_http_smoke.sh
 
       - name: Show server log on failure
         if: failure()

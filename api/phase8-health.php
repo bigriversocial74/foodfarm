@@ -96,13 +96,5 @@ try {
         'checks' => $results,
     ], JSON_THROW_ON_ERROR);
 } catch (Throwable $exception) {
-    http_response_code(500);
-    $environment = strtolower((string)($config['app']['environment'] ?? 'production'));
-    echo json_encode([
-        'ok' => false,
-        'phase' => 8,
-        'error' => $environment === 'production'
-            ? 'Phase 8 health validation failed.'
-            : $exception->getMessage(),
-    ], JSON_THROW_ON_ERROR);
+    Homestead\health_error($exception, is_array($config ?? null) ? $config : []);
 }
