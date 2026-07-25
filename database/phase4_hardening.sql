@@ -10,3 +10,9 @@ CREATE INDEX idx_recipe_ingredients_inventory
 
 CREATE INDEX idx_meal_plan_items_plan_date
     ON meal_plan_items (meal_plan_id, meal_date, meal_type);
+
+ALTER TABLE authentication_events
+    MODIFY COLUMN event_type ENUM(
+        'login_success','login_failure','logout','invitation_created','invitation_accepted',
+        'invitation_revoked','password_changed','password_change_failure','permission_updated'
+    ) NOT NULL;
