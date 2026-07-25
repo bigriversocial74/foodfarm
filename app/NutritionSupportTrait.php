@@ -79,7 +79,7 @@ trait NutritionSupportTrait
     {
         $queries = [
             'plan' => [
-                'SELECT COUNT(*), COALESCE(MAX(updated_at), created_at), status
+                'SELECT COUNT(*), COALESCE(MAX(created_at), "1970-01-01"), 0
                  FROM meal_plans WHERE id = ? AND household_id = ?',
                 [$mealPlanId, $householdId],
             ],
