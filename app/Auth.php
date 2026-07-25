@@ -18,21 +18,22 @@ final class Auth
         $userId = (int)($_SESSION['user_id'] ?? 0);
         $memberId = (int)($_SESSION['member_id'] ?? 0);
         $householdId = (int)($_SESSION['household_id'] ?? 0);
-        if ($userId < 1 || $memberId < 1 || $householdId < 1) {
+        $authVersion = (int)($_SESSION['auth_version'] ?? 0);
+        if ($userId < 1 || $memberId < 1 || $householdId < 1 || $authVersion < 1) {
             return null;
         }
 
         $statement = $this->pdo->prepare(
-            "SELECT u.id, u.email, u.display_name, u.status, u.is_platform_admin,
+            "SELECT u.id, u.email, u.display_name, u.status, u.is_platform_admin, u.auth_version,
                     hm.id AS member_id, hm.household_id, hm.role, hm.age_group,
                     hm.permission_overrides, hm.status AS member_status
              FROM users u
              JOIN household_members hm ON hm.user_id = u.id
              WHERE u.id = ? AND hm.id = ? AND hm.household_id = ?
-               AND u.status = 'active' AND hm.status = 'active'
+               AND u.auth_version = ? AND u.status = 'active' AND hm.status = 'active'
              LIMIT 1"
         );
-        $statement->execute([$userId, $memberId, $householdId]);
+        $statement->execute([$userId, $memberId, $householdId, $authVersion]);
         $user = $statement->fetch();
 
         if (!is_array($user)) {
@@ -52,7 +53,7 @@ final class Auth
         }
 
         $statement = $this->pdo->prepare(
-            "SELECT u.id, u.password_hash, hm.id AS member_id, hm.household_id
+            "SELECT u.id, u.password_hash, u.auth_version, hm.id AS member_id, hm.household_id
              FROM users u
              JOIN household_members hm ON hm.user_id = u.id
              WHERE LOWER(u.email) = LOWER(?)
@@ -85,6 +86,7 @@ final class Auth
         $_SESSION['user_id'] = (int)$record['id'];
         $_SESSION['member_id'] = (int)$record['member_id'];
         $_SESSION['household_id'] = (int)$record['household_id'];
+        $_SESSION['auth_version'] = (int)$record['auth_version'];
         $_SESSION['authenticated_at'] = time();
         return true;
     }
