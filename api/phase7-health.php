@@ -65,11 +65,5 @@ try {
         'integrity' => 'ready',
     ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
 } catch (Throwable $exception) {
-    http_response_code(503);
-    $isProduction = isset($environment) && $environment === 'production';
-    echo json_encode([
-        'ok' => false,
-        'phase' => 7,
-        'error' => $isProduction ? 'Planning automation health check failed.' : $exception->getMessage(),
-    ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+    Homestead\health_error($exception, is_array($config ?? null) ? $config : []);
 }

@@ -3,7 +3,7 @@ Options -Indexes
 <IfModule mod_rewrite.c>
     RewriteEngine On
     RewriteRule (^|/)\.(?!well-known/) - [F,L]
-    RewriteRule ^(?:app|bin|database|docs|tests)(?:/|$) - [F,L,NC]
+    RewriteRule ^(?:app|bin|database|docs|storage|tests)(?:/|$) - [F,L,NC]
 </IfModule>
 
 <FilesMatch "^(?:config(?:-example)?\.php|README(?:\.md)?|.*\.(?:sql|log|ini|env|yml|yaml))$">
