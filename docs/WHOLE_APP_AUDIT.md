@@ -58,6 +58,7 @@ Release-blocking weaknesses included unauthenticated household fallback, incompl
 - Added `Cache-Control: no-store` to protected health responses.
 - Added active-account row locking and guarded updates to password changes.
 - Added password-change attempt throttling, size limits, failure audit events, CSRF rotation, and session-ID rotation.
+- Extended the authentication-event enum for password-change failures in `database/phase4_hardening.sql`.
 - Added health, account, session, redirect, and security-header regression checks to CI.
 
 ## Current provisional score
