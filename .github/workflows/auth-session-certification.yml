@@ -77,5 +77,16 @@ jobs:
           done
       - name: Bootstrap owner and certify authentication sessions
         run: |
-          php bin/create-owner.php
-          php tests/auth_login_integration.php
+          set -o pipefail
+          {
+            php bin/create-owner.php
+            php tests/auth_login_integration.php
+          } 2>&1 | tee "$RUNNER_TEMP/auth-session-${{ matrix.database }}.txt"
+      - name: Upload authentication certification report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-session-${{ matrix.database }}
+          path: ${{ runner.temp }}/auth-session-${{ matrix.database }}.txt
+          if-no-files-found: warn
+          retention-days: 3
