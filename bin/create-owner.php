@@ -29,7 +29,8 @@ try {
     $password = $required('HOMESTEAD_OWNER_PASSWORD');
     $displayName = $required('HOMESTEAD_OWNER_NAME');
     $householdName = trim((string)(getenv('HOMESTEAD_HOUSEHOLD_NAME') ?: 'My Homestead'));
-    $householdSlug = strtolower(trim((string)(getenv('HOMESTEAD_HOUSEHOLD_SLUG') ?: 'my-homestead')));
+    $householdSlug = strtolower(trim((string)(getenv('HOMESTEAD_HOUSEHOLD_SLUG') ?: 'my-homestead'));
+    $householdTimezone = trim((string)(getenv('HOMESTEAD_HOUSEHOLD_TIMEZONE') ?: 'America/Phoenix'));
     $platformAdmin = filter_var(getenv('HOMESTEAD_PLATFORM_ADMIN') ?: '0', FILTER_VALIDATE_BOOL);
 
     if (!filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email) > 190) {
@@ -38,11 +39,14 @@ try {
     if (strlen($password) < 14 || strlen($password) > 4096) {
         throw new RuntimeException('HOMESTEAD_OWNER_PASSWORD must contain 14–4096 characters.');
     }
-    if (mb_strlen($displayName) > 120 || mb_strlen($householdName) > 160) {
-        throw new RuntimeException('Owner or household name is too long.');
+    if ($displayName === '' || $householdName === '' || mb_strlen($displayName) > 120 || mb_strlen($householdName) > 160) {
+        throw new RuntimeException('Owner and household names are required and must fit their limits.');
     }
     if (!preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $householdSlug) || strlen($householdSlug) > 180) {
         throw new RuntimeException('HOMESTEAD_HOUSEHOLD_SLUG must be lowercase and hyphenated.');
+    }
+    if (!in_array($householdTimezone, timezone_identifiers_list(), true)) {
+        throw new RuntimeException('HOMESTEAD_HOUSEHOLD_TIMEZONE must be a valid IANA timezone.');
     }
 
     $dsn = sprintf('mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4', $host, $port, $database);
@@ -60,26 +64,42 @@ try {
     if ($householdId < 1) {
         $insert = $pdo->prepare(
             "INSERT INTO households (name, slug, timezone, measurement_system, currency_code)
-             VALUES (?, ?, 'America/Phoenix', 'us', 'USD')"
+             VALUES (?, ?, ?, 'us', 'USD')"
         );
-        $insert->execute([$householdName, $householdSlug]);
+        $insert->execute([$householdName, $householdSlug, $householdTimezone]);
         $householdId = (int)$pdo->lastInsertId();
     }
 
-    $userQuery = $pdo->prepare('SELECT id, status FROM users WHERE LOWER(email) = LOWER(?) FOR UPDATE');
+    $userQuery = $pdo->prepare('SELECT id, status, password_hash FROM users WHERE LOWER(email) = LOWER(?) FOR UPDATE');
     $userQuery->execute([$email]);
     $user = $userQuery->fetch();
     if (is_array($user)) {
         if ($user['status'] !== 'active') {
             throw new RuntimeException('An account exists for this email but is not active.');
         }
+        if (!password_verify($password, (string)$user['password_hash'])) {
+            throw new RuntimeException('The existing account password does not match HOMESTEAD_OWNER_PASSWORD.');
+        }
         $userId = (int)$user['id'];
+
+        $otherMembership = $pdo->prepare(
+            "SELECT household_id FROM household_members
+             WHERE user_id = ? AND household_id <> ? AND status = 'active' LIMIT 1 FOR UPDATE"
+        );
+        $otherMembership->execute([$userId, $householdId]);
+        if ($otherMembership->fetchColumn()) {
+            throw new RuntimeException('This account already belongs to another active household; multi-household login is not enabled.');
+        }
     } else {
+        $passwordHash = password_hash($password, PASSWORD_DEFAULT);
+        if (!is_string($passwordHash)) {
+            throw new RuntimeException('Password processing failed.');
+        }
         $insert = $pdo->prepare(
             "INSERT INTO users (email, password_hash, display_name, status, is_platform_admin)
              VALUES (?, ?, ?, 'active', ?)"
         );
-        $insert->execute([$email, password_hash($password, PASSWORD_DEFAULT), $displayName, $platformAdmin ? 1 : 0]);
+        $insert->execute([$email, $passwordHash, $displayName, $platformAdmin ? 1 : 0]);
         $userId = (int)$pdo->lastInsertId();
     }
 
@@ -121,7 +141,13 @@ try {
     }
 
     $pdo->commit();
-    fwrite(STDOUT, sprintf("Owner ready: user=%d household=%d member=%d%s\n", $userId, $householdId, $memberId, $platformAdmin ? ' platform-admin' : ''));
+    fwrite(STDOUT, sprintf(
+        "Owner ready: user=%d household=%d member=%d%s\n",
+        $userId,
+        $householdId,
+        $memberId,
+        $platformAdmin ? ' platform-admin' : ''
+    ));
 } catch (Throwable $exception) {
     if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
         $pdo->rollBack();
