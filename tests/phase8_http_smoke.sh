@@ -10,11 +10,12 @@ trap 'rm -f "$COOKIE_JAR"' EXIT
 
 extract_value() {
   local name="$1"
-  grep -o "name=\"${name}\" value=\"[^\"]*\"" | head -n1 | sed -E 's/.*value="([^"]*)"/\1/'
+  local html="$2"
+  grep -o "name=\"${name}\" value=\"[^\"]*\"" <<<"$html" | head -n1 | sed -E 's/.*value="([^"]*)"/\1/'
 }
 
 login_page="$(curl -fsS -c "$COOKIE_JAR" "${BASE_URL}/login.php")"
-login_csrf="$(printf '%s' "$login_page" | extract_value csrf_token)"
+login_csrf="$(extract_value csrf_token "$login_page")"
 test -n "$login_csrf"
 
 curl -fsS -L -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
@@ -24,9 +25,9 @@ curl -fsS -L -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
   "${BASE_URL}/login.php" >/dev/null
 
 forecast_page="$(curl -fsS -b "$COOKIE_JAR" "${BASE_URL}/phase8.php")"
-printf '%s' "$forecast_page" | grep -q 'Forecasting, Seasons &amp; Self-Sufficiency\|Forecasting, Seasons & Self-Sufficiency'
-csrf="$(printf '%s' "$forecast_page" | extract_value csrf_token)"
-action_key="$(printf '%s' "$forecast_page" | extract_value action_key)"
+grep -Eq 'Forecasting, Seasons &amp; Self-Sufficiency|Forecasting, Seasons & Self-Sufficiency' <<<"$forecast_page"
+csrf="$(extract_value csrf_token "$forecast_page")"
+action_key="$(extract_value action_key "$forecast_page")"
 test -n "$csrf"
 test -n "$action_key"
 
@@ -41,8 +42,8 @@ curl -fsS -L -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
   "${BASE_URL}/phase8.php" >/dev/null
 
 forecast_page="$(curl -fsS -b "$COOKIE_JAR" "${BASE_URL}/phase8.php")"
-csrf="$(printf '%s' "$forecast_page" | extract_value csrf_token)"
-action_key="$(printf '%s' "$forecast_page" | extract_value action_key)"
+csrf="$(extract_value csrf_token "$forecast_page")"
+action_key="$(extract_value action_key "$forecast_page")"
 today="$(date -u '+%Y-%m-%d')"
 
 curl -fsS -L -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
@@ -57,12 +58,12 @@ snapshot_count="$(mysql --host="${DB_HOST:-127.0.0.1}" --port="${DB_PORT:-3306}"
 test "$snapshot_count" -ge 1
 
 forecast_page="$(curl -fsS -b "$COOKIE_JAR" "${BASE_URL}/phase8.php")"
-printf '%s' "$forecast_page" | grep -q 'Item projections'
-printf '%s' "$forecast_page" | grep -q 'Forecast recommendations'
-printf '%s' "$forecast_page" | grep -q 'Snapshot trend'
+grep -q 'Item projections' <<<"$forecast_page"
+grep -q 'Forecast recommendations' <<<"$forecast_page"
+grep -q 'Snapshot trend' <<<"$forecast_page"
 
 health="$(curl -fsS -H "X-Homestead-Health-Key: ${HEALTH_KEY}" "${BASE_URL}/api/phase8-health.php")"
-printf '%s' "$health" | grep -q '"ok":true'
-printf '%s' "$health" | grep -q '"phase":8'
+grep -q '"ok":true' <<<"$health"
+grep -q '"phase":8' <<<"$health"
 
 echo "Phase 8 HTTP smoke suite passed."
