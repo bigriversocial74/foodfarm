@@ -1,9 +1,8 @@
 name: Phase 7 Package Sync
 
 on:
-  push:
-    branches:
-      - feature/phase7-planning-tasks-automation-20260725
+  pull_request:
+    branches: [main]
     paths:
       - '.phase7-sync/**'
       - '.github/workflows/phase7-package-sync.yml'
@@ -16,8 +15,10 @@ jobs:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
-      - name: Check out branch
+      - name: Check out Phase 7 branch
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
 
       - name: Reassemble and validate Phase 7 package
         run: |
@@ -45,4 +46,4 @@ jobs:
             exit 0
           fi
           git commit -m 'Synchronize Phase 7 planning and automation source'
-          git push
+          git push origin HEAD:${{ github.head_ref }}
