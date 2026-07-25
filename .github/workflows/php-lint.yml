@@ -29,3 +29,6 @@ jobs:
 
       - name: Run Phase 5 security audit
         run: php tests/phase5_static_audit.php
+
+      - name: Run recipe workflow audit
+        run: php tests/recipe_workflow_static_audit.php
