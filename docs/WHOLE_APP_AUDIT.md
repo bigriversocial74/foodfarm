@@ -47,11 +47,24 @@ Release-blocking weaknesses included unauthenticated household fallback, incompl
 - Disabled debug mode in production and required secure production session cookies.
 - Added a recipe-workflow regression audit to CI.
 
+## Completed repair pass 3
+
+- Added global CSP, frame, MIME, referrer, permissions-policy, and production HSTS headers.
+- Enabled strict cookie-only PHP session handling.
+- Hardened the shared redirect helper against external, protocol-relative, and control-character targets.
+- Protected every phase health endpoint with either a platform-administrator session or configured health key.
+- Removed household IDs, record counts, and customer/catalog totals that were not required for health validation.
+- Suppressed exception details from production health responses while retaining development diagnostics.
+- Added `Cache-Control: no-store` to protected health responses.
+- Added active-account row locking and guarded updates to password changes.
+- Added password-change attempt throttling, size limits, failure audit events, CSRF rotation, and session-ID rotation.
+- Added health, account, session, redirect, and security-header regression checks to CI.
+
 ## Current provisional score
 
-**7.7/10** after the first two repair passes.
+**8.4/10** after three repair passes.
 
-This is not a production certification. The score reflects reviewed source code and static CI coverage, not a completed deployment or database-backed end-to-end test.
+This is not a production certification. The score reflects reviewed source code and static CI coverage, not a completed deployment or database-backed end-to-end test. The latest workflow must also pass before this repair pass is considered validated.
 
 ## SQL required by the repair branch
 
@@ -62,15 +75,14 @@ Import after the earlier migrations:
 
 ## Remaining work before final scoring
 
-- Protect health endpoints from public disclosure and suppress production exception details.
-- Review every SQL migration for clean-install order and replay behavior.
+- Review every SQL migration for clean-install order, replay behavior, partial-failure recovery, and supported MySQL/MariaDB versions.
 - Add database-backed tests for authentication, household isolation, inventory posting, recipe concurrency, invitation races, and starter-kit activation.
 - Verify all event and enum values against the installed schema.
-- Review password change, logout, and account routes.
-- Add security headers and a consistent error boundary.
+- Convert logout to an intentional POST workflow or document the accepted GET boundary.
 - Complete accessibility review for labels, focus states, tables, dialogs, and mobile layout.
 - Run a clean database install from all migrations.
 - Run deployed browser smoke tests and permission-matrix tests.
+- Validate the keyed health checks in the deployed environment.
 
 ## Final 10/10 conditions
 
