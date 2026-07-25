@@ -10,6 +10,7 @@ use function Homestead\csrf_token;
 use function Homestead\e;
 use function Homestead\flash;
 use function Homestead\redirect;
+use function Homestead\user_error_message;
 use function Homestead\verify_csrf;
 
 $user = $auth->requireUser();
@@ -37,7 +38,7 @@ try {
 } catch (Throwable $exception) {
     $activation = null;
     $items = [];
-    $error = $exception->getMessage();
+    $error = user_error_message($exception, 'This starter-kit activation is unavailable.');
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_array($activation)) {
@@ -57,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_array($activation)) {
         flash('success', 'Starter kit activated. Pantry items, shopping needs, recipes, and starter tasks were provisioned.');
         redirect('/phase2.php');
     } catch (Throwable $exception) {
-        $error = $exception->getMessage();
+        $error = user_error_message($exception, 'The starter kit could not be activated. Try again.');
     }
 }
 ?><!doctype html>
