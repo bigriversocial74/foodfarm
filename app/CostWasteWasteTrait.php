@@ -32,6 +32,7 @@ trait CostWasteWasteTrait
 
         $this->pdo->beginTransaction();
         try {
+            $this->lockHousehold($householdId);
             $existing = $this->pdo->prepare(
                 'SELECT id, inventory_item_id, prepared_food_batch_id, waste_type, quantity,
                         occurred_on, estimated_value
