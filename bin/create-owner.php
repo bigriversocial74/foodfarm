@@ -29,7 +29,7 @@ try {
     $password = $required('HOMESTEAD_OWNER_PASSWORD');
     $displayName = $required('HOMESTEAD_OWNER_NAME');
     $householdName = trim((string)(getenv('HOMESTEAD_HOUSEHOLD_NAME') ?: 'My Homestead'));
-    $householdSlug = strtolower(trim((string)(getenv('HOMESTEAD_HOUSEHOLD_SLUG') ?: 'my-homestead'));
+    $householdSlug = strtolower(trim((string)(getenv('HOMESTEAD_HOUSEHOLD_SLUG') ?: 'my-homestead')));
     $householdTimezone = trim((string)(getenv('HOMESTEAD_HOUSEHOLD_TIMEZONE') ?: 'America/Phoenix'));
     $platformAdmin = filter_var(getenv('HOMESTEAD_PLATFORM_ADMIN') ?: '0', FILTER_VALIDATE_BOOL);
 
