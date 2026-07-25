@@ -22,5 +22,6 @@ jobs:
         with:
           name: phase7-staging-data
           path: .phase7-sync
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 3
