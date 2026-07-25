@@ -25,6 +25,14 @@ jobs:
           --health-timeout=5s
           --health-retries=12
 
+    env:
+      MYSQL_PWD: root
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_NAME: homestead
+      DB_USER: root
+      DB_PASSWORD: root
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -51,30 +59,29 @@ jobs:
       - name: Install MySQL client
         run: sudo apt-get update && sudo apt-get install -y mysql-client
 
-      - name: Import clean database migrations
-        env:
-          MYSQL_PWD: root
-        run: |
-          set -euo pipefail
-          for file in \
-            database/schema.sql \
-            database/phase2_install.sql \
-            database/phase3_install.sql \
-            database/phase4_install.sql \
-            database/phase4_hardening.sql \
-            database/phase5_install.sql \
-            database/phase5_shopping_extension.sql \
-            database/phase5_hardening.sql
-          do
-            echo "Importing ${file}"
-            mysql --host=127.0.0.1 --port=3306 --user=root homestead < "${file}"
-          done
+      - name: Import base schema
+        run: mysql --host=127.0.0.1 --port=3306 --user=root homestead < database/schema.sql
+
+      - name: Import Phase 2 migration
+        run: mysql --host=127.0.0.1 --port=3306 --user=root homestead < database/phase2_install.sql
+
+      - name: Import Phase 3 migration
+        run: mysql --host=127.0.0.1 --port=3306 --user=root homestead < database/phase3_install.sql
+
+      - name: Import Phase 4 migration
+        run: mysql --host=127.0.0.1 --port=3306 --user=root homestead < database/phase4_install.sql
+
+      - name: Import Phase 4 hardening
+        run: mysql --host=127.0.0.1 --port=3306 --user=root homestead < database/phase4_hardening.sql
+
+      - name: Import Phase 5 migration
+        run: mysql --host=127.0.0.1 --port=3306 --user=root homestead < database/phase5_install.sql
+
+      - name: Import Phase 5 shopping extension
+        run: mysql --host=127.0.0.1 --port=3306 --user=root homestead < database/phase5_shopping_extension.sql
+
+      - name: Import Phase 5 hardening
+        run: mysql --host=127.0.0.1 --port=3306 --user=root homestead < database/phase5_hardening.sql
 
       - name: Run database-backed migration audit
-        env:
-          DB_HOST: 127.0.0.1
-          DB_PORT: 3306
-          DB_NAME: homestead
-          DB_USER: root
-          DB_PASSWORD: root
         run: php tests/database_integration_audit.php
