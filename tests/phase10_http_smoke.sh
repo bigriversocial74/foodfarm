@@ -35,7 +35,7 @@ curl -fsS -L -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
 pass "owner login succeeds"
 
 nutrition_page="$(curl -fsS -b "$COOKIE_JAR" "${BASE_URL}/phase10.php")" || fail "Phase 10 workspace unavailable"
-grep -q 'Nutrition, Dietary Planning &amp; Wellness' <<<"$nutrition_page" || fail "Phase 10 workspace title missing"
+grep -Eq 'Nutrition, Dietary Planning (&amp;|&) Wellness' <<<"$nutrition_page" || fail "Phase 10 workspace title missing"
 grep -q 'Planning support, not clinical guidance' <<<"$nutrition_page" || fail "Phase 10 planning safety boundary missing"
 csrf="$(extract_value csrf_token "$nutrition_page")"
 action_key="$(extract_value action_key "$nutrition_page")"
