@@ -22,8 +22,10 @@ $requiredTables = [
     'recipe_ingredients', 'recipe_runs', 'recipe_run_ingredients',
     'meal_plans', 'meal_plan_items', 'meal_plan_members',
     'prepared_food_batches', 'starter_kits', 'starter_kit_versions',
-    'starter_kit_items', 'starter_kit_orders', 'starter_kit_activations',
+    'starter_kit_items', 'starter_kit_recipes', 'starter_kit_tasks',
+    'starter_kit_orders', 'starter_kit_activations',
     'starter_kit_activation_items', 'shopping_lists', 'shopping_list_items',
+    'household_tasks',
 ];
 
 $tables = array_map('strval', $pdo->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN));
@@ -50,11 +52,16 @@ $indexExists = static function (PDO $pdo, string $table, string $index): bool {
 $checks = [
     'all required tables installed' => $missingTables === [],
     'platform-admin column installed' => $columnExists($pdo, 'users', 'is_platform_admin'),
+    'authentication version installed' => $columnExists($pdo, 'users', 'auth_version'),
     'recipe completion key installed' => $columnExists($pdo, 'recipe_runs', 'completion_key'),
+    'shopping status installed' => $columnExists($pdo, 'shopping_list_items', 'status'),
     'starter-kit source column installed' => $columnExists($pdo, 'shopping_list_items', 'source_type'),
     'recipe completion uniqueness installed' => $indexExists($pdo, 'recipe_runs', 'uq_recipe_runs_household_completion'),
     'recipe inventory lookup index installed' => $indexExists($pdo, 'recipe_ingredients', 'idx_recipe_ingredients_inventory'),
+    'meal-plan date lookup index installed' => $indexExists($pdo, 'meal_plan_items', 'idx_meal_plan_items_plan_date'),
     'starter-kit activation state index installed' => $indexExists($pdo, 'starter_kit_activations', 'idx_kit_activations_state'),
+    'login throttle index installed' => $indexExists($pdo, 'authentication_events', 'idx_auth_event_ip_type_time'),
+    'account throttle index installed' => $indexExists($pdo, 'authentication_events', 'idx_auth_event_user_type_time'),
 ];
 
 $sourceType = $pdo->query("SHOW COLUMNS FROM shopping_list_items LIKE 'source_type'")->fetch();
@@ -63,12 +70,15 @@ $checks['starter-kit source enum installed'] = is_array($sourceType)
 
 $eventType = $pdo->query("SHOW COLUMNS FROM authentication_events LIKE 'event_type'")->fetch();
 $checks['password failure event installed'] = is_array($eventType)
-    && str_contains((string)$eventType['Type'], "'password_change_failure'");
+    && str_contains((string)$eventType['Type'], "'password_change_failure'")
+    && str_contains((string)$eventType['Type'], "'invitation_revoked'");
 
 $foreignKeyCount = (int)$pdo->query(
     "SELECT COUNT(*) FROM information_schema.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE()"
 )->fetchColumn();
 $checks['foreign-key protections installed'] = $foreignKeyCount >= 20;
+
+$checks['no seeded application users'] = (int)$pdo->query('SELECT COUNT(*) FROM users')->fetchColumn() === 0;
 
 $failed = [];
 foreach ($checks as $name => $passed) {
