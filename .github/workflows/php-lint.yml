@@ -104,6 +104,7 @@ jobs:
       HOMESTEAD_PLATFORM_ADMIN: '1'
       HOMESTEAD_HEALTH_KEY: ci-health-key-2026-very-long-random-test-value
       HOMESTEAD_BASE_URL: http://127.0.0.1:8080
+      BASE_URL: http://127.0.0.1:8080
 
     steps:
       - name: Check out repository
@@ -233,13 +234,17 @@ jobs:
           cat /tmp/homestead-server.log
           exit 1
 
-      - name: Run complete authenticated HTTP smoke suite
-        run: |
-          set -euo pipefail
-          bash tests/http_smoke.sh
-          bash tests/phase6_http_smoke.sh
-          bash tests/phase7_http_smoke.sh
-          bash tests/phase8_http_smoke.sh
+      - name: Run core authenticated HTTP smoke suite
+        run: bash tests/http_smoke.sh
+
+      - name: Run Phase 6 authenticated HTTP smoke suite
+        run: bash tests/phase6_http_smoke.sh
+
+      - name: Run Phase 7 authenticated HTTP smoke suite
+        run: bash tests/phase7_http_smoke.sh
+
+      - name: Run Phase 8 authenticated HTTP smoke suite
+        run: bash tests/phase8_http_smoke.sh
 
       - name: Show server log on failure
         if: failure()
