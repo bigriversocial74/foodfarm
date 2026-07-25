@@ -67,11 +67,15 @@ $check('household context rejects mismatched session scope', $expectException(st
 $check('invalid household context clears session identity', !isset($_SESSION['user_id'], $_SESSION['member_id'], $_SESSION['household_id']));
 
 $auth = new Auth($pdo);
+$sessionNow = time();
 $_SESSION = [
     'user_id' => $userId,
     'member_id' => $memberId,
     'household_id' => $householdId,
     'auth_version' => $authVersion,
+    'authenticated_at' => $sessionNow,
+    'last_activity_at' => $sessionNow,
+    'session_rotated_at' => $sessionNow,
 ];
 $check('authentication resolves a fully bound session', is_array($auth->user()));
 $_SESSION['auth_version'] = $authVersion + 1;
@@ -239,7 +243,7 @@ $kitService->activate((string)$order['token'], [
 ], $selections);
 $check('starter-kit activation is consumed once', (int)$pdo->query('SELECT COUNT(*) FROM starter_kit_activations WHERE activated_at IS NOT NULL')->fetchColumn() >= 1);
 $check('starter-kit activation creates shopping provenance', (int)$pdo->query("SELECT COUNT(*) FROM shopping_list_items WHERE source_type = 'starter_kit'")->fetchColumn() >= 1);
-$check('starter-kit activation clones attached recipes', (int)$pdo->query("SELECT COUNT(*) FROM recipes WHERE notes LIKE 'Provisioned from starter-kit activation #%'" )->fetchColumn() >= 1);
+$check('starter-kit activation clones attached recipes', (int)$pdo->query("SELECT COUNT(*) FROM recipes WHERE notes LIKE 'Provisioned from starter-kit activation #%'")->fetchColumn() >= 1);
 $check('starter-kit activation provisions tasks', (int)$pdo->query("SELECT COUNT(*) FROM household_tasks WHERE related_type = 'starter_kit_activation'")->fetchColumn() >= 1);
 $check('starter-kit token cannot be activated twice', $expectException(static fn() => $kitService->activate((string)$order['token'], [
     'id' => $userId, 'email' => $ownerEmail, 'household_id' => $householdId, 'member_id' => $memberId,
