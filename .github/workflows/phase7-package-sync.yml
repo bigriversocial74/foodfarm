@@ -8,7 +8,7 @@ on:
       - '.github/workflows/phase7-package-sync.yml'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   sync:
@@ -16,12 +16,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Clone Phase 7 branch
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           git clone --depth 1 --branch "${{ github.head_ref }}" \
-            "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" repo
+            "https://github.com/${{ github.repository }}.git" repo
 
       - name: Salvage Phase 7 source from staged ZIP records
         run: |
@@ -42,7 +40,6 @@ jobs:
           cleaned = ''.join(encoded.split())
           padding = '=' * ((4 - len(cleaned) % 4) % 4)
           payload = base64.b64decode(cleaned + padding, validate=False)
-          print(f'Encoded bytes: {len(cleaned)}; decoded bytes: {len(payload)}')
 
           position = 0
           extracted = []
@@ -51,23 +48,20 @@ jobs:
               signature = payload[position:position + 4]
               if signature != b'PK\x03\x04':
                   if signature in {b'PK\x01\x02', b'PK\x05\x06'}:
-                      print(f'Reached ZIP directory at byte {position}.')
                       break
                   next_header = payload.find(b'PK\x03\x04', position + 1)
                   if next_header < 0:
-                      print(f'No further local file header after byte {position}.')
                       break
-                  print(f'Skipping {next_header - position} bytes before next local header.')
                   position = next_header
                   continue
 
               (
                   _signature,
-                  version,
+                  _version,
                   flags,
                   method,
-                  mod_time,
-                  mod_date,
+                  _mod_time,
+                  _mod_date,
                   expected_crc,
                   compressed_size,
                   uncompressed_size,
@@ -80,12 +74,7 @@ jobs:
               extra_end = name_end + extra_length
               data_end = extra_end + compressed_size
               if data_end > len(payload):
-                  raw_name = payload[name_start:min(name_end, len(payload))]
-                  truncated = raw_name.decode('utf-8', errors='replace')
-                  print(
-                      f'Truncated entry {truncated!r}: needs byte {data_end}, '
-                      f'payload ends at {len(payload)}.'
-                  )
+                  truncated = payload[name_start:min(name_end, len(payload))].decode('utf-8', errors='replace')
                   break
 
               filename = payload[name_start:name_end].decode('utf-8')
@@ -102,16 +91,10 @@ jobs:
               else:
                   raise SystemExit(f'Unsupported compression method {method} for {filename}')
 
-              actual_crc = binascii.crc32(content) & 0xFFFFFFFF
               if len(content) != uncompressed_size:
-                  raise SystemExit(
-                      f'Uncompressed length mismatch for {filename}: '
-                      f'{len(content)} != {uncompressed_size}'
-                  )
-              if actual_crc != expected_crc:
-                  raise SystemExit(
-                      f'CRC mismatch for {filename}: {actual_crc:08x} != {expected_crc:08x}'
-                  )
+                  raise SystemExit(f'Uncompressed length mismatch for {filename}')
+              if (binascii.crc32(content) & 0xFFFFFFFF) != expected_crc:
+                  raise SystemExit(f'CRC mismatch for {filename}')
 
               destination = Path(filename)
               if filename.endswith('/'):
@@ -120,40 +103,35 @@ jobs:
                   destination.parent.mkdir(parents=True, exist_ok=True)
                   destination.write_bytes(content)
               extracted.append(filename)
-              print(f'Extracted {filename} ({len(content)} bytes).')
               position = data_end
 
           if not extracted:
               raise SystemExit('No complete Phase 7 source entries could be recovered.')
 
-          print(f'Recovered {len(extracted)} complete entries.')
-          if truncated:
-              print(f'First incomplete entry: {truncated}')
           Path('/tmp/phase7-recovered-files.txt').write_text(
               '\n'.join(extracted) + '\n',
               encoding='utf-8',
           )
+          print(f'Recovered {len(extracted)} complete entries.')
+          if truncated:
+              print(f'First incomplete entry: {truncated}')
+          for filename in extracted:
+              print(filename)
           PY
-          cat /tmp/phase7-recovered-files.txt
 
-      - name: Remove synchronization staging files
+      - name: Package recovered source
         run: |
           set -euo pipefail
           cd repo
-          rm -rf .phase7-sync
+          tar -czf /tmp/phase7-recovered-source.tar.gz -T /tmp/phase7-recovered-files.txt
+          cp /tmp/phase7-recovered-files.txt /tmp/phase7-recovered-files-manifest.txt
 
-      - name: Commit recovered Phase 7 source
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          cd repo
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A
-          if git diff --cached --quiet; then
-            echo 'No Phase 7 changes to commit.'
-            exit 0
-          fi
-          git commit -m 'Recover Phase 7 planning and automation source'
-          git push origin HEAD:${{ github.head_ref }}
+      - name: Upload recovered Phase 7 source
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase7-recovered-source
+          path: |
+            /tmp/phase7-recovered-source.tar.gz
+            /tmp/phase7-recovered-files-manifest.txt
+          if-no-files-found: error
+          retention-days: 3
