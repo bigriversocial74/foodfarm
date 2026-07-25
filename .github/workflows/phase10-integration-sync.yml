@@ -1,20 +1,20 @@
 name: Phase 10 Integration Sync
 
 on:
-  push:
-    branches:
-      - feature/phase10-nutrition-dietary-wellness-20260725
+  pull_request:
+    types: [synchronize, reopened]
 
 permissions:
   contents: write
+  pull-requests: read
 
 concurrency:
-  group: phase10-integration-sync
+  group: phase10-integration-sync-${{ github.event.pull_request.number }}
   cancel-in-progress: false
 
 jobs:
   integrate:
-    if: github.ref_name == 'feature/phase10-nutrition-dietary-wellness-20260725' && github.actor != 'github-actions[bot]'
+    if: github.head_ref == 'feature/phase10-nutrition-dietary-wellness-20260725' && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -151,21 +151,21 @@ jobs:
           text = text.replace('database/phase9_cost_waste_savings_intelligence.sql\n```', 'database/phase9_cost_waste_savings_intelligence.sql\ndatabase/phase10_nutrition_dietary_wellness.sql\n```', 1)
           section = '''## Nutrition, dietary planning, and household wellness
 
-          - Household-entered ingredient nutrition profiles and source confidence
-          - Member dietary patterns and optional planning targets
-          - Member allergen, intolerance, and preference rules
-          - Ingredient contains, may-contain, and shared-facility tags
-          - Deterministic recipe nutrition snapshots with per-serving calculations
-          - Explicit missing-profile and unit-mismatch states
-          - Source-watermarked meal-plan assessments
-          - Member meal coverage, variety, optional target comparisons, and allergen conflict detection
-          - Transparent household balance and data-completeness scores
-          - Nutrition recommendation-to-Phase-7-task conversion with provenance
-          - Guarded recommendation lifecycles and protected health diagnostics
+- Household-entered ingredient nutrition profiles and source confidence
+- Member dietary patterns and optional planning targets
+- Member allergen, intolerance, and preference rules
+- Ingredient contains, may-contain, and shared-facility tags
+- Deterministic recipe nutrition snapshots with per-serving calculations
+- Explicit missing-profile and unit-mismatch states
+- Source-watermarked meal-plan assessments
+- Member meal coverage, variety, optional target comparisons, and allergen conflict detection
+- Transparent household balance and data-completeness scores
+- Nutrition recommendation-to-Phase-7-task conversion with provenance
+- Guarded recommendation lifecycles and protected health diagnostics
 
-          Nutrition values and targets are household-entered planning data. Homestead does not diagnose conditions, prescribe diets, calculate clinical requirements, or certify allergen safety.
+Nutrition values and targets are household-entered planning data. Homestead does not diagnose conditions, prescribe diets, calculate clinical requirements, or certify allergen safety.
 
-          '''
+'''
           text = text.replace('## Cost, waste, and savings intelligence\n', section + '## Cost, waste, and savings intelligence\n', 1)
           text = text.replace('finance snapshots, or finance recommendations.', 'finance snapshots, finance recommendations, nutrition profiles, allergen rules, recipe nutrition snapshots, meal-plan nutrition assessments, or nutrition recommendations.', 1)
           text = text.replace('Phase 9 measures recorded household food economics but does not replace bookkeeping or professional financial advice.', 'Phase 9 measures recorded household food economics but does not replace bookkeeping or professional financial advice. Phase 10 compares household-entered food data and optional targets but does not provide clinical nutrition, medical guidance, or allergen certification.', 1)
