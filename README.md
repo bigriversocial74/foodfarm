@@ -8,8 +8,10 @@ Homestead is a household food system for growing, storing, cooking, preserving, 
 - `/phase2.php` — household, family, storage, inventory, and ledger workspace
 - `/login.php` — account login
 - `/phase3.php` — invitations, roles, permission overrides, and authentication history
+- `/phase4.php` — recipes, family meal planning, ingredient deductions, and prepared food
 - `/api/phase2-health.php` — Phase 2 database validation
 - `/api/phase3-health.php` — Phase 3 authentication validation
+- `/api/phase4-health.php` — Phase 4 food workflow validation
 
 ## Requirements
 
@@ -26,12 +28,13 @@ Copy the example configuration:
 cp config-example.php config.php
 ```
 
-Update the database credentials and application URL. Then import the SQL files in order:
+Update the database credentials and application URL. Import the SQL files in order:
 
 ```text
 database/schema.sql
 database/phase2_install.sql
 database/phase3_install.sql
+database/phase4_install.sql
 ```
 
 Start a local server:
@@ -40,29 +43,34 @@ Start a local server:
 php -S 127.0.0.1:8080
 ```
 
-Open `/api/phase3-health.php` and confirm `ok: true` before using `/login.php`. The Phase 3 installer prepares the seeded owner account for initial access; rotate the temporary credential immediately after installation.
+Open `/api/phase4-health.php` and confirm `ok: true`, then sign in at `/login.php` and open `/phase4.php`.
 
-## Phase 3 capabilities
+## Phase 4 capabilities
 
-- Password-hash verification and secure session regeneration
-- Login, logout, and protected routes
-- Household-scoped user/member identity
-- Seven-day invitation tokens stored only as hashes
-- Invitation acceptance and account creation
-- Invitation revocation and status history
-- Owner, administrator, adult, youth, and guest/helper role defaults
-- Member-specific allow/deny permission overrides
-- Owner protection from permission downgrades
-- Authentication and permission audit events
-- CSRF validation on account-management writes
+- Database-backed household recipe library
+- Recipe ingredient records linked to pantry inventory
+- Base servings, yield, preparation, cooking, and resting details
+- Meal plans and scheduled breakfast, lunch, dinner, and snack records
+- Family-member selection for each meal
+- Serving calculations using each member's serving multiplier
+- Transactional recipe completion
+- Required-ingredient availability checks
+- Pantry quantity deductions
+- Immutable `used_in_recipe` ledger events
+- Recipe-run history and ingredient snapshots
+- Prepared-food and leftover batches
+- Prepared-food inventory creation
+- Refrigerator, freezer, counter, and shelf-stable storage methods
+- Use-by dates, storage locations, reheating notes, and intended family members
+- Role and override permissions for viewing, managing, planning, and completing recipes
 
 ## Family wellness privacy
 
-Height, weight, and activity levels remain optional and private by default. They support household meal-demand planning only. They are excluded from activity feeds and authentication records, and Homestead does not provide medical, diagnostic, calorie, or weight-loss guidance.
+Height, weight, and activity levels remain optional and private by default. Serving multiplier is the primary field used by Phase 4 meal calculations. Private measurements are not exposed in recipe runs, meal schedules, prepared-food records, or food ledger events.
 
 ## Current scope boundary
 
-Phase 3 does not yet include email delivery, password-reset email, multi-household account switching, recipe ingredient deductions, harvest-to-inventory posting, preservation posting, shopping completion, or physical device control.
+Phase 4 does not yet include email delivery, password-reset email, multi-household account switching, automatic nutrition or calorie targets, harvest-to-inventory posting, preservation posting, shopping completion, or physical device control.
 
 ## Safety boundary
 
