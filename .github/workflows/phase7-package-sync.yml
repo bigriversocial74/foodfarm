@@ -141,7 +141,6 @@ jobs:
           set -euo pipefail
           cd repo
           rm -rf .phase7-sync
-          rm -f .github/workflows/phase7-package-sync.yml
 
       - name: Commit recovered Phase 7 source
         env:
