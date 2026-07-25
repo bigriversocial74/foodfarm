@@ -35,6 +35,7 @@ trait CostWastePurchaseTrait
 
         $this->pdo->beginTransaction();
         try {
+            $this->lockHousehold($householdId);
             $existing = $this->pdo->prepare(
                 'SELECT id, inventory_item_id, supplier_id, purchased_on, quantity, package_quantity,
                         package_unit, total_cost, unit_cost
