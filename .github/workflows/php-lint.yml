@@ -24,5 +24,8 @@ jobs:
       - name: Lint PHP files
         run: find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
 
+      - name: Run whole-application security audit
+        run: php tests/application_static_audit.php
+
       - name: Run Phase 5 security audit
         run: php tests/phase5_static_audit.php
