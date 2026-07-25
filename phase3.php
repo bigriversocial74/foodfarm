@@ -26,6 +26,8 @@ $permissions = [
     'members.manage', 'members.invite', 'permissions.manage',
     'storage.view', 'storage.manage', 'inventory.view', 'inventory.manage',
     'recipes.view', 'recipes.manage', 'recipes.complete', 'meals.manage',
+    'garden.view', 'garden.manage', 'harvest.record',
+    'preservation.view', 'preservation.manage',
     'tasks.manage', 'tasks.complete',
 ];
 
@@ -186,7 +188,7 @@ $events = $eventsStmt->fetchAll();
 $flashes = consume_flashes();
 $inviteUrl = $_SESSION['latest_invite_url'] ?? null;
 unset($_SESSION['latest_invite_url']);
-?><!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Family Access · Homestead</title><link rel="stylesheet" href="/assets/css/app.css"></head><body><a class="skip-link" href="#main-content">Skip to access administration</a><main id="main-content" class="page-container"><header class="page-header"><div><p class="eyebrow">Household administration</p><h1>Family access & permissions</h1><p class="page-description">Manage accounts, invitations, role defaults, and member-specific permission overrides.</p></div><div><strong><?= e((string)$user['display_name']) ?></strong><br><a href="/logout.php">Sign out</a></div></header>
+?><!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Family Access · Homestead</title><link rel="stylesheet" href="/assets/css/app.css"></head><body><a class="skip-link" href="#main-content">Skip to access administration</a><main id="main-content" class="page-container"><header class="page-header"><div><p class="eyebrow">Household administration</p><h1>Family access & permissions</h1><p class="page-description">Manage accounts, invitations, role defaults, and member-specific permission overrides.</p></div><div><strong><?= e((string)$user['display_name']) ?></strong><div class="toolbar" style="margin-top:10px"><a class="button secondary" href="/phase2.php">Household</a><a class="button secondary" href="/phase4.php">Recipes</a><a class="button secondary" href="/phase6.php">Grow & preserve</a><a class="button secondary" href="/account.php">Account</a><a class="button secondary" href="/logout.php">Sign out</a></div></div></header>
 <?php foreach ($flashes as $message): ?><div role="status" class="status status-<?= $message['type'] === 'error' ? 'warning' : 'good' ?>" style="display:block;margin-bottom:12px"><?= e((string)$message['message']) ?></div><?php endforeach; ?>
 <?php if ($inviteUrl): ?><section class="panel" style="margin-bottom:22px"><p class="eyebrow">Secure invitation URL</p><label>One-time invitation URL<input class="search-field" readonly value="<?= e((string)$inviteUrl) ?>" onclick="this.select()"></label><p style="color:var(--muted);margin-top:10px">Share privately. The raw token is displayed once and expires in seven days.</p></section><?php endif; ?>
 <section class="content-grid"><article class="panel"><div class="panel-heading"><div><p class="eyebrow">Invite</p><h2>Add a family member</h2></div></div>

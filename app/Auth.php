@@ -161,18 +161,23 @@ final class Auth
                 'members.manage', 'members.invite', 'permissions.manage',
                 'storage.view', 'storage.manage', 'inventory.view', 'inventory.manage',
                 'recipes.view', 'recipes.manage', 'meals.manage', 'recipes.complete',
+                'garden.view', 'garden.manage', 'harvest.record',
+                'preservation.view', 'preservation.manage',
                 'tasks.manage', 'tasks.complete',
             ],
             'adult_member' => [
                 'storage.view', 'inventory.view', 'inventory.manage',
                 'tasks.manage', 'tasks.complete', 'recipes.view', 'recipes.manage',
                 'meals.manage', 'recipes.complete',
+                'garden.view', 'garden.manage', 'harvest.record',
+                'preservation.view', 'preservation.manage',
             ],
             'youth_member' => [
                 'storage.view', 'inventory.view', 'tasks.complete',
-                'recipes.view', 'recipes.complete',
+                'recipes.view', 'recipes.complete', 'garden.view', 'harvest.record',
+                'preservation.view',
             ],
-            'guest_helper' => ['tasks.complete', 'recipes.view'],
+            'guest_helper' => ['tasks.complete', 'recipes.view', 'garden.view'],
         ];
 
         $allowed = $defaults[(string)($user['role'] ?? '')] ?? [];
