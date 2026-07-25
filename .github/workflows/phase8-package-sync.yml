@@ -1,9 +1,8 @@
 name: Phase 8 Package Sync
 
 on:
-  push:
-    branches:
-      - feature/phase8-forecasting-seasonal-self-sufficiency-20260725
+  pull_request:
+    branches: [main]
     paths:
       - '.phase8-sync/**'
       - '.github/workflows/phase8-package-sync.yml'
@@ -19,7 +18,7 @@ jobs:
       - name: Check out Phase 8 branch
         uses: actions/checkout@v4
         with:
-          ref: feature/phase8-forecasting-seasonal-self-sufficiency-20260725
+          ref: ${{ github.head_ref }}
 
       - name: Reassemble and validate Phase 8 package
         run: |
@@ -60,4 +59,4 @@ jobs:
             exit 0
           fi
           git commit -m 'Synchronize Phase 8 forecasting and seasonal intelligence source'
-          git push origin HEAD:feature/phase8-forecasting-seasonal-self-sufficiency-20260725
+          git push origin HEAD:${{ github.head_ref }}
