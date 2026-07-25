@@ -23,61 +23,127 @@ jobs:
           git clone --depth 1 --branch "${{ github.head_ref }}" \
             "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" repo
 
-      - name: Recover and validate Phase 7 package
+      - name: Salvage Phase 7 source from staged ZIP records
         run: |
           set -euo pipefail
           cd repo
           python3 - <<'PY'
           from pathlib import Path
           import base64
-          import io
-          import zipfile
+          import binascii
+          import struct
+          import zlib
 
           root = Path('.phase7-sync')
-          candidates = {
-              'complete': root.joinpath('package.b64').read_text(encoding='utf-8'),
-              'chunks': ''.join(path.read_text(encoding='utf-8') for path in sorted(root.glob('chunk-*'))),
-          }
+          encoded = ''.join(
+              path.read_text(encoding='utf-8')
+              for path in sorted(root.glob('chunk-*'))
+          )
+          cleaned = ''.join(encoded.split())
+          padding = '=' * ((4 - len(cleaned) % 4) % 4)
+          payload = base64.b64decode(cleaned + padding, validate=False)
+          print(f'Encoded bytes: {len(cleaned)}; decoded bytes: {len(payload)}')
 
-          recovered = None
-          for name, encoded in candidates.items():
-              cleaned = ''.join(encoded.split())
-              padding = '=' * ((4 - len(cleaned) % 4) % 4)
-              print(f'{name}: encoded={len(cleaned)} mod4={len(cleaned) % 4} padding={len(padding)}')
-              try:
-                  payload = base64.b64decode(cleaned + padding, validate=False)
-              except Exception as error:
-                  print(f'{name}: base64 decode failed: {error}')
+          position = 0
+          extracted = []
+          truncated = None
+          while position + 30 <= len(payload):
+              signature = payload[position:position + 4]
+              if signature != b'PK\x03\x04':
+                  if signature in {b'PK\x01\x02', b'PK\x05\x06'}:
+                      print(f'Reached ZIP directory at byte {position}.')
+                      break
+                  next_header = payload.find(b'PK\x03\x04', position + 1)
+                  if next_header < 0:
+                      print(f'No further local file header after byte {position}.')
+                      break
+                  print(f'Skipping {next_header - position} bytes before next local header.')
+                  position = next_header
                   continue
-              print(f'{name}: decoded={len(payload)} first={payload[:8]!r} last={payload[-8:]!r}')
-              try:
-                  with zipfile.ZipFile(io.BytesIO(payload)) as archive:
-                      names = archive.namelist()
-                      bad = archive.testzip()
-                      print(f'{name}: entries={len(names)} bad={bad!r}')
-                      if bad is None and names:
-                          Path('/tmp/phase7-package.zip').write_bytes(payload)
-                          recovered = name
-                          break
-              except Exception as error:
-                  print(f'{name}: zip validation failed: {error}')
 
-          if recovered is None:
-              raise SystemExit('No recoverable Phase 7 ZIP package was found.')
-          print(f'Recovered Phase 7 package from {recovered}.')
+              (
+                  _signature,
+                  version,
+                  flags,
+                  method,
+                  mod_time,
+                  mod_date,
+                  expected_crc,
+                  compressed_size,
+                  uncompressed_size,
+                  filename_length,
+                  extra_length,
+              ) = struct.unpack_from('<IHHHHHIIIHH', payload, position)
+
+              name_start = position + 30
+              name_end = name_start + filename_length
+              extra_end = name_end + extra_length
+              data_end = extra_end + compressed_size
+              if data_end > len(payload):
+                  raw_name = payload[name_start:min(name_end, len(payload))]
+                  truncated = raw_name.decode('utf-8', errors='replace')
+                  print(
+                      f'Truncated entry {truncated!r}: needs byte {data_end}, '
+                      f'payload ends at {len(payload)}.'
+                  )
+                  break
+
+              filename = payload[name_start:name_end].decode('utf-8')
+              if flags & 0x08:
+                  raise SystemExit(f'Unsupported data-descriptor entry: {filename}')
+              if filename.startswith('/') or '..' in Path(filename).parts:
+                  raise SystemExit(f'Unsafe archive path: {filename}')
+
+              compressed = payload[extra_end:data_end]
+              if method == 0:
+                  content = compressed
+              elif method == 8:
+                  content = zlib.decompress(compressed, -15)
+              else:
+                  raise SystemExit(f'Unsupported compression method {method} for {filename}')
+
+              actual_crc = binascii.crc32(content) & 0xFFFFFFFF
+              if len(content) != uncompressed_size:
+                  raise SystemExit(
+                      f'Uncompressed length mismatch for {filename}: '
+                      f'{len(content)} != {uncompressed_size}'
+                  )
+              if actual_crc != expected_crc:
+                  raise SystemExit(
+                      f'CRC mismatch for {filename}: {actual_crc:08x} != {expected_crc:08x}'
+                  )
+
+              destination = Path(filename)
+              if filename.endswith('/'):
+                  destination.mkdir(parents=True, exist_ok=True)
+              else:
+                  destination.parent.mkdir(parents=True, exist_ok=True)
+                  destination.write_bytes(content)
+              extracted.append(filename)
+              print(f'Extracted {filename} ({len(content)} bytes).')
+              position = data_end
+
+          if not extracted:
+              raise SystemExit('No complete Phase 7 source entries could be recovered.')
+
+          print(f'Recovered {len(extracted)} complete entries.')
+          if truncated:
+              print(f'First incomplete entry: {truncated}')
+          Path('/tmp/phase7-recovered-files.txt').write_text(
+              '\n'.join(extracted) + '\n',
+              encoding='utf-8',
+          )
           PY
-          unzip -t /tmp/phase7-package.zip
-          unzip -Z1 /tmp/phase7-package.zip
+          cat /tmp/phase7-recovered-files.txt
 
-      - name: Extract authoritative Phase 7 source
+      - name: Remove synchronization staging files
         run: |
           set -euo pipefail
           cd repo
-          unzip -o /tmp/phase7-package.zip -d .
           rm -rf .phase7-sync
           rm -f .github/workflows/phase7-package-sync.yml
 
-      - name: Commit synchronized source
+      - name: Commit recovered Phase 7 source
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -90,5 +156,5 @@ jobs:
             echo 'No Phase 7 changes to commit.'
             exit 0
           fi
-          git commit -m 'Synchronize Phase 7 planning and automation source'
+          git commit -m 'Recover Phase 7 planning and automation source'
           git push origin HEAD:${{ github.head_ref }}
