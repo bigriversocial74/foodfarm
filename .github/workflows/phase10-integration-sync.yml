@@ -1,20 +1,20 @@
 name: Phase 10 Integration Sync
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
+  push:
+    branches:
+      - feature/phase10-nutrition-dietary-wellness-20260725
 
 permissions:
   contents: write
-  pull-requests: read
 
 concurrency:
-  group: phase10-integration-sync-${{ github.event.pull_request.number }}
+  group: phase10-integration-sync
   cancel-in-progress: false
 
 jobs:
   integrate:
-    if: github.head_ref == 'feature/phase10-nutrition-dietary-wellness-20260725' && github.actor != 'github-actions[bot]'
+    if: github.ref_name == 'feature/phase10-nutrition-dietary-wellness-20260725' && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -34,27 +34,18 @@ jobs:
                   raise SystemExit(f"Expected text not found in {path}: {old!r}")
               target.write_text(content.replace(old, new, 1))
 
-          def replace_all(path: str, old: str, new: str, expected: int | None = None) -> None:
-              target = Path(path)
-              content = target.read_text()
-              count = content.count(old)
-              if count == 0 or (expected is not None and count != expected):
-                  raise SystemExit(f"Unexpected replacement count in {path}: {count} for {old!r}")
-              target.write_text(content.replace(old, new))
-
           auth = Path('app/Auth.php')
-          auth_text = auth.read_text()
+          text = auth.read_text()
           old = "                'finance.view', 'finance.manage',\n            ],"
           new = "                'finance.view', 'finance.manage',\n                'nutrition.view', 'nutrition.manage',\n            ],"
-          if auth_text.count(old) != 2:
+          if text.count(old) != 2:
               raise SystemExit('Expected administrator and adult finance permission blocks')
-          auth_text = auth_text.replace(old, new)
-          auth_text = auth_text.replace(
-              "                'preservation.view', 'finance.view',\n            ],",
-              "                'preservation.view', 'finance.view', 'nutrition.view',\n            ],",
-              1,
-          )
-          auth.write_text(auth_text)
+          text = text.replace(old, new)
+          replace = "                'preservation.view', 'finance.view',\n            ],"
+          if replace not in text:
+              raise SystemExit('Youth finance permission block missing')
+          text = text.replace(replace, "                'preservation.view', 'finance.view', 'nutrition.view',\n            ],", 1)
+          auth.write_text(text)
 
           replace_once(
               'phase3.php',
@@ -85,10 +76,10 @@ jobs:
           if marker not in text:
               raise SystemExit('Dashboard metric marker missing')
           text = text.replace(marker, availability, 1)
-          metrics_marker = "if ($phase9Available) {"
-          nutrition_metrics = '''if ($phase10Available) {
+          marker = "if ($phase9Available) {"
+          metrics = '''if ($phase10Available) {
               $latestNutrition = $pdo->prepare(
-                  "SELECT household_balance_score, allergen_conflict_count, data_completeness_percent
+                  "SELECT household_balance_score, allergen_conflict_count
                    FROM meal_nutrition_assessments
                    WHERE household_id = ? AND status = 'completed'
                    ORDER BY completed_at DESC, id DESC LIMIT 1"
@@ -113,41 +104,26 @@ jobs:
               }
           }
           if ($phase9Available) {'''
-          if metrics_marker not in text:
+          if marker not in text:
               raise SystemExit('Dashboard finance metric marker missing')
-          text = text.replace(metrics_marker, nutrition_metrics, 1)
+          text = text.replace(marker, metrics, 1)
           text = text.replace(
               'Forecast, plan, assign, stock, grow, cook, preserve, measure cost and waste, and improve the next household food cycle.',
               'Forecast, plan, assign, stock, grow, cook, preserve, balance household nutrition, measure cost and waste, and improve the next food cycle.',
               1,
           )
-          card_marker = '    <?php if ($phase9Available): ?><a class="panel" href="/phase9.php">'
-          card = '    <?php if ($phase10Available): ?><a class="panel" href="/phase10.php"><p class="eyebrow">Balance</p><h2>Nutrition & dietary planning</h2><p class="page-description" style="margin-top:12px">Ingredient label data, optional family targets, dietary patterns, allergen controls, recipe nutrition, meal-plan assessments, and task-ready recommendations.</p></a><?php endif; ?>\n' + card_marker
-          if card_marker not in text:
+          marker = '    <?php if ($phase9Available): ?><a class="panel" href="/phase9.php">'
+          card = '    <?php if ($phase10Available): ?><a class="panel" href="/phase10.php"><p class="eyebrow">Balance</p><h2>Nutrition & dietary planning</h2><p class="page-description" style="margin-top:12px">Ingredient label data, optional family targets, dietary patterns, allergen controls, recipe nutrition, meal-plan assessments, and task-ready recommendations.</p></a><?php endif; ?>\n' + marker
+          if marker not in text:
               raise SystemExit('Dashboard Phase 9 card marker missing')
-          dashboard.write_text(text.replace(card_marker, card, 1))
+          dashboard.write_text(text.replace(marker, card, 1))
 
           workflow = Path('.github/workflows/php-lint.yml')
           text = workflow.read_text()
-          text = text.replace(
-              '          php tests/phase9_static_audit.php\n',
-              '          php tests/phase9_static_audit.php\n          php tests/phase10_static_audit.php\n',
-              1,
-          )
-          text = text.replace(
-              '            database/phase9_cost_waste_savings_intelligence.sql\n',
-              '            database/phase9_cost_waste_savings_intelligence.sql\n            database/phase10_nutrition_dietary_wellness.sql\n',
-          )
-          text = text.replace(
-              '          php tests/phase9_integration.php\n',
-              '          php tests/phase9_integration.php\n          php tests/phase10_integration.php\n',
-              1,
-          )
-          text = text.replace(
-              '      - name: Show server log on failure\n',
-              '      - name: Run Phase 10 authenticated HTTP smoke suite\n        run: bash tests/phase10_http_smoke.sh\n\n      - name: Show server log on failure\n',
-              1,
-          )
+          text = text.replace('          php tests/phase9_static_audit.php\n', '          php tests/phase9_static_audit.php\n          php tests/phase10_static_audit.php\n', 1)
+          text = text.replace('            database/phase9_cost_waste_savings_intelligence.sql\n', '            database/phase9_cost_waste_savings_intelligence.sql\n            database/phase10_nutrition_dietary_wellness.sql\n')
+          text = text.replace('          php tests/phase9_integration.php\n', '          php tests/phase9_integration.php\n          php tests/phase10_integration.php\n', 1)
+          text = text.replace('      - name: Show server log on failure\n', '      - name: Run Phase 10 authenticated HTTP smoke suite\n        run: bash tests/phase10_http_smoke.sh\n\n      - name: Show server log on failure\n', 1)
           workflow.write_text(text)
 
           replace_once(
@@ -160,95 +136,49 @@ jobs:
           text = static.read_text()
           text = text.replace("$phase9 = $read('phase9.php');\n", "$phase9 = $read('phase9.php');\n$phase10 = $read('phase10.php');\n", 1)
           text = text.replace("    $read('api/phase9-health.php'),\n", "    $read('api/phase9-health.php'),\n    $read('api/phase10-health.php'),\n", 1)
-          text = text.replace(
-              "str_contains($auth, \"'finance.view'\") && str_contains($auth, \"'finance.manage'\")",
-              "str_contains($auth, \"'finance.view'\") && str_contains($auth, \"'finance.manage'\") && str_contains($auth, \"'nutrition.view'\") && str_contains($auth, \"'nutrition.manage'\")",
-              1,
-          )
-          text = text.replace(
-              "    'Phase 9 requires finance permissions' => str_contains($phase9, 'finance.view') && str_contains($phase9, 'finance.manage'),\n",
-              "    'Phase 9 requires finance permissions' => str_contains($phase9, 'finance.view') && str_contains($phase9, 'finance.manage'),\n    'Phase 10 requires nutrition permissions and safety boundary' => str_contains($phase10, 'nutrition.view') && str_contains($phase10, 'nutrition.manage') && str_contains($phase10, 'not diagnosis, treatment, or medical advice'),\n",
-              1,
-          )
-          text = text.replace(
-              "    'CI imports Phase 9 migration' => str_contains($workflow, 'database/phase9_cost_waste_savings_intelligence.sql'),\n",
-              "    'CI imports Phase 9 migration' => str_contains($workflow, 'database/phase9_cost_waste_savings_intelligence.sql'),\n    'CI imports Phase 10 migration' => str_contains($workflow, 'database/phase10_nutrition_dietary_wellness.sql'),\n",
-              1,
-          )
-          text = text.replace(
-              "    'CI runs Phase 9 integration' => str_contains($workflow, 'tests/phase9_integration.php'),\n",
-              "    'CI runs Phase 9 integration' => str_contains($workflow, 'tests/phase9_integration.php'),\n    'CI runs Phase 10 integration' => str_contains($workflow, 'tests/phase10_integration.php'),\n",
-              1,
-          )
-          text = text.replace(
-              "str_contains($workflow, 'tests/http_smoke.sh') && str_contains($workflow, 'tests/phase9_http_smoke.sh')",
-              "str_contains($workflow, 'tests/http_smoke.sh') && str_contains($workflow, 'tests/phase9_http_smoke.sh') && str_contains($workflow, 'tests/phase10_http_smoke.sh')",
-              1,
-          )
+          text = text.replace("str_contains($auth, \"'finance.view'\") && str_contains($auth, \"'finance.manage'\")", "str_contains($auth, \"'finance.view'\") && str_contains($auth, \"'finance.manage'\") && str_contains($auth, \"'nutrition.view'\") && str_contains($auth, \"'nutrition.manage'\")", 1)
+          text = text.replace("    'Phase 9 requires finance permissions' => str_contains($phase9, 'finance.view') && str_contains($phase9, 'finance.manage'),\n", "    'Phase 9 requires finance permissions' => str_contains($phase9, 'finance.view') && str_contains($phase9, 'finance.manage'),\n    'Phase 10 requires nutrition permissions and safety boundary' => str_contains($phase10, 'nutrition.view') && str_contains($phase10, 'nutrition.manage') && str_contains($phase10, 'not diagnosis, treatment, or medical advice'),\n", 1)
+          text = text.replace("    'CI imports Phase 9 migration' => str_contains($workflow, 'database/phase9_cost_waste_savings_intelligence.sql'),\n", "    'CI imports Phase 9 migration' => str_contains($workflow, 'database/phase9_cost_waste_savings_intelligence.sql'),\n    'CI imports Phase 10 migration' => str_contains($workflow, 'database/phase10_nutrition_dietary_wellness.sql'),\n", 1)
+          text = text.replace("    'CI runs Phase 9 integration' => str_contains($workflow, 'tests/phase9_integration.php'),\n", "    'CI runs Phase 9 integration' => str_contains($workflow, 'tests/phase9_integration.php'),\n    'CI runs Phase 10 integration' => str_contains($workflow, 'tests/phase10_integration.php'),\n", 1)
+          text = text.replace("str_contains($workflow, 'tests/http_smoke.sh') && str_contains($workflow, 'tests/phase9_http_smoke.sh')", "str_contains($workflow, 'tests/http_smoke.sh') && str_contains($workflow, 'tests/phase9_http_smoke.sh') && str_contains($workflow, 'tests/phase10_http_smoke.sh')", 1)
           static.write_text(text)
 
           readme = Path('README.md')
           text = readme.read_text()
-          text = text.replace(
-              'Homestead is a household food system for growing, storing, cooking, preserving, planning, forecasting, measuring cost and waste, and coordinating real food.',
-              'Homestead is a household food system for growing, storing, cooking, preserving, planning, forecasting, balancing household nutrition, measuring cost and waste, and coordinating real food.',
-              1,
-          )
-          text = text.replace(
-              '- `/phase9.php` — purchase costs, recipe economics, food waste, budgets, supplier comparisons, and savings intelligence\n',
-              '- `/phase9.php` — purchase costs, recipe economics, food waste, budgets, supplier comparisons, and savings intelligence\n- `/phase10.php` — ingredient nutrition, dietary patterns, allergen controls, recipe nutrition, meal-plan assessments, and wellness planning\n',
-              1,
-          )
-          text = text.replace(
-              '- `/api/phase9-health.php` — protected purchase, cost-basis, waste, recipe-cost, finance-snapshot, and recommendation validation\n',
-              '- `/api/phase9-health.php` — protected purchase, cost-basis, waste, recipe-cost, finance-snapshot, and recommendation validation\n- `/api/phase10-health.php` — protected nutrition-profile, allergen, recipe-snapshot, meal-assessment, and recommendation validation\n',
-              1,
-          )
-          text = text.replace(
-              'database/phase9_cost_waste_savings_intelligence.sql\n```',
-              'database/phase9_cost_waste_savings_intelligence.sql\ndatabase/phase10_nutrition_dietary_wellness.sql\n```',
-              1,
-          )
+          text = text.replace('Homestead is a household food system for growing, storing, cooking, preserving, planning, forecasting, measuring cost and waste, and coordinating real food.', 'Homestead is a household food system for growing, storing, cooking, preserving, planning, forecasting, balancing household nutrition, measuring cost and waste, and coordinating real food.', 1)
+          text = text.replace('- `/phase9.php` — purchase costs, recipe economics, food waste, budgets, supplier comparisons, and savings intelligence\n', '- `/phase9.php` — purchase costs, recipe economics, food waste, budgets, supplier comparisons, and savings intelligence\n- `/phase10.php` — ingredient nutrition, dietary patterns, allergen controls, recipe nutrition, meal-plan assessments, and wellness planning\n', 1)
+          text = text.replace('- `/api/phase9-health.php` — protected purchase, cost-basis, waste, recipe-cost, finance-snapshot, and recommendation validation\n', '- `/api/phase9-health.php` — protected purchase, cost-basis, waste, recipe-cost, finance-snapshot, and recommendation validation\n- `/api/phase10-health.php` — protected nutrition-profile, allergen, recipe-snapshot, meal-assessment, and recommendation validation\n', 1)
+          text = text.replace('database/phase9_cost_waste_savings_intelligence.sql\n```', 'database/phase9_cost_waste_savings_intelligence.sql\ndatabase/phase10_nutrition_dietary_wellness.sql\n```', 1)
           section = '''## Nutrition, dietary planning, and household wellness
 
-- Household-entered ingredient nutrition profiles and source confidence
-- Member dietary patterns and optional planning targets
-- Member allergen, intolerance, and preference rules
-- Ingredient contains, may-contain, and shared-facility tags
-- Deterministic recipe nutrition snapshots with per-serving calculations
-- Explicit missing-profile and unit-mismatch states
-- Source-watermarked meal-plan assessments
-- Member meal coverage, variety, optional target comparisons, and allergen conflict detection
-- Transparent household balance and data-completeness scores
-- Nutrition recommendation-to-Phase-7-task conversion with provenance
-- Guarded recommendation lifecycles and protected health diagnostics
+          - Household-entered ingredient nutrition profiles and source confidence
+          - Member dietary patterns and optional planning targets
+          - Member allergen, intolerance, and preference rules
+          - Ingredient contains, may-contain, and shared-facility tags
+          - Deterministic recipe nutrition snapshots with per-serving calculations
+          - Explicit missing-profile and unit-mismatch states
+          - Source-watermarked meal-plan assessments
+          - Member meal coverage, variety, optional target comparisons, and allergen conflict detection
+          - Transparent household balance and data-completeness scores
+          - Nutrition recommendation-to-Phase-7-task conversion with provenance
+          - Guarded recommendation lifecycles and protected health diagnostics
 
-Nutrition values and targets are household-entered planning data. Homestead does not diagnose conditions, prescribe diets, calculate clinical requirements, or certify allergen safety.
+          Nutrition values and targets are household-entered planning data. Homestead does not diagnose conditions, prescribe diets, calculate clinical requirements, or certify allergen safety.
 
-'''
+          '''
           text = text.replace('## Cost, waste, and savings intelligence\n', section + '## Cost, waste, and savings intelligence\n', 1)
-          text = text.replace(
-              'finance snapshots, or finance recommendations.',
-              'finance snapshots, finance recommendations, nutrition profiles, allergen rules, recipe nutrition snapshots, meal-plan nutrition assessments, or nutrition recommendations.',
-              1,
-          )
-          text = text.replace(
-              'Phase 9 measures recorded household food economics but does not replace bookkeeping or professional financial advice.',
-              'Phase 9 measures recorded household food economics but does not replace bookkeeping or professional financial advice. Phase 10 compares household-entered food data and optional targets but does not provide clinical nutrition, medical guidance, or allergen certification.',
-              1,
-          )
+          text = text.replace('finance snapshots, or finance recommendations.', 'finance snapshots, finance recommendations, nutrition profiles, allergen rules, recipe nutrition snapshots, meal-plan nutrition assessments, or nutrition recommendations.', 1)
+          text = text.replace('Phase 9 measures recorded household food economics but does not replace bookkeeping or professional financial advice.', 'Phase 9 measures recorded household food economics but does not replace bookkeeping or professional financial advice. Phase 10 compares household-entered food data and optional targets but does not provide clinical nutrition, medical guidance, or allergen certification.', 1)
           readme.write_text(text)
 
           snapshot = Path('app/NutritionSnapshotTrait.php')
           text = snapshot.read_text()
+          if 'use RuntimeException;' not in text:
+              text = text.replace('use PDO;\n', 'use PDO;\nuse RuntimeException;\n', 1)
           marker = "            if (is_array($existingRow) && (string)$existingRow['status'] === 'completed') {"
           if marker not in text:
               raise SystemExit('Nutrition assessment reuse marker missing')
-          text = text.replace(
-              marker,
-              "            if (is_array($existingRow) && (string)$existingRow['status'] !== 'completed') {\n                throw new RuntimeException('An assessment is already running for unchanged meal-plan data.');\n            }\n            if (is_array($existingRow) && (string)$existingRow['status'] === 'completed') {",
-              1,
-          )
+          text = text.replace(marker, "            if (is_array($existingRow) && (string)$existingRow['status'] !== 'completed') {\n                throw new RuntimeException('An assessment is already running for unchanged meal-plan data.');\n            }\n            if (is_array($existingRow) && (string)$existingRow['status'] === 'completed') {", 1)
           snapshot.write_text(text)
 
           Path('.github/workflows/phase10-integration-sync.yml').unlink()
