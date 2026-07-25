@@ -85,9 +85,23 @@ CREATE TABLE IF NOT EXISTS meal_plan_members (
     UNIQUE KEY uq_meal_member (meal_plan_item_id, household_member_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-ALTER TABLE recipes
-    ADD COLUMN IF NOT EXISTS yield_quantity DECIMAL(10,2) NULL AFTER servings,
-    ADD COLUMN IF NOT EXISTS yield_unit VARCHAR(30) NULL AFTER yield_quantity;
+SET @sql := IF(
+    (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'recipes' AND COLUMN_NAME = 'yield_quantity') = 0,
+    'ALTER TABLE recipes ADD COLUMN yield_quantity DECIMAL(10,2) NULL AFTER servings',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
-ALTER TABLE meal_plan_items
-    ADD COLUMN IF NOT EXISTS status ENUM('planned','prepared','served','skipped') NOT NULL DEFAULT 'planned' AFTER notes;
+SET @sql := IF(
+    (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'recipes' AND COLUMN_NAME = 'yield_unit') = 0,
+    'ALTER TABLE recipes ADD COLUMN yield_unit VARCHAR(30) NULL AFTER yield_quantity',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := IF(
+    (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'meal_plan_items' AND COLUMN_NAME = 'status') = 0,
+    "ALTER TABLE meal_plan_items ADD COLUMN status ENUM('planned','prepared','served','skipped') NOT NULL DEFAULT 'planned' AFTER notes",
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
