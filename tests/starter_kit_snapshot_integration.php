@@ -176,4 +176,15 @@ if (!$tamperRejected) {
 }
 echo "[PASS] snapshot hash blocks tampered recipe bundles\n";
 
+$cleanup = $pdo->prepare('DELETE FROM starter_kits WHERE id = ?');
+$cleanup->execute([$kit2]);
+$invalidSnapshots = (int)$pdo->query(
+    'SELECT COUNT(*) FROM starter_kit_recipe_snapshots WHERE snapshot_hash <> SHA2(recipe_snapshot, 256)'
+)->fetchColumn();
+if ($invalidSnapshots !== 0) {
+    fwrite(STDERR, "Snapshot tamper test left invalid release data behind.\n");
+    exit(1);
+}
+echo "[PASS] tamper-test data is removed before release health checks\n";
+
 echo "Starter Kit recipe snapshot integration suite passed.\n";
