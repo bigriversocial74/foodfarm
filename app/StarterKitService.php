@@ -120,6 +120,16 @@ final class StarterKitService
                 $this->validatePublishableItem($item);
             }
 
+            $recipeLinks = $this->pdo->prepare(
+                'SELECT recipe_id FROM starter_kit_recipes WHERE starter_kit_version_id = ? ORDER BY recipe_id FOR UPDATE'
+            );
+            $recipeLinks->execute([$versionId]);
+            foreach ($recipeLinks->fetchAll(PDO::FETCH_COLUMN) as $recipeId) {
+                $snapshot = $this->snapshotRecipe((int)$recipeId, null);
+                $this->upsertRecipeSnapshot($versionId, (int)$recipeId, $snapshot);
+            }
+            $this->assertSnapshotIntegrity($versionId);
+
             $update = $this->pdo->prepare(
                 "UPDATE starter_kit_versions SET status = 'published', published_at = UTC_TIMESTAMP()
                  WHERE id = ? AND status = 'draft'"
@@ -156,7 +166,7 @@ final class StarterKitService
         if (!in_array($kind, self::ITEM_KINDS, true) || !in_array($fulfillment, self::FULFILLMENT_TYPES, true)) {
             throw new InvalidArgumentException('Item kind or fulfillment type is invalid.');
         }
-        if ($quantity !== null && $quantity < 0 || $reorderLevel !== null && $reorderLevel < 0 || $estimatedPrice !== null && $estimatedPrice < 0) {
+        if (($quantity !== null && $quantity < 0) || ($reorderLevel !== null && $reorderLevel < 0) || ($estimatedPrice !== null && $estimatedPrice < 0)) {
             throw new InvalidArgumentException('Quantities, reorder levels, and prices cannot be negative.');
         }
         if ($kind === 'digital') {
@@ -214,26 +224,26 @@ final class StarterKitService
 
     public function attachRecipe(int $versionId, int $recipeId, int $sourceHouseholdId): void
     {
-        $this->draftVersion($versionId);
         if ($recipeId < 1 || $sourceHouseholdId < 1) {
             throw new InvalidArgumentException('Choose a valid starter recipe.');
         }
-        $recipe = $this->pdo->prepare(
-            "SELECT r.id, COUNT(ri.id) AS ingredient_count
-             FROM recipes r
-             LEFT JOIN recipe_ingredients ri ON ri.recipe_id = r.id
-             WHERE r.id = ? AND r.household_id = ? AND r.status = 'active'
-             GROUP BY r.id LIMIT 1"
-        );
-        $recipe->execute([$recipeId, $sourceHouseholdId]);
-        $record = $recipe->fetch();
-        if (!is_array($record) || (int)$record['ingredient_count'] < 1) {
-            throw new RuntimeException('The starter recipe must belong to your household and contain at least one ingredient.');
+
+        try {
+            $this->pdo->beginTransaction();
+            $this->draftVersion($versionId, true);
+            $snapshot = $this->snapshotRecipe($recipeId, $sourceHouseholdId);
+            $statement = $this->pdo->prepare(
+                'INSERT IGNORE INTO starter_kit_recipes (starter_kit_version_id, recipe_id) VALUES (?, ?)'
+            );
+            $statement->execute([$versionId, $recipeId]);
+            $this->upsertRecipeSnapshot($versionId, $recipeId, $snapshot);
+            $this->pdo->commit();
+        } catch (Throwable $exception) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $exception;
         }
-        $statement = $this->pdo->prepare(
-            'INSERT IGNORE INTO starter_kit_recipes (starter_kit_version_id, recipe_id) VALUES (?, ?)'
-        );
-        $statement->execute([$versionId, $recipeId]);
     }
 
     public function addTask(int $versionId, array $data): void
@@ -285,6 +295,7 @@ final class StarterKitService
         if ((int)$count->fetchColumn() < 1) {
             throw new RuntimeException('The starter-kit version must contain at least one item.');
         }
+        $this->assertSnapshotIntegrity($versionId);
 
         $token = bin2hex(random_bytes(32));
         try {
@@ -309,6 +320,9 @@ final class StarterKitService
                  FROM starter_kit_items WHERE starter_kit_version_id = ?'
             );
             $statement->execute([$activationId, $versionId]);
+            if ($statement->rowCount() < 1) {
+                throw new RuntimeException('Starter-kit activation items could not be created.');
+            }
             $this->pdo->commit();
 
             return ['order_id' => $orderId, 'activation_id' => $activationId, 'token' => $token];
@@ -354,7 +368,8 @@ final class StarterKitService
         $email = strtolower(trim((string)($user['email'] ?? '')));
         $householdId = (int)($user['household_id'] ?? 0);
         $memberId = (int)($user['member_id'] ?? 0);
-        if ($householdId < 1 || $memberId < 1 || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $userId = (int)($user['id'] ?? 0);
+        if ($householdId < 1 || $memberId < 1 || $userId < 1 || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
             throw new RuntimeException('A valid signed-in household member is required.');
         }
 
@@ -381,10 +396,11 @@ final class StarterKitService
             $member = $this->pdo->prepare(
                 "SELECT id FROM household_members WHERE id = ? AND household_id = ? AND user_id = ? AND status = 'active' LIMIT 1"
             );
-            $member->execute([$memberId, $householdId, (int)($user['id'] ?? 0)]);
+            $member->execute([$memberId, $householdId, $userId]);
             if (!$member->fetchColumn()) {
                 throw new RuntimeException('The active household membership could not be verified.');
             }
+            $this->assertSnapshotIntegrity((int)$activation['starter_kit_version_id']);
 
             $itemsStatement = $this->pdo->prepare(
                 'SELECT ai.*, i.item_name, i.item_kind, i.fulfillment_type, i.required,
@@ -563,14 +579,17 @@ final class StarterKitService
         if ($status === 'delivery_requested' && ($fulfillment !== 'optional_delivery' || empty($item['delivery_eligible']))) {
             throw new InvalidArgumentException($item['item_name'] . ' is not eligible for delivery.');
         }
-        if (in_array($status, ['shipped', 'pending'], true) && $fulfillment === 'shipped' && empty($item['shipping_eligible'])) {
-            throw new InvalidArgumentException($item['item_name'] . ' is not eligible for shipping.');
+        if (in_array($status, ['pending', 'shipped'], true) && $fulfillment !== 'shipped') {
+            throw new InvalidArgumentException('Pending or shipped status requires shipped fulfillment.');
         }
         if ($fulfillment === 'shipped' && empty($item['shipping_eligible'])) {
             throw new InvalidArgumentException($item['item_name'] . ' is not eligible for shipping.');
         }
         if ($fulfillment === 'optional_delivery' && empty($item['delivery_eligible'])) {
             throw new InvalidArgumentException($item['item_name'] . ' is not eligible for delivery.');
+        }
+        if ($status === 'skipped' && !empty($item['required'])) {
+            throw new InvalidArgumentException($item['item_name'] . ' is required and cannot be skipped.');
         }
     }
 
@@ -597,15 +616,142 @@ final class StarterKitService
         }
     }
 
+    private function snapshotRecipe(int $recipeId, ?int $householdId): array
+    {
+        $sql = "SELECT id, name, category, servings, yield_quantity, yield_unit, prep_minutes,
+                       cook_minutes, rest_minutes, instructions, notes
+                FROM recipes WHERE id = ? AND status = 'active'";
+        $params = [$recipeId];
+        if ($householdId !== null) {
+            $sql .= ' AND household_id = ?';
+            $params[] = $householdId;
+        }
+        $sql .= ' LIMIT 1';
+        $recipeQuery = $this->pdo->prepare($sql);
+        $recipeQuery->execute($params);
+        $recipe = $recipeQuery->fetch();
+        if (!is_array($recipe)) {
+            throw new RuntimeException('The selected starter recipe is unavailable.');
+        }
+
+        $ingredientQuery = $this->pdo->prepare(
+            'SELECT ingredient_name, quantity, unit, optional, sort_order
+             FROM recipe_ingredients WHERE recipe_id = ? ORDER BY sort_order, id'
+        );
+        $ingredientQuery->execute([$recipeId]);
+        $ingredients = $ingredientQuery->fetchAll();
+        if ($ingredients === []) {
+            throw new RuntimeException('The starter recipe must contain at least one ingredient.');
+        }
+
+        $snapshot = [
+            'schema_version' => 1,
+            'name' => (string)$recipe['name'],
+            'category' => $recipe['category'],
+            'servings' => (float)$recipe['servings'],
+            'yield_quantity' => $recipe['yield_quantity'] === null ? null : (float)$recipe['yield_quantity'],
+            'yield_unit' => $recipe['yield_unit'],
+            'prep_minutes' => $recipe['prep_minutes'] === null ? null : (int)$recipe['prep_minutes'],
+            'cook_minutes' => $recipe['cook_minutes'] === null ? null : (int)$recipe['cook_minutes'],
+            'rest_minutes' => $recipe['rest_minutes'] === null ? null : (int)$recipe['rest_minutes'],
+            'instructions' => $recipe['instructions'],
+            'notes' => $recipe['notes'],
+            'ingredients' => array_map(static fn(array $ingredient): array => [
+                'ingredient_name' => (string)$ingredient['ingredient_name'],
+                'quantity' => (float)$ingredient['quantity'],
+                'unit' => (string)$ingredient['unit'],
+                'optional' => (int)$ingredient['optional'],
+                'sort_order' => (int)$ingredient['sort_order'],
+            ], $ingredients),
+        ];
+        $this->validateRecipeSnapshot($snapshot);
+
+        return $snapshot;
+    }
+
+    private function upsertRecipeSnapshot(int $versionId, int $recipeId, array $snapshot): void
+    {
+        $json = json_encode($snapshot, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION);
+        $statement = $this->pdo->prepare(
+            'INSERT INTO starter_kit_recipe_snapshots
+             (starter_kit_version_id, source_recipe_id, snapshot_hash, recipe_snapshot)
+             VALUES (?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE snapshot_hash = VALUES(snapshot_hash), recipe_snapshot = VALUES(recipe_snapshot)'
+        );
+        $statement->execute([$versionId, $recipeId, hash('sha256', $json), $json]);
+    }
+
+    private function assertSnapshotIntegrity(int $versionId): void
+    {
+        $links = $this->pdo->prepare('SELECT COUNT(*) FROM starter_kit_recipes WHERE starter_kit_version_id = ?');
+        $links->execute([$versionId]);
+        $linkCount = (int)$links->fetchColumn();
+
+        $snapshots = $this->pdo->prepare(
+            'SELECT snapshot_hash, recipe_snapshot FROM starter_kit_recipe_snapshots
+             WHERE starter_kit_version_id = ? ORDER BY id'
+        );
+        $snapshots->execute([$versionId]);
+        $rows = $snapshots->fetchAll();
+        if (count($rows) < $linkCount) {
+            throw new RuntimeException('One or more Starter Kit recipes are missing immutable snapshots.');
+        }
+        foreach ($rows as $row) {
+            $raw = (string)$row['recipe_snapshot'];
+            if (!hash_equals((string)$row['snapshot_hash'], hash('sha256', $raw))) {
+                throw new RuntimeException('A Starter Kit recipe snapshot failed its integrity check.');
+            }
+            $snapshot = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+            if (!is_array($snapshot)) {
+                throw new RuntimeException('A Starter Kit recipe snapshot is invalid.');
+            }
+            $this->validateRecipeSnapshot($snapshot);
+        }
+    }
+
+    private function validateRecipeSnapshot(array $snapshot): void
+    {
+        if (($snapshot['schema_version'] ?? null) !== 1
+            || !is_string($snapshot['name'] ?? null)
+            || trim((string)$snapshot['name']) === ''
+            || mb_strlen((string)$snapshot['name']) > 180
+            || !is_numeric($snapshot['servings'] ?? null)
+            || (float)$snapshot['servings'] <= 0
+            || !is_array($snapshot['ingredients'] ?? null)
+            || $snapshot['ingredients'] === []) {
+            throw new RuntimeException('A Starter Kit recipe snapshot has an invalid recipe structure.');
+        }
+        foreach ($snapshot['ingredients'] as $ingredient) {
+            if (!is_array($ingredient)
+                || trim((string)($ingredient['ingredient_name'] ?? '')) === ''
+                || mb_strlen((string)$ingredient['ingredient_name']) > 180
+                || !is_numeric($ingredient['quantity'] ?? null)
+                || (float)$ingredient['quantity'] <= 0
+                || trim((string)($ingredient['unit'] ?? '')) === ''
+                || mb_strlen((string)$ingredient['unit']) > 30) {
+                throw new RuntimeException('A Starter Kit recipe snapshot has an invalid ingredient structure.');
+            }
+        }
+    }
+
     private function provisionRecipes(int $versionId, int $householdId, int $memberId, int $activationId): void
     {
         $recipes = $this->pdo->prepare(
-            'SELECT r.* FROM starter_kit_recipes skr
-             JOIN recipes r ON r.id = skr.recipe_id
-             WHERE skr.starter_kit_version_id = ? AND r.status = \'active\''
+            'SELECT snapshot_hash, recipe_snapshot FROM starter_kit_recipe_snapshots
+             WHERE starter_kit_version_id = ? ORDER BY id'
         );
         $recipes->execute([$versionId]);
-        foreach ($recipes->fetchAll() as $recipe) {
+        foreach ($recipes->fetchAll() as $row) {
+            $raw = (string)$row['recipe_snapshot'];
+            if (!hash_equals((string)$row['snapshot_hash'], hash('sha256', $raw))) {
+                throw new RuntimeException('A Starter Kit recipe snapshot failed its integrity check.');
+            }
+            $recipe = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+            if (!is_array($recipe)) {
+                throw new RuntimeException('A Starter Kit recipe snapshot is invalid.');
+            }
+            $this->validateRecipeSnapshot($recipe);
+
             $insert = $this->pdo->prepare(
                 "INSERT INTO recipes
                  (household_id, name, category, servings, yield_quantity, yield_unit, prep_minutes,
@@ -615,25 +761,33 @@ final class StarterKitService
             $insert->execute([
                 $householdId,
                 $recipe['name'],
-                $recipe['category'],
+                $recipe['category'] ?? null,
                 $recipe['servings'],
-                $recipe['yield_quantity'],
-                $recipe['yield_unit'],
-                $recipe['prep_minutes'],
-                $recipe['cook_minutes'],
-                $recipe['rest_minutes'],
-                $recipe['instructions'],
+                $recipe['yield_quantity'] ?? null,
+                $recipe['yield_unit'] ?? null,
+                $recipe['prep_minutes'] ?? null,
+                $recipe['cook_minutes'] ?? null,
+                $recipe['rest_minutes'] ?? null,
+                $recipe['instructions'] ?? null,
                 'Provisioned from starter-kit activation #' . $activationId,
                 $memberId,
             ]);
             $newRecipeId = (int)$this->pdo->lastInsertId();
-            $ingredients = $this->pdo->prepare(
+            $ingredientInsert = $this->pdo->prepare(
                 'INSERT INTO recipe_ingredients
                  (recipe_id, inventory_item_id, ingredient_name, quantity, unit, optional, sort_order)
-                 SELECT ?, NULL, ingredient_name, quantity, unit, optional, sort_order
-                 FROM recipe_ingredients WHERE recipe_id = ?'
+                 VALUES (?, NULL, ?, ?, ?, ?, ?)'
             );
-            $ingredients->execute([$newRecipeId, (int)$recipe['id']]);
+            foreach ($recipe['ingredients'] as $ingredient) {
+                $ingredientInsert->execute([
+                    $newRecipeId,
+                    $ingredient['ingredient_name'],
+                    $ingredient['quantity'],
+                    $ingredient['unit'],
+                    !empty($ingredient['optional']) ? 1 : 0,
+                    max(0, (int)($ingredient['sort_order'] ?? 0)),
+                ]);
+            }
         }
     }
 
@@ -650,14 +804,16 @@ final class StarterKitService
         $statement->execute([$householdId, $memberId, $activationId, $versionId]);
     }
 
-    private function draftVersion(int $versionId): array
+    private function draftVersion(int $versionId, bool $lock = false): array
     {
-        $statement = $this->pdo->prepare(
-            'SELECT v.id, v.status, k.status AS kit_status
-             FROM starter_kit_versions v
-             JOIN starter_kits k ON k.id = v.starter_kit_id
-             WHERE v.id = ? LIMIT 1'
-        );
+        $sql = 'SELECT v.id, v.status, k.status AS kit_status
+                FROM starter_kit_versions v
+                JOIN starter_kits k ON k.id = v.starter_kit_id
+                WHERE v.id = ? LIMIT 1';
+        if ($lock) {
+            $sql .= ' FOR UPDATE';
+        }
+        $statement = $this->pdo->prepare($sql);
         $statement->execute([$versionId]);
         $version = $statement->fetch();
         if (!is_array($version) || $version['status'] !== 'draft' || $version['kit_status'] === 'retired') {
