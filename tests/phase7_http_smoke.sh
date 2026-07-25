@@ -19,11 +19,12 @@ pass() {
 
 extract_value() {
   local name="$1"
-  grep -o "name=\"${name}\" value=\"[^\"]*\"" | head -n1 | sed -E 's/.*value="([^"]*)"/\1/'
+  local html="$2"
+  sed -n -E "s/.*name=\"${name}\" value=\"([^\"]*)\".*/\1/p" <<<"$html" | head -n1
 }
 
 login_page="$(curl -fsS -c "$COOKIE_JAR" "${BASE_URL}/login.php")" || fail "login page unavailable"
-login_csrf="$(printf '%s' "$login_page" | extract_value csrf_token)"
+login_csrf="$(extract_value csrf_token "$login_page")"
 [[ "$login_csrf" =~ ^[a-f0-9]{64}$ ]] || fail "login CSRF token missing"
 
 login_result="$(curl -fsS -L -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
@@ -31,13 +32,13 @@ login_result="$(curl -fsS -L -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
   --data-urlencode "email=${OWNER_EMAIL}" \
   --data-urlencode "password=${OWNER_PASSWORD}" \
   "${BASE_URL}/login.php")" || fail "owner login request failed"
-printf '%s' "$login_result" | grep -q 'Household Access\|Household Dashboard\|Welcome' || fail "owner login did not reach an authenticated page"
+grep -Eq 'Household Access|Household Dashboard|Welcome' <<<"$login_result" || fail "owner login did not reach an authenticated page"
 pass "owner login succeeds"
 
 planning_page="$(curl -fsS -b "$COOKIE_JAR" "${BASE_URL}/phase7.php")" || fail "Phase 7 workspace unavailable"
-printf '%s' "$planning_page" | grep -q 'Planning, Tasks &amp; Automation\|Planning, Tasks & Automation' || fail "Phase 7 workspace title missing"
-csrf="$(printf '%s' "$planning_page" | extract_value csrf_token)"
-action_key="$(printf '%s' "$planning_page" | extract_value action_key)"
+grep -Eq 'Planning, Tasks &amp; Automation|Planning, Tasks & Automation' <<<"$planning_page" || fail "Phase 7 workspace title missing"
+csrf="$(extract_value csrf_token "$planning_page")"
+action_key="$(extract_value action_key "$planning_page")"
 [[ "$csrf" =~ ^[a-f0-9]{64}$ ]] || fail "Phase 7 CSRF token missing"
 [[ "$action_key" =~ ^[a-f0-9]{64}$ ]] || fail "Phase 7 action key missing"
 pass "Phase 7 workspace loads with protected action tokens"
@@ -56,9 +57,9 @@ curl -fsS -L -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
   "${BASE_URL}/phase7.php" >/dev/null || fail "Phase 7 task creation request failed"
 
 planning_page="$(curl -fsS -b "$COOKIE_JAR" "${BASE_URL}/phase7.php")" || fail "Phase 7 workspace unavailable after task creation"
-printf '%s' "$planning_page" | grep -Fq "$title" || fail "created Phase 7 task was not visible"
-csrf="$(printf '%s' "$planning_page" | extract_value csrf_token)"
-action_key="$(printf '%s' "$planning_page" | extract_value action_key)"
+grep -Fq "$title" <<<"$planning_page" || fail "created Phase 7 task was not visible"
+csrf="$(extract_value csrf_token "$planning_page")"
+action_key="$(extract_value action_key "$planning_page")"
 [[ "$csrf" =~ ^[a-f0-9]{64}$ ]] || fail "refreshed Phase 7 CSRF token missing"
 [[ "$action_key" =~ ^[a-f0-9]{64}$ ]] || fail "refreshed Phase 7 action key missing"
 
@@ -81,8 +82,8 @@ status="$(mysql --host="${DB_HOST:-127.0.0.1}" --port="${DB_PORT:-3306}" --user=
 pass "Phase 7 task completion persists"
 
 health="$(curl -fsS -H "X-Homestead-Health-Key: ${HEALTH_KEY}" "${BASE_URL}/api/phase7-health.php")" || fail "Phase 7 health endpoint request failed"
-printf '%s' "$health" | grep -Eq '"ok"[[:space:]]*:[[:space:]]*true' || { printf '%s\n' "$health" >&2; fail "Phase 7 health endpoint did not report ok"; }
-printf '%s' "$health" | grep -Eq '"phase"[[:space:]]*:[[:space:]]*7' || fail "Phase 7 health response omitted phase identifier"
+grep -Eq '"ok"[[:space:]]*:[[:space:]]*true' <<<"$health" || { printf '%s\n' "$health" >&2; fail "Phase 7 health endpoint did not report ok"; }
+grep -Eq '"phase"[[:space:]]*:[[:space:]]*7' <<<"$health" || fail "Phase 7 health response omitted phase identifier"
 pass "Phase 7 health endpoint passes"
 
 echo "Phase 7 HTTP smoke suite passed."
