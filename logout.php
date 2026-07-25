@@ -10,6 +10,8 @@ use function Homestead\flash;
 use function Homestead\redirect;
 use function Homestead\verify_csrf;
 
+header('Cache-Control: no-store, max-age=0');
+
 $user = $auth->user();
 if ($user === null) {
     redirect('/login.php');
@@ -18,20 +20,23 @@ if ($user === null) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf($_POST['csrf_token'] ?? null);
 
-    $statement = $pdo->prepare(
-        "INSERT INTO authentication_events
-         (user_id, household_id, event_type, ip_address, user_agent)
-         VALUES (?, ?, 'logout', ?, ?)"
-    );
-    $statement->execute([
-        $user['id'],
-        $user['household_id'],
-        $_SERVER['REMOTE_ADDR'] ?? null,
-        substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 255),
-    ]);
+    try {
+        $statement = $pdo->prepare(
+            "INSERT INTO authentication_events
+             (user_id, household_id, event_type, ip_address, user_agent)
+             VALUES (?, ?, 'logout', ?, ?)"
+        );
+        $statement->execute([
+            $user['id'],
+            $user['household_id'],
+            $_SERVER['REMOTE_ADDR'] ?? null,
+            substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 255),
+        ]);
+    } catch (Throwable $exception) {
+        error_log('Homestead logout audit failed: ' . $exception->getMessage());
+    }
 
     $auth->logout();
-    unset($_SESSION['csrf_token'], $_SESSION['recipe_completion_key']);
     flash('success', 'You have been signed out.');
     redirect('/login.php');
 }
@@ -50,7 +55,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     <link rel="stylesheet" href="/assets/css/app.css">
 </head>
 <body>
-<main class="page-container" style="max-width:620px;padding-top:8vh">
+<a class="skip-link" href="#main-content">Skip to sign out</a>
+<main id="main-content" class="page-container" style="max-width:620px;padding-top:8vh">
     <section class="panel">
         <p class="eyebrow">Account security</p>
         <h1>Sign out?</h1>
