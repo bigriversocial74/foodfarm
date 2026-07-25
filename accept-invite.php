@@ -98,6 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_array($invitation)) {
         $_SESSION['user_id'] = $userId;
         $_SESSION['member_id'] = $memberId;
         $_SESSION['household_id'] = (int)$invitation['household_id'];
+        $_SESSION['auth_version'] = 1;
         $_SESSION['authenticated_at'] = time();
         flash('success', 'Your Homestead account is ready.');
         redirect('/phase3.php');
