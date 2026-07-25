@@ -54,6 +54,7 @@ if ($failures === []) {
     foreach ([
         'public function recordPurchase',
         'action_key = ? FOR UPDATE',
+        'lockHousehold',
         'lockInventoryItem',
         'updateCostBasis',
         'food_ledger_events',
@@ -67,6 +68,7 @@ if ($failures === []) {
     foreach ([
         'public function recordWaste',
         'prepared_food_batch_id',
+        'lockHousehold',
         'FOR UPDATE',
         'estimated_value',
         'food_ledger_events',
@@ -106,6 +108,7 @@ if ($failures === []) {
 
     foreach ([
         'assertActiveMember',
+        'lockHousehold',
         'lockInventoryItem',
         'assertSupplier',
         'updateCostBasis',
