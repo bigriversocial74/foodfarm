@@ -36,6 +36,7 @@ jobs:
           unzip -o /tmp/phase8-package.zip -d .
           rm -rf .phase8-sync
           rm -f .github/workflows/phase8-package-sync.yml
+          rm -f .github/workflows/phase8-certification.yml
 
       - name: Validate synchronized source
         run: |
