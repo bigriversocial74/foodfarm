@@ -15,7 +15,13 @@ if ($environment === 'production' && $debug) {
     exit('Unsafe production configuration: debug mode must be disabled.');
 }
 
+require_once __DIR__ . '/Support.php';
+Homestead\apply_security_headers($environment === 'production');
+
 if (session_status() !== PHP_SESSION_ACTIVE) {
+    ini_set('session.use_strict_mode', '1');
+    ini_set('session.use_only_cookies', '1');
+    ini_set('session.cookie_httponly', '1');
     session_name((string)($config['security']['session_name'] ?? 'homestead_session'));
     session_set_cookie_params([
         'httponly' => true,
@@ -34,7 +40,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $requestPath === '/phase4.php' && (
     $_POST['completion_key'] = (string)($_SESSION['recipe_completion_key'] ?? '');
 }
 
-require_once __DIR__ . '/Support.php';
 require_once __DIR__ . '/Database.php';
 require_once __DIR__ . '/HouseholdContext.php';
 require_once __DIR__ . '/Auth.php';
