@@ -63,6 +63,20 @@ CREATE TABLE IF NOT EXISTS starter_kit_recipes (
     CONSTRAINT fk_kit_recipes_recipe FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS starter_kit_recipe_snapshots (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    starter_kit_version_id BIGINT UNSIGNED NOT NULL,
+    source_recipe_id BIGINT UNSIGNED NULL,
+    snapshot_hash CHAR(64) NOT NULL,
+    recipe_snapshot JSON NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_kit_recipe_snapshot_version FOREIGN KEY (starter_kit_version_id) REFERENCES starter_kit_versions(id) ON DELETE CASCADE,
+    CONSTRAINT fk_kit_recipe_snapshot_source FOREIGN KEY (source_recipe_id) REFERENCES recipes(id) ON DELETE SET NULL,
+    UNIQUE KEY uq_kit_recipe_snapshot_source (starter_kit_version_id, source_recipe_id),
+    INDEX idx_kit_recipe_snapshots_version (starter_kit_version_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS starter_kit_tasks (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     starter_kit_version_id BIGINT UNSIGNED NOT NULL,
