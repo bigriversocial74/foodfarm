@@ -66,7 +66,26 @@ jobs:
           coverage: none
 
       - name: Lint PHP files
-        run: find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
+        run: |
+          set +e
+          report="$RUNNER_TEMP/php-lint-${{ matrix.database }}.txt"
+          : > "$report"
+          result=0
+          while IFS= read -r -d '' file; do
+            echo "=== $file ===" >> "$report"
+            php -l "$file" >> "$report" 2>&1 || result=1
+          done < <(find . -type f -name '*.php' -not -path './vendor/*' -print0)
+          cat "$report"
+          exit "$result"
+
+      - name: Upload PHP lint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: php-lint-${{ matrix.database }}
+          path: ${{ runner.temp }}/php-lint-${{ matrix.database }}.txt
+          if-no-files-found: error
+          retention-days: 3
 
       - name: Validate shell scripts
         run: bash -n tests/http_smoke.sh
