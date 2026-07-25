@@ -34,10 +34,15 @@ $phase4Hardening = $read('database/phase4_hardening.sql');
 $phase5Migration = $read('database/phase5_hardening.sql');
 $css = $read('assets/css/app.css');
 $workflow = $read('.github/workflows/php-lint.yml');
-$healthFiles = [];
-foreach (range(2, 8) as $phaseNumber) {
-    $healthFiles[] = $read('api/phase' . $phaseNumber . '-health.php');
-}
+$healthFiles = [
+    $read('api/phase2-health.php'),
+    $read('api/phase3-health.php'),
+    $read('api/phase4-health.php'),
+    $read('api/phase5-health.php'),
+    $read('api/phase6-health.php'),
+    $read('api/phase7-health.php'),
+    $read('api/phase8-health.php'),
+];
 
 $checks = [
     'Phase 2 requires authenticated user' => str_contains($phase2, '$auth->requireUser()'),
