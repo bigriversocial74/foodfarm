@@ -15,39 +15,74 @@ jobs:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
-      - name: Check out Phase 7 branch
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref }}
-
-      - name: Reassemble and validate Phase 7 package
+      - name: Clone Phase 7 branch
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          decode_package() {
-            local source_file="$1"
-            tr -d '\r\n\t ' < "$source_file" | base64 --decode --ignore-garbage > /tmp/phase7-package.zip
-            unzip -t /tmp/phase7-package.zip
+          git clone --depth 1 --branch "${{ github.head_ref }}" \
+            "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" repo
+
+      - name: Recover and validate Phase 7 package
+        run: |
+          set -euo pipefail
+          cd repo
+          python3 - <<'PY'
+          from pathlib import Path
+          import base64
+          import io
+          import zipfile
+
+          root = Path('.phase7-sync')
+          candidates = {
+              'complete': root.joinpath('package.b64').read_text(encoding='utf-8'),
+              'chunks': ''.join(path.read_text(encoding='utf-8') for path in sorted(root.glob('chunk-*'))),
           }
 
-          if decode_package .phase7-sync/package.b64; then
-            echo 'Validated complete Phase 7 package.'
-          else
-            echo 'Complete package did not validate; trying ordered chunks.'
-            cat .phase7-sync/chunk-* > /tmp/phase7-package.b64
-            decode_package /tmp/phase7-package.b64
-          fi
+          recovered = None
+          for name, encoded in candidates.items():
+              cleaned = ''.join(encoded.split())
+              padding = '=' * ((4 - len(cleaned) % 4) % 4)
+              print(f'{name}: encoded={len(cleaned)} mod4={len(cleaned) % 4} padding={len(padding)}')
+              try:
+                  payload = base64.b64decode(cleaned + padding, validate=False)
+              except Exception as error:
+                  print(f'{name}: base64 decode failed: {error}')
+                  continue
+              print(f'{name}: decoded={len(payload)} first={payload[:8]!r} last={payload[-8:]!r}')
+              try:
+                  with zipfile.ZipFile(io.BytesIO(payload)) as archive:
+                      names = archive.namelist()
+                      bad = archive.testzip()
+                      print(f'{name}: entries={len(names)} bad={bad!r}')
+                      if bad is None and names:
+                          Path('/tmp/phase7-package.zip').write_bytes(payload)
+                          recovered = name
+                          break
+              except Exception as error:
+                  print(f'{name}: zip validation failed: {error}')
+
+          if recovered is None:
+              raise SystemExit('No recoverable Phase 7 ZIP package was found.')
+          print(f'Recovered Phase 7 package from {recovered}.')
+          PY
+          unzip -t /tmp/phase7-package.zip
           unzip -Z1 /tmp/phase7-package.zip
 
       - name: Extract authoritative Phase 7 source
         run: |
           set -euo pipefail
+          cd repo
           unzip -o /tmp/phase7-package.zip -d .
           rm -rf .phase7-sync
           rm -f .github/workflows/phase7-package-sync.yml
 
       - name: Commit synchronized source
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          cd repo
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
