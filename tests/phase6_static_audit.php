@@ -23,9 +23,9 @@ foreach ($files as $name => $path) {
 $content = array_map(static fn(string $path): string => (string)file_get_contents($path), $files);
 $checks = [
     'route requires authenticated user' => str_contains($content['route'], '$auth->requireUser()'),
-    'route enforces garden permission' => str_contains($content['route'], "$auth->requirePermission($user, 'garden.manage')"),
-    'route enforces harvest permission' => str_contains($content['route'], "$auth->requirePermission($user, 'harvest.record')"),
-    'route enforces preservation permission' => str_contains($content['route'], "$auth->requirePermission($user, 'preservation.manage')"),
+    'route enforces garden permission' => str_contains($content['route'], "\$auth->requirePermission(\$user, 'garden.manage')"),
+    'route enforces harvest permission' => str_contains($content['route'], "\$auth->requirePermission(\$user, 'harvest.record')"),
+    'route enforces preservation permission' => str_contains($content['route'], "\$auth->requirePermission(\$user, 'preservation.manage')"),
     'route scopes garden and preservation reads' => str_contains($content['route'], 'if ($canViewGarden)')
         && str_contains($content['route'], 'if ($canViewPreservation)'),
     'harvest uses transaction' => str_contains($content['service'], 'public function recordHarvest')
