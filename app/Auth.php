@@ -89,10 +89,21 @@ final class Auth
         }
 
         $defaults = [
-            'administrator' => ['members.manage', 'members.invite', 'permissions.manage', 'storage.manage', 'inventory.manage'],
-            'adult_member' => ['storage.view', 'inventory.view', 'inventory.manage', 'tasks.manage'],
-            'youth_member' => ['storage.view', 'inventory.view', 'tasks.complete'],
-            'guest_helper' => ['tasks.complete'],
+            'administrator' => [
+                'members.manage', 'members.invite', 'permissions.manage',
+                'storage.manage', 'inventory.manage', 'recipes.view',
+                'recipes.manage', 'meals.manage', 'recipes.complete'
+            ],
+            'adult_member' => [
+                'storage.view', 'inventory.view', 'inventory.manage',
+                'tasks.manage', 'recipes.view', 'recipes.manage',
+                'meals.manage', 'recipes.complete'
+            ],
+            'youth_member' => [
+                'storage.view', 'inventory.view', 'tasks.complete',
+                'recipes.view', 'recipes.complete'
+            ],
+            'guest_helper' => ['tasks.complete', 'recipes.view'],
         ];
 
         $allowed = $defaults[(string)$user['role']] ?? [];
