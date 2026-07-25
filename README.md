@@ -1,6 +1,6 @@
 # Homestead
 
-Homestead is a household food system for growing, storing, cooking, preserving, planning, forecasting, measuring cost and waste, and coordinating real food.
+Homestead is a household food system for growing, storing, cooking, preserving, planning, forecasting, balancing household nutrition, measuring cost and waste, and coordinating real food.
 
 ## Interfaces
 
@@ -15,6 +15,7 @@ Homestead is a household food system for growing, storing, cooking, preserving, 
 - `/phase7.php` — daily planning, assignments, recurring tasks, automation cycles, and shopping suggestions
 - `/phase8.php` — food forecasting, seasonal planning, shortage projections, and self-sufficiency intelligence
 - `/phase9.php` — purchase costs, recipe economics, food waste, budgets, supplier comparisons, and savings intelligence
+- `/phase10.php` — ingredient nutrition, dietary patterns, allergen controls, recipe nutrition, meal-plan assessments, and household wellness planning
 - `/prepared-food.php` — prepared-food consumption, freezing, spoilage, and ledger posting
 - `/starter-kit-lifecycle.php` — Starter Kit version duplication, retirement, cancellation, and activation lifecycle
 - `/activate-kit.php?token=...` — customer kit review and household provisioning
@@ -26,6 +27,7 @@ Homestead is a household food system for growing, storing, cooking, preserving, 
 - `/api/phase7-health.php` — protected planning, task, suggestion, and lifecycle validation
 - `/api/phase8-health.php` — protected forecast, projection, seasonal-plan, and recommendation validation
 - `/api/phase9-health.php` — protected purchase, cost-basis, waste, recipe-cost, finance-snapshot, and recommendation validation
+- `/api/phase10-health.php` — protected nutrition-profile, allergen, recipe-snapshot, meal-assessment, and recommendation validation
 
 ## Requirements
 
@@ -59,6 +61,7 @@ database/phase6_grow_harvest_preserve.sql
 database/phase7_planning_tasks_automation.sql
 database/phase8_forecasting_seasonal_self_sufficiency.sql
 database/phase9_cost_waste_savings_intelligence.sql
+database/phase10_nutrition_dietary_wellness.sql
 ```
 
 Create the first owner from the command line:
@@ -78,7 +81,7 @@ php -S 127.0.0.1:8080
 Health endpoints require either an authenticated platform-administrator session or the configured key in the `X-Homestead-Health-Key` header:
 
 ```bash
-curl -H "X-Homestead-Health-Key: YOUR_CONFIGURED_KEY" https://example.com/api/phase9-health.php
+curl -H "X-Homestead-Health-Key: YOUR_CONFIGURED_KEY" https://example.com/api/phase10-health.php
 ```
 
 Production health failures return a generic message rather than database or exception details.
@@ -94,6 +97,22 @@ docs/WHOLE_APP_AUDIT.md
 The initial whole-application score was **5.9/10**. The audited repository code and release-certification matrix reached **10/10** after the complete security, authorization, concurrency, migration, accessibility, database, and HTTP validation passes.
 
 Phase-specific MySQL 8 and MariaDB 10.11 workflows extend that baseline with clean migration, replay, database integration, protected-health, and authenticated HTTP certification.
+
+## Nutrition, dietary planning, and household wellness
+
+- Household-entered ingredient nutrition profiles and source confidence
+- Member dietary patterns and optional planning targets
+- Member allergen, intolerance, and preference rules
+- Ingredient contains, may-contain, and shared-facility tags
+- Deterministic recipe nutrition snapshots with per-serving calculations
+- Explicit missing-profile and unit-mismatch states
+- Source-watermarked meal-plan assessments
+- Member meal coverage, variety, optional target comparisons, and allergen conflict detection
+- Transparent household balance and data-completeness scores
+- Nutrition recommendation-to-Phase-7-task conversion with provenance
+- Guarded recommendation lifecycles and protected health diagnostics
+
+Nutrition values and targets are household-entered planning data. Homestead does not diagnose conditions, prescribe diets, calculate clinical requirements, provide medical advice, or certify allergen safety.
 
 ## Cost, waste, and savings intelligence
 
@@ -164,7 +183,7 @@ The tracked production-share score is an average of item-level recorded inflow r
 - Guarded preservation input deductions with rollback protection
 - Separate preserved-food output inventory records
 - Preservation input provenance and immutable lifecycle ledger entries
-- Role defaults and member-specific permission overrides for garden, harvest, preservation, and household finance work
+- Role defaults and member-specific permission overrides for garden, harvest, preservation, household finance, and nutrition work
 
 ## Starter Kit capabilities
 
@@ -185,12 +204,12 @@ The tracked production-share score is an average of item-level recorded inflow r
 
 ## Family wellness privacy
 
-Height, weight, and activity levels remain optional and private by default. They are not copied into kit orders, activation records, inventory provenance, shopping lists, delivery requests, garden records, harvests, preservation batches, planning cycles, tasks, shopping suggestions, forecast snapshots, projections, recommendations, seasonal plans, purchase records, waste events, recipe-cost snapshots, finance snapshots, or finance recommendations.
+Height, weight, and activity levels remain optional and private by default. They are not copied into kit orders, activation records, inventory provenance, shopping lists, delivery requests, garden records, harvests, preservation batches, planning cycles, tasks, shopping suggestions, forecast snapshots, projections, recommendations, seasonal plans, purchase records, waste events, recipe-cost snapshots, finance snapshots, finance recommendations, nutrition profiles, allergen rules, recipe nutrition snapshots, meal-plan nutrition assessments, or nutrition recommendations.
 
 ## Current scope boundary
 
-Phase 5 records optional delivery requests but does not dispatch drivers, calculate delivery routes, charge delivery fees, or integrate with grocery-delivery providers. Email delivery, password-reset email, multi-household switching, external notifications, automatic purchasing, weather prediction, bank synchronization, receipt OCR, tax accounting, and physical device control remain deferred. Phase 6 accepts manual and simulated grow readings; real sensor adapters remain a later integration layer. Phase 7 creates internal plans and recommendations but does not execute external actions. Phase 8 estimates future household conditions from recorded data but does not guarantee yield, demand, availability, or food independence. Phase 9 measures recorded household food economics but does not replace bookkeeping or professional financial advice.
+Phase 5 records optional delivery requests but does not dispatch drivers, calculate delivery routes, charge delivery fees, or integrate with grocery-delivery providers. Email delivery, password-reset email, multi-household switching, external notifications, automatic purchasing, weather prediction, bank synchronization, receipt OCR, tax accounting, and physical device control remain deferred. Phase 6 accepts manual and simulated grow readings; real sensor adapters remain a later integration layer. Phase 7 creates internal plans and recommendations but does not execute external actions. Phase 8 estimates future household conditions from recorded data but does not guarantee yield, demand, availability, or food independence. Phase 9 measures recorded household food economics but does not replace bookkeeping or professional financial advice. Phase 10 compares household-entered food data and optional targets but does not provide clinical nutrition, medical guidance, or allergen certification.
 
 ## Safety boundary
 
-Homestead supports household planning and record keeping. It does not certify food safety, replace authoritative preservation guidance, offer medical, financial, accounting, tax, or agricultural advice, or automatically operate physical devices.
+Homestead supports household planning and record keeping. It does not certify food safety, replace authoritative preservation guidance, offer medical, financial, accounting, tax, nutrition, or agricultural advice, or automatically operate physical devices.
