@@ -19,6 +19,7 @@ $phase6 = $read('phase6.php');
 $phase7 = $read('phase7.php');
 $phase8 = $read('phase8.php');
 $phase9 = $read('phase9.php');
+$phase10 = $read('phase10.php');
 $login = $read('login.php');
 $logout = $read('logout.php');
 $invite = $read('accept-invite.php');
@@ -44,6 +45,7 @@ $healthFiles = [
     $read('api/phase7-health.php'),
     $read('api/phase8-health.php'),
     $read('api/phase9-health.php'),
+    $read('api/phase10-health.php'),
 ];
 
 $checks = [
@@ -57,7 +59,7 @@ $checks = [
     'Auth binds session member household and auth version' => str_contains($auth, 'hm.id = ? AND hm.household_id = ?') && str_contains($auth, 'u.auth_version = ?'),
     'Auth clears session identity during logout' => str_contains($auth, '$_SESSION = []'),
     'Auth uses centralized safe login redirect' => str_contains($auth, "redirect('/login.php')"),
-    'Role permission defaults include view task and finance permissions' => str_contains($auth, "'storage.view'") && str_contains($auth, "'tasks.complete'") && str_contains($auth, "'finance.view'") && str_contains($auth, "'finance.manage'"),
+    'Role permission defaults include task finance and nutrition permissions' => str_contains($auth, "'storage.view'") && str_contains($auth, "'tasks.complete'") && str_contains($auth, "'finance.view'") && str_contains($auth, "'finance.manage'") && str_contains($auth, "'nutrition.view'") && str_contains($auth, "'nutrition.manage'"),
     'Phase 3 has administration access guard' => str_contains($phase3, 'You do not have permission to administer household access.'),
     'Phase 3 serializes invitation creation' => str_contains($phase3, 'SELECT id FROM households WHERE id = ? FOR UPDATE'),
     'Phase 3 prevents duplicate invitations' => str_contains($phase3, 'active invitation already exists'),
@@ -100,15 +102,18 @@ $checks = [
     'Phase 7 requires task permissions' => str_contains($phase7, 'tasks.manage') && str_contains($phase7, 'tasks.complete'),
     'Phase 8 requires forecast permissions' => str_contains($phase8, 'inventory.view') && str_contains($phase8, 'tasks.manage'),
     'Phase 9 requires finance permissions' => str_contains($phase9, 'finance.view') && str_contains($phase9, 'finance.manage'),
+    'Phase 10 requires nutrition permissions and safety boundary' => str_contains($phase10, 'nutrition.view') && str_contains($phase10, 'nutrition.manage') && str_contains($phase10, 'not diagnosis, treatment, or medical advice'),
     'Activation token suppresses referrer leakage' => str_contains($activation, 'Referrer-Policy: no-referrer'),
     'Keyboard focus treatment exists' => str_contains($css, ':focus-visible') && str_contains($css, '.skip-link'),
     'Reduced motion is supported' => str_contains($css, 'prefers-reduced-motion'),
     'High contrast mode is supported' => str_contains($css, 'forced-colors'),
     'CI validates migration replay' => str_contains($workflow, 'Replay incremental migrations'),
     'CI imports Phase 9 migration' => str_contains($workflow, 'database/phase9_cost_waste_savings_intelligence.sql'),
+    'CI imports Phase 10 migration' => str_contains($workflow, 'database/phase10_nutrition_dietary_wellness.sql'),
     'CI runs database workflow integration' => str_contains($workflow, 'tests/workflow_integration.php'),
     'CI runs Phase 9 integration' => str_contains($workflow, 'tests/phase9_integration.php'),
-    'CI runs authenticated HTTP smoke tests' => str_contains($workflow, 'tests/http_smoke.sh') && str_contains($workflow, 'tests/phase9_http_smoke.sh'),
+    'CI runs Phase 10 integration' => str_contains($workflow, 'tests/phase10_integration.php'),
+    'CI runs authenticated HTTP smoke tests' => str_contains($workflow, 'tests/http_smoke.sh') && str_contains($workflow, 'tests/phase9_http_smoke.sh') && str_contains($workflow, 'tests/phase10_http_smoke.sh'),
 ];
 
 $failed = [];
