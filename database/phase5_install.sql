@@ -1,7 +1,7 @@
 SET NAMES utf8mb4;
 SET time_zone = '+00:00';
 
-CREATE TABLE starter_kits (
+CREATE TABLE IF NOT EXISTS starter_kits (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(180) NOT NULL,
     slug VARCHAR(190) NOT NULL UNIQUE,
@@ -16,7 +16,7 @@ CREATE TABLE starter_kits (
     CONSTRAINT fk_starter_kits_user FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE starter_kit_versions (
+CREATE TABLE IF NOT EXISTS starter_kit_versions (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     starter_kit_id BIGINT UNSIGNED NOT NULL,
     version_number INT UNSIGNED NOT NULL,
@@ -31,7 +31,7 @@ CREATE TABLE starter_kit_versions (
     UNIQUE KEY uq_kit_sku (sku)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE starter_kit_items (
+CREATE TABLE IF NOT EXISTS starter_kit_items (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     starter_kit_version_id BIGINT UNSIGNED NOT NULL,
     item_name VARCHAR(180) NOT NULL,
@@ -55,7 +55,7 @@ CREATE TABLE starter_kit_items (
     INDEX idx_kit_items_version (starter_kit_version_id, sort_order)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE starter_kit_recipes (
+CREATE TABLE IF NOT EXISTS starter_kit_recipes (
     starter_kit_version_id BIGINT UNSIGNED NOT NULL,
     recipe_id BIGINT UNSIGNED NOT NULL,
     PRIMARY KEY (starter_kit_version_id, recipe_id),
@@ -63,7 +63,7 @@ CREATE TABLE starter_kit_recipes (
     CONSTRAINT fk_kit_recipes_recipe FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE starter_kit_tasks (
+CREATE TABLE IF NOT EXISTS starter_kit_tasks (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     starter_kit_version_id BIGINT UNSIGNED NOT NULL,
     title VARCHAR(180) NOT NULL,
@@ -75,7 +75,7 @@ CREATE TABLE starter_kit_tasks (
     CONSTRAINT fk_kit_tasks_version FOREIGN KEY (starter_kit_version_id) REFERENCES starter_kit_versions(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE starter_kit_orders (
+CREATE TABLE IF NOT EXISTS starter_kit_orders (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     household_id BIGINT UNSIGNED NULL,
     starter_kit_version_id BIGINT UNSIGNED NOT NULL,
@@ -91,7 +91,7 @@ CREATE TABLE starter_kit_orders (
     UNIQUE KEY uq_kit_external_order (external_order_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE starter_kit_activations (
+CREATE TABLE IF NOT EXISTS starter_kit_activations (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     starter_kit_order_id BIGINT UNSIGNED NOT NULL,
     household_id BIGINT UNSIGNED NULL,
@@ -106,7 +106,7 @@ CREATE TABLE starter_kit_activations (
     CONSTRAINT fk_kit_activation_member FOREIGN KEY (activated_by_member_id) REFERENCES household_members(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE starter_kit_activation_items (
+CREATE TABLE IF NOT EXISTS starter_kit_activation_items (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     starter_kit_activation_id BIGINT UNSIGNED NOT NULL,
     starter_kit_item_id BIGINT UNSIGNED NOT NULL,
