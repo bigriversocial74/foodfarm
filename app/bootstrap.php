@@ -89,6 +89,7 @@ require_once __DIR__ . '/Database.php';
 require_once __DIR__ . '/HouseholdContext.php';
 require_once __DIR__ . '/Auth.php';
 require_once __DIR__ . '/RecipeService.php';
+require_once __DIR__ . '/GrowPreserveService.php';
 require_once __DIR__ . '/StarterKitService.php';
 require_once __DIR__ . '/StarterKitAdminService.php';
 
