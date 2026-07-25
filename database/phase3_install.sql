@@ -34,11 +34,3 @@ CREATE TABLE IF NOT EXISTS authentication_events (
     CONSTRAINT fk_auth_event_household FOREIGN KEY (household_id) REFERENCES households(id) ON DELETE CASCADE,
     INDEX idx_auth_event_household_time (household_id, occurred_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-UPDATE users
-SET password_hash = '$2y$12$y9TwQhEAzPO3UyDcZw1M5eo5hEKVAz9/XJWi9GqF5fXi47k90sy9K'
-WHERE id = 1 AND (password_hash = '' OR password_hash = 'phase2-placeholder');
-
-UPDATE household_members
-SET user_id = 1
-WHERE id = 1 AND user_id IS NULL;

@@ -74,6 +74,26 @@ CREATE TABLE IF NOT EXISTS prepared_food_batches (
     INDEX idx_prepared_use_by (use_by_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS prepared_food_actions (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    household_id BIGINT UNSIGNED NOT NULL,
+    prepared_food_batch_id BIGINT UNSIGNED NOT NULL,
+    member_id BIGINT UNSIGNED NULL,
+    action_key CHAR(64) NOT NULL,
+    action_type ENUM('consumed','spoiled','frozen') NOT NULL,
+    quantity DECIMAL(8,2) NOT NULL,
+    unit VARCHAR(30) NOT NULL DEFAULT 'servings',
+    destination_location_id BIGINT UNSIGNED NULL,
+    notes TEXT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_prepared_actions_household FOREIGN KEY (household_id) REFERENCES households(id) ON DELETE CASCADE,
+    CONSTRAINT fk_prepared_actions_batch FOREIGN KEY (prepared_food_batch_id) REFERENCES prepared_food_batches(id) ON DELETE CASCADE,
+    CONSTRAINT fk_prepared_actions_member FOREIGN KEY (member_id) REFERENCES household_members(id) ON DELETE SET NULL,
+    CONSTRAINT fk_prepared_actions_location FOREIGN KEY (destination_location_id) REFERENCES storage_locations(id) ON DELETE SET NULL,
+    UNIQUE KEY uq_prepared_action_household_key (household_id, action_key),
+    INDEX idx_prepared_actions_batch_time (prepared_food_batch_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS meal_plan_members (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     meal_plan_item_id BIGINT UNSIGNED NOT NULL,
@@ -85,9 +105,23 @@ CREATE TABLE IF NOT EXISTS meal_plan_members (
     UNIQUE KEY uq_meal_member (meal_plan_item_id, household_member_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-ALTER TABLE recipes
-    ADD COLUMN IF NOT EXISTS yield_quantity DECIMAL(10,2) NULL AFTER servings,
-    ADD COLUMN IF NOT EXISTS yield_unit VARCHAR(30) NULL AFTER yield_quantity;
+SET @sql := IF(
+    (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'recipes' AND COLUMN_NAME = 'yield_quantity') = 0,
+    'ALTER TABLE recipes ADD COLUMN yield_quantity DECIMAL(10,2) NULL AFTER servings',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
-ALTER TABLE meal_plan_items
-    ADD COLUMN IF NOT EXISTS status ENUM('planned','prepared','served','skipped') NOT NULL DEFAULT 'planned' AFTER notes;
+SET @sql := IF(
+    (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'recipes' AND COLUMN_NAME = 'yield_unit') = 0,
+    'ALTER TABLE recipes ADD COLUMN yield_unit VARCHAR(30) NULL AFTER yield_quantity',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := IF(
+    (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'meal_plan_items' AND COLUMN_NAME = 'status') = 0,
+    "ALTER TABLE meal_plan_items ADD COLUMN status ENUM('planned','prepared','served','skipped') NOT NULL DEFAULT 'planned' AFTER notes",
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

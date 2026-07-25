@@ -1,0 +1,26 @@
+# Include these rules inside the Homestead server block.
+
+location ~ /(?:^|/)\. {
+    deny all;
+    return 404;
+}
+
+location ~ ^/(?:app|bin|database|docs|tests|deploy)(?:/|$) {
+    deny all;
+    return 404;
+}
+
+location ~ ^/(?:config(?:-example)?\.php|README(?:\.md)?|.*\.(?:sql|log|ini|env|yml|yaml))$ {
+    deny all;
+    return 404;
+}
+
+location ~ \.php$ {
+    include fastcgi_params;
+    fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+    fastcgi_pass unix:/run/php/php8.3-fpm.sock;
+}
+
+add_header X-Content-Type-Options nosniff always;
+add_header X-Frame-Options DENY always;
+server_tokens off;

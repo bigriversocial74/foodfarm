@@ -5,16 +5,16 @@ Homestead is a household food system for growing, storing, cooking, preserving, 
 ## Interfaces
 
 - `/index.php` — visual application shell
-- `/phase2.php` — household, family, storage, inventory, and ledger workspace
+- `/phase2.php` — authenticated household, family, storage, inventory, and ledger workspace
 - `/login.php` — account login
-- `/phase3.php` — invitations, roles, permission overrides, and authentication history
+- `/phase3.php` — restricted invitations, roles, permission overrides, and authentication history
 - `/phase4.php` — recipes, family meal planning, ingredient deductions, and prepared food
-- `/phase5.php` — administrator starter-kit builder, versions, fulfillment mapping, orders, and activation links
+- `/phase5.php` — platform-administrator starter-kit builder, versions, fulfillment mapping, orders, and activation links
 - `/activate-kit.php?token=...` — customer kit review and household provisioning
-- `/api/phase2-health.php` — Phase 2 database validation
-- `/api/phase3-health.php` — Phase 3 authentication validation
-- `/api/phase4-health.php` — Phase 4 food workflow validation
-- `/api/phase5-health.php` — Phase 5 starter-kit validation
+- `/api/phase2-health.php` — protected Phase 2 database validation
+- `/api/phase3-health.php` — protected Phase 3 authentication validation
+- `/api/phase4-health.php` — protected Phase 4 food workflow validation
+- `/api/phase5-health.php` — protected Phase 5 starter-kit validation
 
 ## Requirements
 
@@ -31,15 +31,17 @@ Copy the example configuration:
 cp config-example.php config.php
 ```
 
-Update database credentials and application URL. Import SQL in order:
+Set explicit database credentials, application URL, environment, `debug=false` in production, and a long random `security.health_key`. Import SQL in order:
 
 ```text
 database/schema.sql
 database/phase2_install.sql
 database/phase3_install.sql
 database/phase4_install.sql
+database/phase4_hardening.sql
 database/phase5_install.sql
 database/phase5_shopping_extension.sql
+database/phase5_hardening.sql
 ```
 
 Start a local server:
@@ -48,7 +50,32 @@ Start a local server:
 php -S 127.0.0.1:8080
 ```
 
-Open `/api/phase5-health.php` and confirm `ok: true`, sign in at `/login.php`, then open `/phase5.php`.
+## Protected health checks
+
+Health endpoints require either an authenticated platform-administrator session or the configured key in the `X-Homestead-Health-Key` header:
+
+```bash
+curl -H "X-Homestead-Health-Key: YOUR_CONFIGURED_KEY" https://example.com/api/phase5-health.php
+```
+
+Production health failures return a generic message rather than database or exception details.
+
+## Whole-application audit
+
+The repository-wide audit and repair record is maintained in:
+
+```text
+docs/WHOLE_APP_AUDIT.md
+```
+
+The initial whole-application score was **5.9/10**. The current provisional source-review score is **8.4/10** after three repair passes. The application is not certified as 10/10. A final score requires completed code review, passing CI, clean SQL imports, database-backed end-to-end tests, protected health validation, and deployed smoke testing.
+
+CI currently includes:
+
+- PHP syntax validation across all PHP files
+- Whole-application static security regression checks
+- Recipe workflow regression checks
+- Phase 5 starter-kit security regression checks
 
 ## Phase 5 capabilities
 

@@ -15,33 +15,37 @@ final class HouseholdContext
 
     public function id(): int
     {
-        if (!empty($_SESSION['household_id'])) {
-            return (int)$_SESSION['household_id'];
+        $householdId = (int)($_SESSION['household_id'] ?? 0);
+        $memberId = (int)($_SESSION['member_id'] ?? 0);
+        $userId = (int)($_SESSION['user_id'] ?? 0);
+
+        if ($householdId < 1 || $memberId < 1 || $userId < 1) {
+            throw new RuntimeException('An authenticated household context is required.');
         }
 
-        $id = (int)$this->pdo->query('SELECT id FROM households ORDER BY id ASC LIMIT 1')->fetchColumn();
-        if ($id < 1) {
-            throw new RuntimeException('No household exists. Import database/phase2_install.sql first.');
+        $statement = $this->pdo->prepare(
+            "SELECT 1
+             FROM household_members
+             WHERE id = ? AND household_id = ? AND user_id = ? AND status = 'active'
+             LIMIT 1"
+        );
+        $statement->execute([$memberId, $householdId, $userId]);
+        if (!$statement->fetchColumn()) {
+            $this->clear();
+            throw new RuntimeException('The active household context is invalid. Sign in again.');
         }
 
-        $_SESSION['household_id'] = $id;
-        return $id;
+        return $householdId;
     }
 
-    public function memberId(): ?int
+    public function memberId(): int
     {
-        if (!empty($_SESSION['member_id'])) {
-            return (int)$_SESSION['member_id'];
-        }
+        $this->id();
+        return (int)$_SESSION['member_id'];
+    }
 
-        $statement = $this->pdo->prepare("SELECT id FROM household_members WHERE household_id = ? AND status = 'active' ORDER BY FIELD(role, 'owner','administrator','adult_member','youth_member','guest_helper'), id LIMIT 1");
-        $statement->execute([$this->id()]);
-        $id = (int)$statement->fetchColumn();
-        if ($id > 0) {
-            $_SESSION['member_id'] = $id;
-            return $id;
-        }
-
-        return null;
+    private function clear(): void
+    {
+        unset($_SESSION['user_id'], $_SESSION['member_id'], $_SESSION['household_id']);
     }
 }

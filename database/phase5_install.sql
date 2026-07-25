@@ -1,7 +1,7 @@
 SET NAMES utf8mb4;
 SET time_zone = '+00:00';
 
-CREATE TABLE starter_kits (
+CREATE TABLE IF NOT EXISTS starter_kits (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(180) NOT NULL,
     slug VARCHAR(190) NOT NULL UNIQUE,
@@ -16,7 +16,7 @@ CREATE TABLE starter_kits (
     CONSTRAINT fk_starter_kits_user FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE starter_kit_versions (
+CREATE TABLE IF NOT EXISTS starter_kit_versions (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     starter_kit_id BIGINT UNSIGNED NOT NULL,
     version_number INT UNSIGNED NOT NULL,
@@ -31,7 +31,7 @@ CREATE TABLE starter_kit_versions (
     UNIQUE KEY uq_kit_sku (sku)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE starter_kit_items (
+CREATE TABLE IF NOT EXISTS starter_kit_items (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     starter_kit_version_id BIGINT UNSIGNED NOT NULL,
     item_name VARCHAR(180) NOT NULL,
@@ -55,7 +55,7 @@ CREATE TABLE starter_kit_items (
     INDEX idx_kit_items_version (starter_kit_version_id, sort_order)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE starter_kit_recipes (
+CREATE TABLE IF NOT EXISTS starter_kit_recipes (
     starter_kit_version_id BIGINT UNSIGNED NOT NULL,
     recipe_id BIGINT UNSIGNED NOT NULL,
     PRIMARY KEY (starter_kit_version_id, recipe_id),
@@ -63,7 +63,21 @@ CREATE TABLE starter_kit_recipes (
     CONSTRAINT fk_kit_recipes_recipe FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE starter_kit_tasks (
+CREATE TABLE IF NOT EXISTS starter_kit_recipe_snapshots (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    starter_kit_version_id BIGINT UNSIGNED NOT NULL,
+    source_recipe_id BIGINT UNSIGNED NULL,
+    snapshot_hash CHAR(64) NOT NULL,
+    recipe_snapshot JSON NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_kit_recipe_snapshot_version FOREIGN KEY (starter_kit_version_id) REFERENCES starter_kit_versions(id) ON DELETE CASCADE,
+    CONSTRAINT fk_kit_recipe_snapshot_source FOREIGN KEY (source_recipe_id) REFERENCES recipes(id) ON DELETE SET NULL,
+    UNIQUE KEY uq_kit_recipe_snapshot_source (starter_kit_version_id, source_recipe_id),
+    INDEX idx_kit_recipe_snapshots_version (starter_kit_version_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS starter_kit_tasks (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     starter_kit_version_id BIGINT UNSIGNED NOT NULL,
     title VARCHAR(180) NOT NULL,
@@ -75,7 +89,7 @@ CREATE TABLE starter_kit_tasks (
     CONSTRAINT fk_kit_tasks_version FOREIGN KEY (starter_kit_version_id) REFERENCES starter_kit_versions(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE starter_kit_orders (
+CREATE TABLE IF NOT EXISTS starter_kit_orders (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     household_id BIGINT UNSIGNED NULL,
     starter_kit_version_id BIGINT UNSIGNED NOT NULL,
@@ -91,7 +105,7 @@ CREATE TABLE starter_kit_orders (
     UNIQUE KEY uq_kit_external_order (external_order_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE starter_kit_activations (
+CREATE TABLE IF NOT EXISTS starter_kit_activations (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     starter_kit_order_id BIGINT UNSIGNED NOT NULL,
     household_id BIGINT UNSIGNED NULL,
@@ -106,7 +120,7 @@ CREATE TABLE starter_kit_activations (
     CONSTRAINT fk_kit_activation_member FOREIGN KEY (activated_by_member_id) REFERENCES household_members(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE starter_kit_activation_items (
+CREATE TABLE IF NOT EXISTS starter_kit_activation_items (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     starter_kit_activation_id BIGINT UNSIGNED NOT NULL,
     starter_kit_item_id BIGINT UNSIGNED NOT NULL,
@@ -124,21 +138,3 @@ CREATE TABLE starter_kit_activation_items (
     CONSTRAINT fk_activation_items_shopping FOREIGN KEY (shopping_list_item_id) REFERENCES shopping_list_items(id) ON DELETE SET NULL,
     UNIQUE KEY uq_activation_item (starter_kit_activation_id, starter_kit_item_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-INSERT INTO starter_kits (name, slug, kit_type, category, description, status)
-SELECT 'Bread & Dough Basics', 'bread-dough-basics', 'basic', 'baking', 'A practical bread, tortilla, and pizza-dough onboarding kit.', 'published'
-WHERE NOT EXISTS (SELECT 1 FROM starter_kits WHERE slug = 'bread-dough-basics');
-
-INSERT INTO starter_kit_versions (starter_kit_id, version_number, sku, price, status, published_at)
-SELECT id, 1, 'HS-BREAD-BASIC-V1', 49.00, 'published', UTC_TIMESTAMP()
-FROM starter_kits WHERE slug = 'bread-dough-basics'
-AND NOT EXISTS (SELECT 1 FROM starter_kit_versions WHERE sku = 'HS-BREAD-BASIC-V1');
-
-INSERT INTO starter_kits (name, slug, kit_type, category, description, status)
-SELECT 'Year-Round Microgreens System', 'year-round-microgreens', 'specialized', 'growing', 'A specialized indoor microgreens setup with equipment, seed, schedules, and recurring tasks.', 'published'
-WHERE NOT EXISTS (SELECT 1 FROM starter_kits WHERE slug = 'year-round-microgreens');
-
-INSERT INTO starter_kit_versions (starter_kit_id, version_number, sku, price, status, published_at)
-SELECT id, 1, 'HS-MICRO-SYS-V1', 129.00, 'published', UTC_TIMESTAMP()
-FROM starter_kits WHERE slug = 'year-round-microgreens'
-AND NOT EXISTS (SELECT 1 FROM starter_kit_versions WHERE sku = 'HS-MICRO-SYS-V1');

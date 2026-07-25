@@ -1,0 +1,151 @@
+name: Homestead Release Certification
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: homestead-release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  certify:
+    name: certify (${{ matrix.database }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - database: mysql-8
+            image: mysql:8.0
+          - database: mariadb-10.11
+            image: mariadb:10.11
+    services:
+      database:
+        image: ${{ matrix.image }}
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: homestead
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+    env:
+      MYSQL_PWD: root
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_NAME: homestead
+      DB_USER: root
+      DB_PASSWORD: root
+      HOMESTEAD_OWNER_EMAIL: owner@example.test
+      HOMESTEAD_OWNER_PASSWORD: CI-Only-Owner-Password-2026!
+      HOMESTEAD_OWNER_NAME: CI Owner
+      HOMESTEAD_HOUSEHOLD_NAME: CI Homestead
+      HOMESTEAD_HOUSEHOLD_SLUG: ci-homestead
+      HOMESTEAD_HOUSEHOLD_TIMEZONE: America/Phoenix
+      HOMESTEAD_PLATFORM_ADMIN: '1'
+      HOMESTEAD_HEALTH_KEY: ci-health-key-2026
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_mysql, mbstring
+          coverage: none
+      - name: Static code validation
+        run: |
+          set -euo pipefail
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
+          bash -n tests/http_smoke.sh
+          php tests/application_static_audit.php
+          php tests/phase5_static_audit.php
+          php tests/recipe_workflow_static_audit.php
+      - name: Install database client
+        run: sudo apt-get update && sudo apt-get install -y default-mysql-client
+      - name: Install and replay every migration
+        run: |
+          set -euo pipefail
+          migrations=(
+            database/schema.sql
+            database/phase2_install.sql
+            database/phase3_install.sql
+            database/phase4_install.sql
+            database/phase4_hardening.sql
+            database/phase5_install.sql
+            database/phase5_shopping_extension.sql
+            database/phase5_hardening.sql
+            database/phase5_snapshot_storage_hardening.sql
+          )
+          for file in "${migrations[@]}"; do
+            mysql --host=127.0.0.1 --port=3306 --user=root homestead < "$file"
+          done
+          for file in "${migrations[@]:1}"; do
+            mysql --host=127.0.0.1 --port=3306 --user=root homestead < "$file"
+          done
+      - name: Validate clean schema and bootstrap owner
+        run: |
+          php tests/database_integration_audit.php
+          php bin/create-owner.php
+          php bin/create-owner.php
+      - name: Run database workflow suites
+        run: |
+          set -euo pipefail
+          php tests/workflow_integration.php
+          php tests/prepared_food_integration.php
+          php tests/starter_kit_snapshot_integration.php
+          php tests/starter_kit_lifecycle_integration.php
+      - name: Create test configuration
+        run: |
+          cat > config.php <<'PHP'
+          <?php
+          declare(strict_types=1);
+          return [
+              'app' => [
+                  'name' => 'Homestead',
+                  'environment' => 'development',
+                  'debug' => false,
+                  'base_url' => 'http://127.0.0.1:8080',
+                  'timezone' => 'America/Phoenix',
+              ],
+              'database' => [
+                  'host' => '127.0.0.1',
+                  'port' => 3306,
+                  'name' => 'homestead',
+                  'user' => 'root',
+                  'password' => 'root',
+                  'charset' => 'utf8mb4',
+              ],
+              'security' => [
+                  'session_name' => 'homestead_certification_session',
+                  'health_key' => 'ci-health-key-2026',
+              ],
+              'features' => [
+                  'simulated_sensors' => true,
+                  'device_adapters' => false,
+                  'family_tracking' => true,
+                  'prepared_food_tracking' => true,
+              ],
+          ];
+          PHP
+      - name: Start application and run HTTP certification
+        run: |
+          set -euo pipefail
+          php -S 127.0.0.1:8080 -t . > /tmp/homestead-server.log 2>&1 &
+          for attempt in {1..20}; do
+            if curl -fsS http://127.0.0.1:8080/login.php >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:8080/login.php >/dev/null || { cat /tmp/homestead-server.log; exit 1; }
+          bash tests/http_smoke.sh
+      - name: Show application log on failure
+        if: failure()
+        run: cat /tmp/homestead-server.log || true
