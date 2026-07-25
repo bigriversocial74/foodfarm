@@ -1,0 +1,111 @@
+name: Phase 9 Finalize Sync
+
+on:
+  push:
+    branches:
+      - feature/phase9-cost-waste-savings-intelligence-20260725
+
+permissions:
+  contents: write
+
+concurrency:
+  group: phase9-finalize-sync
+  cancel-in-progress: false
+
+jobs:
+  finalize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/phase9-cost-waste-savings-intelligence-20260725
+          fetch-depth: 0
+
+      - name: Apply final hardening
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              target = Path(path)
+              content = target.read_text()
+              if old not in content:
+                  raise SystemExit(f"Expected text not found in {path}: {old!r}")
+              target.write_text(content.replace(old, new, 1))
+
+          replace_once(
+              'phase3.php',
+              "    'tasks.manage', 'tasks.complete',\n];",
+              "    'tasks.manage', 'tasks.complete',\n    'finance.view', 'finance.manage',\n];",
+          )
+
+          support = Path('app/CostWasteSupportTrait.php')
+          support_text = support.read_text()
+          marker = "    private function lockInventoryItem(int $householdId, int $itemId): array\n"
+          method = '''    private function lockHousehold(int $householdId): void
+    {
+        $statement = $this->pdo->prepare('SELECT id FROM households WHERE id = ? FOR UPDATE');
+        $statement->execute([$householdId]);
+        if (!$statement->fetchColumn()) {
+            throw new RuntimeException('The household is unavailable.');
+        }
+    }
+
+'''
+          if marker not in support_text:
+              raise SystemExit('CostWasteSupportTrait lock insertion marker missing')
+          support.write_text(support_text.replace(marker, method + marker, 1))
+
+          for path in ['app/CostWastePurchaseTrait.php', 'app/CostWasteWasteTrait.php']:
+              replace_once(
+                  path,
+                  "        try {\n",
+                  "        try {\n            $this->lockHousehold($householdId);\n",
+              )
+
+          snapshot = Path('app/CostWasteSnapshotTrait.php')
+          snapshot_text = snapshot.read_text()
+          expected = snapshot_text.count("        try {\n")
+          if expected != 2:
+              raise SystemExit(f'Expected two Phase 9 snapshot transactions, found {expected}')
+          snapshot.write_text(snapshot_text.replace(
+              "        try {\n",
+              "        try {\n            $this->lockHousehold($householdId);\n",
+          ))
+
+          replace_once(
+              'tests/phase9_static_audit.php',
+              "        'lockInventoryItem',\n        'assertSupplier',",
+              "        'lockHousehold',\n        'lockInventoryItem',\n        'assertSupplier',",
+          )
+          replace_once(
+              'tests/application_static_audit.php',
+              "    'Phase 3 records invitation revocation' => str_contains($phase3, \"'invitation_revoked'\"),",
+              "    'Phase 3 records invitation revocation' => str_contains($phase3, \"'invitation_revoked'\"),\n    'Phase 3 permission catalog includes finance controls' => str_contains($phase3, \"'finance.view'\") && str_contains($phase3, \"'finance.manage'\"),",
+          )
+
+          workflow = Path('.github/workflows/phase9-finalize-sync.yml')
+          workflow.unlink()
+          PY
+
+      - name: Validate final hardening
+        run: |
+          set -euo pipefail
+          php -l phase3.php
+          php -l app/CostWasteSupportTrait.php
+          php -l app/CostWastePurchaseTrait.php
+          php -l app/CostWasteWasteTrait.php
+          php -l app/CostWasteSnapshotTrait.php
+          php -l tests/phase9_static_audit.php
+          php -l tests/application_static_audit.php
+          php tests/phase9_static_audit.php
+          php tests/application_static_audit.php
+
+      - name: Commit final hardening
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Finalize Phase 9 permission and concurrency hardening"
+          git push origin HEAD:feature/phase9-cost-waste-savings-intelligence-20260725
