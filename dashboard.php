@@ -16,6 +16,7 @@ $canViewPreservation = $auth->can($user, 'preservation.view') || $auth->can($use
 $canViewPlanning = $auth->can($user, 'tasks.manage') || $auth->can($user, 'tasks.complete');
 $canViewForecast = $canViewInventory || $canViewGarden || $canViewPreservation || $canViewPlanning;
 $canViewFinance = $auth->can($user, 'finance.view') || $auth->can($user, 'finance.manage');
+$canViewNutrition = $auth->can($user, 'nutrition.view') || $auth->can($user, 'nutrition.manage');
 $canManageAccess = $auth->can($user, 'members.manage') || $auth->can($user, 'members.invite') || $auth->can($user, 'permissions.manage');
 $isPlatformAdmin = !empty($user['is_platform_admin']);
 
@@ -47,7 +48,44 @@ if ($canViewFinance) {
     $phase9Available = (int)$availability->fetchColumn() === 4;
 }
 
+$phase10Available = false;
+if ($canViewNutrition) {
+    $availability = $pdo->prepare(
+        "SELECT COUNT(*) FROM information_schema.tables
+         WHERE table_schema = DATABASE()
+           AND table_name IN ('recipe_nutrition_snapshots','meal_nutrition_assessments','nutrition_recommendations')"
+    );
+    $availability->execute();
+    $phase10Available = (int)$availability->fetchColumn() === 3;
+}
+
 $metrics = [];
+if ($phase10Available) {
+    $latestNutrition = $pdo->prepare(
+        "SELECT household_balance_score, allergen_conflict_count
+         FROM meal_nutrition_assessments
+         WHERE household_id = ? AND status = 'completed'
+         ORDER BY completed_at DESC, id DESC LIMIT 1"
+    );
+    $latestNutrition->execute([$householdId]);
+    $nutrition = $latestNutrition->fetch();
+    if (is_array($nutrition)) {
+        $metrics[] = [
+            'label' => 'Meal balance',
+            'value' => (int)round((float)$nutrition['household_balance_score']),
+            'prefix' => '',
+            'suffix' => '%',
+            'href' => '/phase10.php',
+        ];
+        $metrics[] = [
+            'label' => 'Allergen conflicts',
+            'value' => (int)$nutrition['allergen_conflict_count'],
+            'prefix' => '',
+            'suffix' => '',
+            'href' => '/phase10.php',
+        ];
+    }
+}
 if ($phase9Available) {
     $latestFinance = $pdo->prepare(
         "SELECT purchase_spend, waste_value, estimated_savings
@@ -219,7 +257,7 @@ if ($canViewInventory) {
     <div>
         <p class="eyebrow">Household food operating system</p>
         <h1>Welcome, <?= e((string)$user['display_name']) ?></h1>
-        <p class="page-description">Forecast, plan, assign, stock, grow, cook, preserve, measure cost and waste, and improve the next household food cycle.</p>
+        <p class="page-description">Forecast, plan, assign, stock, grow, cook, preserve, balance household nutrition, measure cost and waste, and improve the next food cycle.</p>
     </div>
     <div class="toolbar">
         <a class="button secondary" href="/account.php">Account</a>
@@ -232,6 +270,7 @@ if ($canViewInventory) {
 </section><?php endif; ?>
 
 <section class="content-grid">
+    <?php if ($phase10Available): ?><a class="panel" href="/phase10.php"><p class="eyebrow">Balance</p><h2>Nutrition & dietary planning</h2><p class="page-description" style="margin-top:12px">Ingredient label data, optional family targets, dietary patterns, allergen controls, recipe nutrition, meal-plan assessments, and task-ready recommendations.</p></a><?php endif; ?>
     <?php if ($phase9Available): ?><a class="panel" href="/phase9.php"><p class="eyebrow">Measure</p><h2>Cost, waste & savings</h2><p class="page-description" style="margin-top:12px">Purchase prices, weighted unit costs, recipe cost per serving, budgets, waste value, supplier comparisons, household-production value, and savings recommendations.</p></a><?php endif; ?>
     <?php if ($phase8Available): ?><a class="panel" href="/phase8.php"><p class="eyebrow">Forecast</p><h2>Seasons & self-sufficiency</h2><p class="page-description" style="margin-top:12px">Pantry coverage, planned demand, days on hand, expected harvests, preservation output, seasonal plans, and evidence-linked recommendations.</p></a><?php endif; ?>
     <?php if ($canViewPlanning): ?><a class="panel" href="/phase7.php"><p class="eyebrow">Coordinate</p><h2>Daily planning & tasks</h2><p class="page-description" style="margin-top:12px">Assignments, recurring duties, meal preparation, harvest windows, preservation follow-up, and shopping suggestions.</p></a><?php endif; ?>
