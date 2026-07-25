@@ -26,6 +26,15 @@ trait CostWasteSupportTrait
         }
     }
 
+    private function lockHousehold(int $householdId): void
+    {
+        $statement = $this->pdo->prepare('SELECT id FROM households WHERE id = ? FOR UPDATE');
+        $statement->execute([$householdId]);
+        if (!$statement->fetchColumn()) {
+            throw new RuntimeException('The household is unavailable.');
+        }
+    }
+
     private function lockInventoryItem(int $householdId, int $itemId): array
     {
         $statement = $this->pdo->prepare(
