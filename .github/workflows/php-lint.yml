@@ -8,12 +8,25 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: homestead-validation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   application-validation:
+    name: application-validation (${{ matrix.database }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - database: mysql-8
+            image: mysql:8.0
+          - database: mariadb-10.11
+            image: mariadb:10.11
     services:
-      mysql:
-        image: mysql:8.0
+      database:
+        image: ${{ matrix.image }}
         env:
           MYSQL_ROOT_PASSWORD: root
           MYSQL_DATABASE: homestead
@@ -37,6 +50,7 @@ jobs:
       HOMESTEAD_OWNER_NAME: CI Owner
       HOMESTEAD_HOUSEHOLD_NAME: CI Homestead
       HOMESTEAD_HOUSEHOLD_SLUG: ci-homestead
+      HOMESTEAD_HOUSEHOLD_TIMEZONE: America/Phoenix
       HOMESTEAD_PLATFORM_ADMIN: '1'
       HOMESTEAD_HEALTH_KEY: ci-health-key-2026
 
@@ -54,6 +68,9 @@ jobs:
       - name: Lint PHP files
         run: find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
 
+      - name: Validate shell scripts
+        run: bash -n tests/http_smoke.sh
+
       - name: Run whole-application security audit
         run: php tests/application_static_audit.php
 
@@ -63,8 +80,8 @@ jobs:
       - name: Run recipe workflow audit
         run: php tests/recipe_workflow_static_audit.php
 
-      - name: Install MySQL client
-        run: sudo apt-get update && sudo apt-get install -y mysql-client
+      - name: Install database client
+        run: sudo apt-get update && sudo apt-get install -y default-mysql-client
 
       - name: Import clean database migrations
         run: |
@@ -99,14 +116,14 @@ jobs:
             mysql --host=127.0.0.1 --port=3306 --user=root homestead < "${file}"
           done
 
+      - name: Run clean-database migration audit
+        run: php tests/database_integration_audit.php
+
       - name: Bootstrap secure test owner
         run: php bin/create-owner.php
 
       - name: Verify owner bootstrap is idempotent
         run: php bin/create-owner.php
-
-      - name: Run database-backed migration audit
-        run: php tests/database_integration_audit.php
 
       - name: Run database-backed workflow integration suite
         run: php tests/workflow_integration.php
