@@ -71,11 +71,12 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
 }
 
 $requestPath = (string)(parse_url((string)($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH) ?? '');
-$isRecipeRoute = basename($requestPath) === 'phase4.php';
-if ($_SERVER['REQUEST_METHOD'] === 'GET' && $isRecipeRoute) {
+$routeName = basename($requestPath);
+$isFoodWorkflowRoute = in_array($routeName, ['phase4.php', 'prepared-food.php'], true);
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && $isFoodWorkflowRoute) {
     $_SESSION['recipe_action_key'] = bin2hex(random_bytes(32));
 }
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isRecipeRoute) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isFoodWorkflowRoute) {
     $action = (string)($_POST['action'] ?? '');
     if ($action === 'complete_recipe') {
         $_POST['completion_key'] = (string)($_SESSION['recipe_action_key'] ?? '');
