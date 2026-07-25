@@ -1,16 +1,18 @@
 # Homestead
 
-Homestead is a household food system for growing, storing, cooking, preserving, and coordinating real food.
+Homestead is a household food system for growing, storing, cooking, preserving, planning, and coordinating real food.
 
 ## Interfaces
 
 - `/index.php` — public product landing page
 - `/login.php` — account login
+- `/dashboard.php` — permission-aware household operating dashboard
 - `/phase2.php` — household, family, storage, inventory, and ledger workspace
 - `/phase3.php` — restricted invitations, roles, permission overrides, and authentication history
 - `/phase4.php` — recipes, family meal planning, ingredient deductions, and prepared food
 - `/phase5.php` — platform-administrator Starter Kit builder, versions, fulfillment mapping, orders, and activation links
 - `/phase6.php` — garden zones, plantings, readings, harvests, inventory posting, and preservation batches
+- `/phase7.php` — daily planning, assignments, recurring tasks, automation cycles, and shopping suggestions
 - `/prepared-food.php` — prepared-food consumption, freezing, spoilage, and ledger posting
 - `/starter-kit-lifecycle.php` — Starter Kit version duplication, retirement, cancellation, and activation lifecycle
 - `/activate-kit.php?token=...` — customer kit review and household provisioning
@@ -19,6 +21,7 @@ Homestead is a household food system for growing, storing, cooking, preserving, 
 - `/api/phase4-health.php` — protected Phase 4 food-workflow validation
 - `/api/phase5-health.php` — protected Phase 5 Starter Kit validation
 - `/api/phase6-health.php` — protected grow, harvest, inventory, and preservation validation
+- `/api/phase7-health.php` — protected planning, task, suggestion, and lifecycle validation
 
 ## Requirements
 
@@ -49,6 +52,7 @@ database/phase5_shopping_extension.sql
 database/phase5_hardening.sql
 database/phase5_snapshot_storage_hardening.sql
 database/phase6_grow_harvest_preserve.sql
+database/phase7_planning_tasks_automation.sql
 ```
 
 Create the first owner from the command line:
@@ -68,7 +72,7 @@ php -S 127.0.0.1:8080
 Health endpoints require either an authenticated platform-administrator session or the configured key in the `X-Homestead-Health-Key` header:
 
 ```bash
-curl -H "X-Homestead-Health-Key: YOUR_CONFIGURED_KEY" https://example.com/api/phase6-health.php
+curl -H "X-Homestead-Health-Key: YOUR_CONFIGURED_KEY" https://example.com/api/phase7-health.php
 ```
 
 Production health failures return a generic message rather than database or exception details.
@@ -83,7 +87,22 @@ docs/WHOLE_APP_AUDIT.md
 
 The initial whole-application score was **5.9/10**. The audited repository code and release-certification matrix reached **10/10** after the complete security, authorization, concurrency, migration, accessibility, database, and HTTP validation passes.
 
-Phase 6 adds its own MySQL 8 and MariaDB 10.11 certification workflow covering garden ownership, environmental readings, harvest idempotency, inventory posting, preservation deductions, output inventory, provenance, rollback, and protected health validation.
+Phase-specific MySQL 8 and MariaDB 10.11 workflows extend that baseline with clean migration, replay, database integration, protected-health, and authenticated HTTP certification.
+
+## Planning, tasks, and household automation
+
+- One daily planning cycle per household and date
+- Manual tasks with assignments, due dates, priorities, and time estimates
+- Daily, weekly, and monthly recurring task templates
+- Low-stock tasks and shopping recommendations
+- Meal-preparation tasks from active meal plans
+- Harvest-readiness tasks from planting windows
+- Preservation follow-up tasks from active batches
+- Prepared-food use-or-freeze tasks from use-by dates
+- Start, complete, snooze, cancel, and reopen transitions
+- Assignee-aware task visibility and household-manager controls
+- Idempotent generation keys and single-use shopping suggestions
+- Immutable task lifecycle and household activity records
 
 ## Grow, harvest, and preserve capabilities
 
@@ -119,11 +138,11 @@ Phase 6 adds its own MySQL 8 and MariaDB 10.11 certification workflow covering g
 
 ## Family wellness privacy
 
-Height, weight, and activity levels remain optional and private by default. They are not copied into kit orders, activation records, inventory provenance, shopping lists, delivery requests, garden records, harvests, or preservation batches.
+Height, weight, and activity levels remain optional and private by default. They are not copied into kit orders, activation records, inventory provenance, shopping lists, delivery requests, garden records, harvests, preservation batches, planning cycles, tasks, or shopping suggestions.
 
 ## Current scope boundary
 
-Phase 5 records optional delivery requests but does not dispatch drivers, calculate delivery routes, charge delivery fees, or integrate with grocery-delivery providers. Email delivery, password-reset email, multi-household switching, and physical device control remain deferred. Phase 6 accepts manual and simulated grow readings; real sensor adapters remain a later integration layer.
+Phase 5 records optional delivery requests but does not dispatch drivers, calculate delivery routes, charge delivery fees, or integrate with grocery-delivery providers. Email delivery, password-reset email, multi-household switching, external notifications, automatic purchasing, and physical device control remain deferred. Phase 6 accepts manual and simulated grow readings; real sensor adapters remain a later integration layer. Phase 7 creates internal plans and recommendations but does not execute external actions.
 
 ## Safety boundary
 
