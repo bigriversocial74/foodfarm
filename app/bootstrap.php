@@ -73,10 +73,15 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
 $requestPath = (string)(parse_url((string)($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH) ?? '');
 $isRecipeRoute = basename($requestPath) === 'phase4.php';
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && $isRecipeRoute) {
-    $_SESSION['recipe_completion_key'] = bin2hex(random_bytes(32));
+    $_SESSION['recipe_action_key'] = bin2hex(random_bytes(32));
 }
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isRecipeRoute && ($_POST['action'] ?? null) === 'complete_recipe') {
-    $_POST['completion_key'] = (string)($_SESSION['recipe_completion_key'] ?? '');
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isRecipeRoute) {
+    $action = (string)($_POST['action'] ?? '');
+    if ($action === 'complete_recipe') {
+        $_POST['completion_key'] = (string)($_SESSION['recipe_action_key'] ?? '');
+    } elseif ($action === 'update_prepared_food') {
+        $_POST['action_key'] = (string)($_SESSION['recipe_action_key'] ?? '');
+    }
 }
 
 require_once __DIR__ . '/Database.php';
