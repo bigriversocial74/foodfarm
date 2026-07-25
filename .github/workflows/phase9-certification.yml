@@ -1,0 +1,201 @@
+name: Homestead Phase 9 Certification
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: homestead-phase9-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  phase9-certification:
+    name: phase9-certification (${{ matrix.database }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - database: mysql-8
+            image: mysql:8.0
+          - database: mariadb-10.11
+            image: mariadb:10.11
+    services:
+      database:
+        image: ${{ matrix.image }}
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: homestead
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+
+    env:
+      MYSQL_PWD: root
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_NAME: homestead
+      DB_USER: root
+      DB_PASSWORD: root
+      HOMESTEAD_OWNER_EMAIL: owner@example.test
+      HOMESTEAD_OWNER_PASSWORD: CI-Only-Owner-Password-2026!
+      HOMESTEAD_OWNER_NAME: CI Owner
+      HOMESTEAD_HOUSEHOLD_NAME: CI Homestead
+      HOMESTEAD_HOUSEHOLD_SLUG: ci-homestead
+      HOMESTEAD_HOUSEHOLD_TIMEZONE: America/Phoenix
+      HOMESTEAD_PLATFORM_ADMIN: '1'
+      HOMESTEAD_HEALTH_KEY: ci-phase9-health-key-2026-very-long
+      HOMESTEAD_BASE_URL: http://127.0.0.1:8080
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_mysql, mbstring
+          coverage: none
+
+      - name: Lint Phase 9 PHP
+        run: |
+          set -euo pipefail
+          php -l app/CostWasteService.php
+          php -l app/CostWasteSettingsTrait.php
+          php -l app/CostWastePurchaseTrait.php
+          php -l app/CostWasteWasteTrait.php
+          php -l app/CostWasteSnapshotTrait.php
+          php -l app/CostWasteRecommendationTrait.php
+          php -l app/CostWasteQueryTrait.php
+          php -l app/CostWasteSupportTrait.php
+          php -l phase9.php
+          php -l api/phase9-health.php
+          php -l tests/phase9_static_audit.php
+          php -l tests/phase9_integration.php
+
+      - name: Validate Phase 9 shell script
+        run: bash -n tests/phase9_http_smoke.sh
+
+      - name: Run Phase 9 static audit
+        run: php tests/phase9_static_audit.php
+
+      - name: Install database client
+        run: sudo apt-get update && sudo apt-get install -y default-mysql-client
+
+      - name: Import complete database sequence
+        run: |
+          set -euo pipefail
+          migrations=(
+            database/schema.sql
+            database/phase2_install.sql
+            database/phase3_install.sql
+            database/household_owner_integrity_hardening.sql
+            database/phase4_install.sql
+            database/phase4_hardening.sql
+            database/phase5_install.sql
+            database/phase5_shopping_extension.sql
+            database/phase5_hardening.sql
+            database/phase5_snapshot_storage_hardening.sql
+            database/phase6_grow_harvest_preserve.sql
+            database/phase7_planning_tasks_automation.sql
+            database/phase8_forecasting_seasonal_self_sufficiency.sql
+            database/phase9_cost_waste_savings_intelligence.sql
+          )
+          for file in "${migrations[@]}"; do
+            echo "Importing ${file}"
+            mysql --host=127.0.0.1 --port=3306 --user=root homestead < "${file}"
+          done
+
+      - name: Replay Phase 9 migration
+        run: mysql --host=127.0.0.1 --port=3306 --user=root homestead < database/phase9_cost_waste_savings_intelligence.sql
+
+      - name: Bootstrap secure test owner
+        run: php bin/create-owner.php
+
+      - name: Run Phase 9 integration suite
+        run: |
+          set -o pipefail
+          php tests/phase9_integration.php 2>&1 | tee "$RUNNER_TEMP/phase9-integration-${{ matrix.database }}.txt"
+
+      - name: Upload Phase 9 integration report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase9-integration-${{ matrix.database }}
+          path: ${{ runner.temp }}/phase9-integration-${{ matrix.database }}.txt
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Create CI configuration
+        run: |
+          cat > config.php <<'PHP'
+          <?php
+          declare(strict_types=1);
+          return [
+              'app' => [
+                  'name' => 'Homestead',
+                  'environment' => 'development',
+                  'debug' => false,
+                  'base_url' => 'http://127.0.0.1:8080',
+                  'timezone' => 'America/Phoenix',
+              ],
+              'database' => [
+                  'host' => '127.0.0.1',
+                  'port' => 3306,
+                  'name' => 'homestead',
+                  'user' => 'root',
+                  'password' => 'root',
+                  'charset' => 'utf8mb4',
+              ],
+              'security' => [
+                  'session_name' => 'homestead_phase9_ci',
+                  'health_key' => 'ci-phase9-health-key-2026-very-long',
+              ],
+              'features' => [
+                  'simulated_sensors' => true,
+                  'device_adapters' => false,
+                  'family_tracking' => true,
+                  'prepared_food_tracking' => true,
+              ],
+          ];
+          PHP
+
+      - name: Start application server
+        run: |
+          php -S 127.0.0.1:8080 -t . > /tmp/homestead-phase9-server.log 2>&1 &
+          echo $! > /tmp/homestead-phase9-server.pid
+          for attempt in {1..20}; do
+            if curl -fsS http://127.0.0.1:8080/login.php >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/homestead-phase9-server.log
+          exit 1
+
+      - name: Run Phase 9 HTTP smoke suite
+        run: |
+          set -o pipefail
+          bash tests/phase9_http_smoke.sh 2>&1 | tee "$RUNNER_TEMP/phase9-http-${{ matrix.database }}.txt"
+
+      - name: Upload Phase 9 HTTP report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase9-http-${{ matrix.database }}
+          path: ${{ runner.temp }}/phase9-http-${{ matrix.database }}.txt
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Show server log on failure
+        if: failure()
+        run: cat /tmp/homestead-phase9-server.log || true
