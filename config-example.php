@@ -15,12 +15,15 @@ return [
         'port' => 3306,
         'name' => 'homestead',
         'user' => 'homestead_user',
-        'password' => 'change-me',
+        'password' => 'replace-with-a-strong-database-password',
         'charset' => 'utf8mb4',
     ],
     'security' => [
         'session_name' => 'homestead_session',
         'csrf_key' => 'replace-with-a-random-secret',
+        // Send this value in X-Homestead-Health-Key for noninteractive health checks.
+        // Use at least 32 random bytes in production and never commit the real value.
+        'health_key' => 'replace-with-a-long-random-health-key',
     ],
     'features' => [
         'simulated_sensors' => true,
