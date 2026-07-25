@@ -120,11 +120,13 @@ jobs:
             database/schema.sql \
             database/phase2_install.sql \
             database/phase3_install.sql \
+            database/household_owner_integrity_hardening.sql \
             database/phase4_install.sql \
             database/phase4_hardening.sql \
             database/phase5_install.sql \
             database/phase5_shopping_extension.sql \
-            database/phase5_hardening.sql
+            database/phase5_hardening.sql \
+            database/phase5_snapshot_storage_hardening.sql
           do
             echo "Importing ${file}"
             mysql --host=127.0.0.1 --port=3306 --user=root homestead < "${file}"
@@ -136,11 +138,13 @@ jobs:
           for file in \
             database/phase2_install.sql \
             database/phase3_install.sql \
+            database/household_owner_integrity_hardening.sql \
             database/phase4_install.sql \
             database/phase4_hardening.sql \
             database/phase5_install.sql \
             database/phase5_shopping_extension.sql \
-            database/phase5_hardening.sql
+            database/phase5_hardening.sql \
+            database/phase5_snapshot_storage_hardening.sql
           do
             echo "Replaying ${file}"
             mysql --host=127.0.0.1 --port=3306 --user=root homestead < "${file}"
@@ -156,7 +160,22 @@ jobs:
         run: php bin/create-owner.php
 
       - name: Run database-backed workflow integration suite
-        run: php tests/workflow_integration.php
+        run: |
+          set +e
+          report="$RUNNER_TEMP/workflow-integration-${{ matrix.database }}.txt"
+          php tests/workflow_integration.php > "$report" 2>&1
+          result=$?
+          cat "$report"
+          exit "$result"
+
+      - name: Upload workflow integration report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: workflow-integration-${{ matrix.database }}
+          path: ${{ runner.temp }}/workflow-integration-${{ matrix.database }}.txt
+          if-no-files-found: warn
+          retention-days: 3
 
       - name: Run prepared-food lifecycle integration suite
         run: php tests/prepared_food_integration.php
@@ -166,6 +185,12 @@ jobs:
 
       - name: Run Starter Kit lifecycle integration suite
         run: php tests/starter_kit_lifecycle_integration.php
+
+      - name: Run Starter Kit activation administration suite
+        run: php tests/starter_kit_activation_admin_integration.php
+
+      - name: Run household owner integrity suite
+        run: php tests/owner_integrity_integration.php
 
       - name: Create CI application configuration
         run: |
