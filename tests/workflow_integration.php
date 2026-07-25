@@ -40,7 +40,8 @@ $expectException = static function (callable $callback): bool {
 };
 
 $owner = $pdo->query(
-    "SELECT u.id AS user_id, u.email, u.is_platform_admin, hm.id AS member_id, hm.household_id, hm.role
+    "SELECT u.id AS user_id, u.email, u.is_platform_admin, u.auth_version,
+            hm.id AS member_id, hm.household_id, hm.role
      FROM users u JOIN household_members hm ON hm.user_id = u.id
      WHERE hm.role = 'owner' AND hm.status = 'active' AND u.status = 'active'
      ORDER BY u.id LIMIT 1"
@@ -53,6 +54,7 @@ if (!is_array($owner)) {
 $userId = (int)$owner['user_id'];
 $memberId = (int)$owner['member_id'];
 $householdId = (int)$owner['household_id'];
+$authVersion = (int)$owner['auth_version'];
 $ownerEmail = (string)$owner['email'];
 $check('owner bootstrap links user and household member', $userId > 0 && $memberId > 0 && $householdId > 0);
 $check('owner bootstrap can grant platform administration', (int)$owner['is_platform_admin'] === 1);
@@ -65,9 +67,19 @@ $check('household context rejects mismatched session scope', $expectException(st
 $check('invalid household context clears session identity', !isset($_SESSION['user_id'], $_SESSION['member_id'], $_SESSION['household_id']));
 
 $auth = new Auth($pdo);
+$_SESSION = [
+    'user_id' => $userId,
+    'member_id' => $memberId,
+    'household_id' => $householdId,
+    'auth_version' => $authVersion,
+];
+$check('authentication resolves a fully bound session', is_array($auth->user()));
+$_SESSION['auth_version'] = $authVersion + 1;
+$check('authentication rejects a stale session version', $auth->user() === null && $_SESSION === []);
 $check('owner receives role permissions', $auth->can(['role' => 'owner', 'permission_overrides' => null], 'inventory.manage'));
+$check('administrator receives read and task permissions', $auth->can(['role' => 'administrator', 'permission_overrides' => null], 'storage.view') && $auth->can(['role' => 'administrator', 'permission_overrides' => null], 'tasks.complete'));
 $check('guest role does not receive inventory management', !$auth->can(['role' => 'guest_helper', 'permission_overrides' => null], 'inventory.manage'));
-$check('permission deny override removes a role default', !$auth->can(['role' => 'adult_member', 'permission_overrides' => json_encode(['inventory.manage' => false])], 'inventory.manage'));
+$check('permission deny override removes a role default', !$auth->can(['role' => 'adult_member', 'permission_overrides' => json_encode(['inventory.manage' => false], JSON_THROW_ON_ERROR)], 'inventory.manage'));
 
 $location = $pdo->prepare('SELECT id FROM storage_locations WHERE household_id = ? ORDER BY id LIMIT 1');
 $location->execute([$householdId]);
@@ -167,7 +179,6 @@ $pdo->prepare("INSERT INTO users (email, password_hash, display_name, status, is
 $otherUserId = (int)$pdo->lastInsertId();
 $pdo->prepare("INSERT INTO household_members (household_id, user_id, display_name, age_group, role, status) VALUES (?, ?, 'Isolation User', 'adult', 'owner', 'active')")
     ->execute([$otherHouseholdId, $otherUserId]);
-$otherMemberId = (int)$pdo->lastInsertId();
 $pdo->prepare("INSERT INTO inventory_items (household_id, name, item_type, current_quantity, unit, status) VALUES (?, 'Other Flour', 'ingredient', 10, 'lb', 'active')")
     ->execute([$otherHouseholdId]);
 $otherInventoryId = (int)$pdo->lastInsertId();
@@ -207,6 +218,7 @@ $kitService->addTask($versionId, ['title' => 'Bake the first loaf', 'due_offset_
 $kitService->publishVersion($versionId);
 $check('starter-kit publication freezes validated version', (string)$pdo->query('SELECT status FROM starter_kit_versions WHERE id = ' . $versionId)->fetchColumn() === 'published');
 $check('published starter-kit version rejects edits', $expectException(static fn() => $kitService->addTask($versionId, ['title' => 'Late edit'])));
+$check('cross-household starter recipe attachment is rejected', $expectException(static fn() => $kitService->attachRecipe($versionId, $recipeId, $otherHouseholdId)));
 
 $order = $kitService->createOrderAndActivation($versionId, $ownerEmail, 'INTEGRATION-ORDER-1');
 $activation = $kitService->activationByToken((string)$order['token']);
@@ -227,7 +239,7 @@ $kitService->activate((string)$order['token'], [
 ], $selections);
 $check('starter-kit activation is consumed once', (int)$pdo->query('SELECT COUNT(*) FROM starter_kit_activations WHERE activated_at IS NOT NULL')->fetchColumn() >= 1);
 $check('starter-kit activation creates shopping provenance', (int)$pdo->query("SELECT COUNT(*) FROM shopping_list_items WHERE source_type = 'starter_kit'")->fetchColumn() >= 1);
-$check('starter-kit activation clones attached recipes', (int)$pdo->query("SELECT COUNT(*) FROM recipes WHERE notes LIKE 'Provisioned from starter-kit activation #%'")->fetchColumn() >= 1);
+$check('starter-kit activation clones attached recipes', (int)$pdo->query("SELECT COUNT(*) FROM recipes WHERE notes LIKE 'Provisioned from starter-kit activation #%'" )->fetchColumn() >= 1);
 $check('starter-kit activation provisions tasks', (int)$pdo->query("SELECT COUNT(*) FROM household_tasks WHERE related_type = 'starter_kit_activation'")->fetchColumn() >= 1);
 $check('starter-kit token cannot be activated twice', $expectException(static fn() => $kitService->activate((string)$order['token'], [
     'id' => $userId, 'email' => $ownerEmail, 'household_id' => $householdId, 'member_id' => $memberId,
