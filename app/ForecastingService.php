@@ -152,6 +152,7 @@ final class ForecastingService
             $coverageMet = 0;
             $shortageCount = 0;
             $productionRatios = [];
+            $projectionIds = [];
             $itemDetails = [];
 
             foreach ($items as $item) {
@@ -210,6 +211,7 @@ final class ForecastingService
                     $eventCount,
                     $confidence
                 );
+                $projectionIds[$itemId] = $projectionId;
                 $itemDetails[$itemId] = [
                     'projection_id' => $projectionId,
                     'item' => $item,
@@ -239,7 +241,7 @@ final class ForecastingService
             $seasonalReadiness = $this->seasonalReadinessScore($upcomingHarvests, $horizonDays);
             $resilience = ($coverageScore + $selfSufficiency + $seasonalReadiness) / 3;
 
-            foreach ($itemDetails as $detail) {
+            foreach ($itemDetails as $itemId => $detail) {
                 $this->generateItemRecommendations(
                     $householdId,
                     $snapshotId,

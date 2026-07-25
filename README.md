@@ -1,6 +1,6 @@
 # Homestead
 
-Homestead is a household food system for growing, storing, cooking, preserving, planning, and coordinating real food.
+Homestead is a household food system for growing, storing, cooking, preserving, planning, forecasting, and coordinating real food.
 
 ## Interfaces
 
@@ -13,6 +13,7 @@ Homestead is a household food system for growing, storing, cooking, preserving, 
 - `/phase5.php` — platform-administrator Starter Kit builder, versions, fulfillment mapping, orders, and activation links
 - `/phase6.php` — garden zones, plantings, readings, harvests, inventory posting, and preservation batches
 - `/phase7.php` — daily planning, assignments, recurring tasks, automation cycles, and shopping suggestions
+- `/phase8.php` — food forecasting, seasonal planning, shortage projections, and self-sufficiency intelligence
 - `/prepared-food.php` — prepared-food consumption, freezing, spoilage, and ledger posting
 - `/starter-kit-lifecycle.php` — Starter Kit version duplication, retirement, cancellation, and activation lifecycle
 - `/activate-kit.php?token=...` — customer kit review and household provisioning
@@ -22,6 +23,7 @@ Homestead is a household food system for growing, storing, cooking, preserving, 
 - `/api/phase5-health.php` — protected Phase 5 Starter Kit validation
 - `/api/phase6-health.php` — protected grow, harvest, inventory, and preservation validation
 - `/api/phase7-health.php` — protected planning, task, suggestion, and lifecycle validation
+- `/api/phase8-health.php` — protected forecast, projection, seasonal-plan, and recommendation validation
 
 ## Requirements
 
@@ -53,6 +55,7 @@ database/phase5_hardening.sql
 database/phase5_snapshot_storage_hardening.sql
 database/phase6_grow_harvest_preserve.sql
 database/phase7_planning_tasks_automation.sql
+database/phase8_forecasting_seasonal_self_sufficiency.sql
 ```
 
 Create the first owner from the command line:
@@ -72,7 +75,7 @@ php -S 127.0.0.1:8080
 Health endpoints require either an authenticated platform-administrator session or the configured key in the `X-Homestead-Health-Key` header:
 
 ```bash
-curl -H "X-Homestead-Health-Key: YOUR_CONFIGURED_KEY" https://example.com/api/phase7-health.php
+curl -H "X-Homestead-Health-Key: YOUR_CONFIGURED_KEY" https://example.com/api/phase8-health.php
 ```
 
 Production health failures return a generic message rather than database or exception details.
@@ -88,6 +91,27 @@ docs/WHOLE_APP_AUDIT.md
 The initial whole-application score was **5.9/10**. The audited repository code and release-certification matrix reached **10/10** after the complete security, authorization, concurrency, migration, accessibility, database, and HTTP validation passes.
 
 Phase-specific MySQL 8 and MariaDB 10.11 workflows extend that baseline with clean migration, replay, database integration, protected-health, and authenticated HTTP certification.
+
+## Forecasting, seasons, and self-sufficiency intelligence
+
+- Source-watermarked, idempotent forecast snapshots
+- Household-configurable forecast and history windows
+- Item-level historical depletion rates
+- Active meal-plan demand
+- Historical harvest profiles and expected harvest windows
+- Planned preservation output
+- Projected ending quantities, days on hand, and shortage dates
+- Inventory coverage score
+- Tracked production-share score
+- Seasonal-readiness score
+- Transparent household resilience score
+- Restock, use-first, preservation, buffer, and data-quality recommendations
+- Recommendation-to-task conversion with Phase 7 provenance
+- Generated and manual seasonal operating-calendar entries
+- Guarded recommendation and seasonal-entry lifecycles
+- Snapshot history for trend review
+
+The tracked production-share score is an average of item-level recorded inflow ratios. It is not a calorie, nutrition, financial-value, or complete food-independence calculation.
 
 ## Planning, tasks, and household automation
 
@@ -138,12 +162,12 @@ Phase-specific MySQL 8 and MariaDB 10.11 workflows extend that baseline with cle
 
 ## Family wellness privacy
 
-Height, weight, and activity levels remain optional and private by default. They are not copied into kit orders, activation records, inventory provenance, shopping lists, delivery requests, garden records, harvests, preservation batches, planning cycles, tasks, or shopping suggestions.
+Height, weight, and activity levels remain optional and private by default. They are not copied into kit orders, activation records, inventory provenance, shopping lists, delivery requests, garden records, harvests, preservation batches, planning cycles, tasks, shopping suggestions, forecast snapshots, projections, recommendations, or seasonal plans.
 
 ## Current scope boundary
 
-Phase 5 records optional delivery requests but does not dispatch drivers, calculate delivery routes, charge delivery fees, or integrate with grocery-delivery providers. Email delivery, password-reset email, multi-household switching, external notifications, automatic purchasing, and physical device control remain deferred. Phase 6 accepts manual and simulated grow readings; real sensor adapters remain a later integration layer. Phase 7 creates internal plans and recommendations but does not execute external actions.
+Phase 5 records optional delivery requests but does not dispatch drivers, calculate delivery routes, charge delivery fees, or integrate with grocery-delivery providers. Email delivery, password-reset email, multi-household switching, external notifications, automatic purchasing, weather prediction, and physical device control remain deferred. Phase 6 accepts manual and simulated grow readings; real sensor adapters remain a later integration layer. Phase 7 creates internal plans and recommendations but does not execute external actions. Phase 8 estimates future household conditions from recorded data but does not guarantee yield, demand, availability, or food independence.
 
 ## Safety boundary
 
-Homestead supports household planning and record keeping. It does not certify food safety, replace authoritative preservation guidance, offer medical advice, or automatically operate physical devices.
+Homestead supports household planning and record keeping. It does not certify food safety, replace authoritative preservation guidance, offer medical, financial, or agricultural advice, or automatically operate physical devices.
