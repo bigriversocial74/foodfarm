@@ -50,28 +50,6 @@ SET @sql := IF(
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
-INSERT INTO households (name, slug, timezone, measurement_system, currency_code)
-SELECT 'Parker Homestead', 'parker-homestead', 'America/Phoenix', 'us', 'USD'
-WHERE NOT EXISTS (SELECT 1 FROM households);
-
-SET @household_id := (SELECT id FROM households ORDER BY id LIMIT 1);
-
-INSERT INTO household_members (household_id, display_name, age_group, role, status, serving_multiplier, activity_level, wellness_visibility, joined_at)
-SELECT @household_id, 'Household Owner', 'adult', 'owner', 'active', 1.00, 'not_set', 'private', CURDATE()
-WHERE NOT EXISTS (SELECT 1 FROM household_members WHERE household_id = @household_id);
-
-INSERT INTO storage_locations (household_id, name, location_type, capacity_value, capacity_unit, target_temperature, target_humidity, notes)
-SELECT @household_id, 'Kitchen Pantry', 'room', 300, 'items', 68, 45, 'Primary dry-goods pantry'
-WHERE NOT EXISTS (SELECT 1 FROM storage_locations WHERE household_id = @household_id AND name = 'Kitchen Pantry');
-
-INSERT INTO storage_locations (household_id, name, location_type, capacity_value, capacity_unit, target_temperature, target_humidity, notes)
-SELECT @household_id, 'Refrigerator', 'refrigerator', 120, 'items', 38, 45, 'Primary refrigerator'
-WHERE NOT EXISTS (SELECT 1 FROM storage_locations WHERE household_id = @household_id AND name = 'Refrigerator');
-
-INSERT INTO storage_locations (household_id, name, location_type, capacity_value, capacity_unit, target_temperature, target_humidity, notes)
-SELECT @household_id, 'Freezer', 'freezer', 120, 'items', 0, 40, 'Primary frozen-food storage'
-WHERE NOT EXISTS (SELECT 1 FROM storage_locations WHERE household_id = @household_id AND name = 'Freezer');
-
 INSERT INTO inventory_categories (household_id, name, slug, category_type)
 SELECT NULL, 'Grains & Flours', 'grains-flours', 'food'
 WHERE NOT EXISTS (SELECT 1 FROM inventory_categories WHERE household_id IS NULL AND slug = 'grains-flours');
