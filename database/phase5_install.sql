@@ -124,21 +124,3 @@ CREATE TABLE IF NOT EXISTS starter_kit_activation_items (
     CONSTRAINT fk_activation_items_shopping FOREIGN KEY (shopping_list_item_id) REFERENCES shopping_list_items(id) ON DELETE SET NULL,
     UNIQUE KEY uq_activation_item (starter_kit_activation_id, starter_kit_item_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-INSERT INTO starter_kits (name, slug, kit_type, category, description, status)
-SELECT 'Bread & Dough Basics', 'bread-dough-basics', 'basic', 'baking', 'A practical bread, tortilla, and pizza-dough onboarding kit.', 'published'
-WHERE NOT EXISTS (SELECT 1 FROM starter_kits WHERE slug = 'bread-dough-basics');
-
-INSERT INTO starter_kit_versions (starter_kit_id, version_number, sku, price, status, published_at)
-SELECT id, 1, 'HS-BREAD-BASIC-V1', 49.00, 'published', UTC_TIMESTAMP()
-FROM starter_kits WHERE slug = 'bread-dough-basics'
-AND NOT EXISTS (SELECT 1 FROM starter_kit_versions WHERE sku = 'HS-BREAD-BASIC-V1');
-
-INSERT INTO starter_kits (name, slug, kit_type, category, description, status)
-SELECT 'Year-Round Microgreens System', 'year-round-microgreens', 'specialized', 'growing', 'A specialized indoor microgreens setup with equipment, seed, schedules, and recurring tasks.', 'published'
-WHERE NOT EXISTS (SELECT 1 FROM starter_kits WHERE slug = 'year-round-microgreens');
-
-INSERT INTO starter_kit_versions (starter_kit_id, version_number, sku, price, status, published_at)
-SELECT id, 1, 'HS-MICRO-SYS-V1', 129.00, 'published', UTC_TIMESTAMP()
-FROM starter_kits WHERE slug = 'year-round-microgreens'
-AND NOT EXISTS (SELECT 1 FROM starter_kit_versions WHERE sku = 'HS-MICRO-SYS-V1');
