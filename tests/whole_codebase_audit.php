@@ -84,13 +84,18 @@ $requiredFiles = [
     'app/Database.php',
     'app/HouseholdContext.php',
     'app/Support.php',
+    'app/CostWasteService.php',
+    'phase9.php',
+    'api/phase9-health.php',
     'database/schema.sql',
-    'database/phase8_forecasting_seasonal_self_sufficiency.sql',
+    'database/phase9_cost_waste_savings_intelligence.sql',
     'tests/application_static_audit.php',
     'tests/database_integration_audit.php',
     'tests/http_smoke.sh',
-    'tests/phase8_integration.php',
-    'tests/phase8_http_smoke.sh',
+    'tests/phase9_static_audit.php',
+    'tests/phase9_integration.php',
+    'tests/phase9_http_smoke.sh',
+    '.github/workflows/phase9-certification.yml',
     '.htaccess',
     'config-example.php',
     'README.md',
@@ -231,8 +236,8 @@ $workflowFiles = array_values(array_filter(
     static fn(string $relative): bool => str_starts_with($relative, '.github/workflows/')
         && in_array(strtolower(pathinfo($relative, PATHINFO_EXTENSION)), ['yml', 'yaml'], true)
 ));
-if (count($workflowFiles) > 6) {
-    $add('medium', 'maintainability', 'The repository has more than six overlapping workflows; consolidate to reduce drift and duplicated CI cost.', '.github/workflows');
+if (count($workflowFiles) > 7) {
+    $add('medium', 'maintainability', 'The repository has more than seven overlapping workflows; consolidate to reduce drift and duplicated CI cost.', '.github/workflows');
 }
 foreach ($workflowFiles as $relative) {
     $content = $read($relative);
@@ -246,7 +251,7 @@ foreach ($workflowFiles as $relative) {
 
 if (isset($files['tests/application_static_audit.php'])) {
     $applicationAudit = $read('tests/application_static_audit.php');
-    foreach (range(2, 8) as $phase) {
+    foreach (range(2, 9) as $phase) {
         $healthPath = "api/phase{$phase}-health.php";
         if (isset($files[$healthPath]) && !str_contains($applicationAudit, $healthPath)) {
             $add('high', 'validation', 'Whole-application static audit does not include every current health endpoint.', 'tests/application_static_audit.php');
@@ -260,25 +265,31 @@ if (isset($files['.github/workflows/php-lint.yml'])) {
         'database/phase6_grow_harvest_preserve.sql',
         'database/phase7_planning_tasks_automation.sql',
         'database/phase8_forecasting_seasonal_self_sufficiency.sql',
+        'database/phase9_cost_waste_savings_intelligence.sql',
     ] as $migration) {
         if (isset($files[$migration]) && !str_contains($workflow, $migration)) {
             $add('high', 'validation', 'Primary whole-application workflow does not import or replay every current migration.', '.github/workflows/php-lint.yml');
         }
     }
-    foreach (['tests/phase6_integration.php', 'tests/phase7_integration.php', 'tests/phase8_integration.php'] as $suite) {
+    foreach (['tests/phase6_integration.php', 'tests/phase7_integration.php', 'tests/phase8_integration.php', 'tests/phase9_integration.php'] as $suite) {
         if (isset($files[$suite]) && !str_contains($workflow, $suite)) {
             $add('medium', 'validation', 'Primary whole-application workflow does not execute every current integration suite.', '.github/workflows/php-lint.yml');
+        }
+    }
+    foreach (['tests/phase6_http_smoke.sh', 'tests/phase7_http_smoke.sh', 'tests/phase8_http_smoke.sh', 'tests/phase9_http_smoke.sh'] as $suite) {
+        if (isset($files[$suite]) && !str_contains($workflow, $suite)) {
+            $add('medium', 'validation', 'Primary whole-application workflow does not execute every current HTTP suite.', '.github/workflows/php-lint.yml');
         }
     }
 }
 
 if (isset($files['README.md'])) {
     $readme = $read('README.md');
-    if (!str_contains($readme, 'database/phase8_forecasting_seasonal_self_sufficiency.sql')) {
-        $add('high', 'documentation', 'README migration sequence does not include Phase 8.', 'README.md');
+    if (!str_contains($readme, 'database/phase9_cost_waste_savings_intelligence.sql')) {
+        $add('high', 'documentation', 'README migration sequence does not include Phase 9.', 'README.md');
     }
-    if (!str_contains($readme, '/phase8.php')) {
-        $add('medium', 'documentation', 'README interface list does not include Phase 8.', 'README.md');
+    if (!str_contains($readme, '/phase9.php')) {
+        $add('medium', 'documentation', 'README interface list does not include Phase 9.', 'README.md');
     }
 }
 
