@@ -32,6 +32,13 @@ jobs:
       DB_NAME: homestead
       DB_USER: root
       DB_PASSWORD: root
+      HOMESTEAD_OWNER_EMAIL: owner@example.test
+      HOMESTEAD_OWNER_PASSWORD: CI-Only-Owner-Password-2026!
+      HOMESTEAD_OWNER_NAME: CI Owner
+      HOMESTEAD_HOUSEHOLD_NAME: CI Homestead
+      HOMESTEAD_HOUSEHOLD_SLUG: ci-homestead
+      HOMESTEAD_PLATFORM_ADMIN: '1'
+      HOMESTEAD_HEALTH_KEY: ci-health-key-2026
 
     steps:
       - name: Check out repository
@@ -59,29 +66,101 @@ jobs:
       - name: Install MySQL client
         run: sudo apt-get update && sudo apt-get install -y mysql-client
 
-      - name: Import base schema
-        run: mysql --host=127.0.0.1 --port=3306 --user=root homestead < database/schema.sql
+      - name: Import clean database migrations
+        run: |
+          set -euo pipefail
+          for file in \
+            database/schema.sql \
+            database/phase2_install.sql \
+            database/phase3_install.sql \
+            database/phase4_install.sql \
+            database/phase4_hardening.sql \
+            database/phase5_install.sql \
+            database/phase5_shopping_extension.sql \
+            database/phase5_hardening.sql
+          do
+            echo "Importing ${file}"
+            mysql --host=127.0.0.1 --port=3306 --user=root homestead < "${file}"
+          done
 
-      - name: Import Phase 2 migration
-        run: mysql --host=127.0.0.1 --port=3306 --user=root homestead < database/phase2_install.sql
+      - name: Replay incremental migrations
+        run: |
+          set -euo pipefail
+          for file in \
+            database/phase2_install.sql \
+            database/phase3_install.sql \
+            database/phase4_install.sql \
+            database/phase4_hardening.sql \
+            database/phase5_install.sql \
+            database/phase5_shopping_extension.sql \
+            database/phase5_hardening.sql
+          do
+            echo "Replaying ${file}"
+            mysql --host=127.0.0.1 --port=3306 --user=root homestead < "${file}"
+          done
 
-      - name: Import Phase 3 migration
-        run: mysql --host=127.0.0.1 --port=3306 --user=root homestead < database/phase3_install.sql
+      - name: Bootstrap secure test owner
+        run: php bin/create-owner.php
 
-      - name: Import Phase 4 migration
-        run: mysql --host=127.0.0.1 --port=3306 --user=root homestead < database/phase4_install.sql
-
-      - name: Import Phase 4 hardening
-        run: mysql --host=127.0.0.1 --port=3306 --user=root homestead < database/phase4_hardening.sql
-
-      - name: Import Phase 5 migration
-        run: mysql --host=127.0.0.1 --port=3306 --user=root homestead < database/phase5_install.sql
-
-      - name: Import Phase 5 shopping extension
-        run: mysql --host=127.0.0.1 --port=3306 --user=root homestead < database/phase5_shopping_extension.sql
-
-      - name: Import Phase 5 hardening
-        run: mysql --host=127.0.0.1 --port=3306 --user=root homestead < database/phase5_hardening.sql
+      - name: Verify owner bootstrap is idempotent
+        run: php bin/create-owner.php
 
       - name: Run database-backed migration audit
         run: php tests/database_integration_audit.php
+
+      - name: Run database-backed workflow integration suite
+        run: php tests/workflow_integration.php
+
+      - name: Create CI application configuration
+        run: |
+          cat > config.php <<'PHP'
+          <?php
+          declare(strict_types=1);
+          return [
+              'app' => [
+                  'name' => 'Homestead',
+                  'environment' => 'development',
+                  'debug' => false,
+                  'base_url' => 'http://127.0.0.1:8080',
+                  'timezone' => 'America/Phoenix',
+              ],
+              'database' => [
+                  'host' => '127.0.0.1',
+                  'port' => 3306,
+                  'name' => 'homestead',
+                  'user' => 'root',
+                  'password' => 'root',
+                  'charset' => 'utf8mb4',
+              ],
+              'security' => [
+                  'session_name' => 'homestead_ci_session',
+                  'health_key' => 'ci-health-key-2026',
+              ],
+              'features' => [
+                  'simulated_sensors' => true,
+                  'device_adapters' => false,
+                  'family_tracking' => true,
+                  'prepared_food_tracking' => true,
+              ],
+          ];
+          PHP
+
+      - name: Start PHP application server
+        run: |
+          php -S 127.0.0.1:8080 -t . > /tmp/homestead-server.log 2>&1 &
+          echo $! > /tmp/homestead-server.pid
+          for attempt in {1..20}; do
+            if curl -fsS http://127.0.0.1:8080/login.php >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/homestead-server.log
+          exit 1
+
+      - name: Run authenticated HTTP smoke suite
+        run: bash tests/http_smoke.sh
+
+      - name: Show server log on failure
+        if: failure()
+        run: cat /tmp/homestead-server.log || true
