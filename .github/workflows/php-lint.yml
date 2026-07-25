@@ -240,7 +240,22 @@ jobs:
           exit 1
 
       - name: Run authenticated HTTP smoke suite
-        run: bash tests/http_smoke.sh
+        run: |
+          set +e
+          report="$RUNNER_TEMP/http-smoke-${{ matrix.database }}.txt"
+          bash tests/http_smoke.sh > "$report" 2>&1
+          result=$?
+          cat "$report"
+          exit "$result"
+
+      - name: Upload HTTP smoke report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: http-smoke-${{ matrix.database }}
+          path: ${{ runner.temp }}/http-smoke-${{ matrix.database }}.txt
+          if-no-files-found: warn
+          retention-days: 3
 
       - name: Show server log on failure
         if: failure()
