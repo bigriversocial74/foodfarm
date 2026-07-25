@@ -9,6 +9,10 @@ use RuntimeException;
 
 final class Auth
 {
+    private const ABSOLUTE_SESSION_LIFETIME = 43200;
+    private const IDLE_SESSION_LIFETIME = 7200;
+    private const SESSION_ROTATION_INTERVAL = 900;
+
     public function __construct(private readonly PDO $pdo)
     {
     }
@@ -20,6 +24,17 @@ final class Auth
         $householdId = (int)($_SESSION['household_id'] ?? 0);
         $authVersion = (int)($_SESSION['auth_version'] ?? 0);
         if ($userId < 1 || $memberId < 1 || $householdId < 1 || $authVersion < 1) {
+            return null;
+        }
+
+        $now = time();
+        $authenticatedAt = (int)($_SESSION['authenticated_at'] ?? 0);
+        $lastActivityAt = (int)($_SESSION['last_activity_at'] ?? 0);
+        $sessionRotatedAt = (int)($_SESSION['session_rotated_at'] ?? 0);
+        if ($authenticatedAt < 1 || $lastActivityAt < 1 || $sessionRotatedAt < 1
+            || ($now - $authenticatedAt) > self::ABSOLUTE_SESSION_LIFETIME
+            || ($now - $lastActivityAt) > self::IDLE_SESSION_LIFETIME) {
+            $this->logout();
             return null;
         }
 
@@ -40,6 +55,12 @@ final class Auth
             $this->logout();
             return null;
         }
+
+        if (($now - $sessionRotatedAt) >= self::SESSION_ROTATION_INTERVAL) {
+            $this->rotateSessionId();
+            $_SESSION['session_rotated_at'] = $now;
+        }
+        $_SESSION['last_activity_at'] = $now;
 
         $user['is_platform_admin'] = (bool)$user['is_platform_admin'];
         return $user;
@@ -72,31 +93,38 @@ final class Auth
         if (password_needs_rehash((string)$record['password_hash'], PASSWORD_DEFAULT)) {
             $newHash = password_hash($password, PASSWORD_DEFAULT);
             if (is_string($newHash)) {
-                $this->pdo->prepare('UPDATE users SET password_hash = ? WHERE id = ? AND status = \'active\'')
+                $this->pdo->prepare("UPDATE users SET password_hash = ? WHERE id = ? AND status = 'active'")
                     ->execute([$newHash, (int)$record['id']]);
             }
         }
 
         $intendedUrl = $_SESSION['intended_url'] ?? null;
+        $activationToken = $_SESSION['starter_kit_activation_token'] ?? null;
         $_SESSION = [];
-        session_regenerate_id(true);
-        if (is_string($intendedUrl)) {
+        $this->rotateSessionId();
+
+        if ($this->isSafeLocalUrl($intendedUrl)) {
             $_SESSION['intended_url'] = $intendedUrl;
         }
+        if (is_string($activationToken) && preg_match('/^[a-f0-9]{64}$/', $activationToken) === 1) {
+            $_SESSION['starter_kit_activation_token'] = $activationToken;
+        }
+
+        $now = time();
         $_SESSION['user_id'] = (int)$record['id'];
         $_SESSION['member_id'] = (int)$record['member_id'];
         $_SESSION['household_id'] = (int)$record['household_id'];
         $_SESSION['auth_version'] = (int)$record['auth_version'];
-        $_SESSION['authenticated_at'] = time();
+        $_SESSION['authenticated_at'] = $now;
+        $_SESSION['last_activity_at'] = $now;
+        $_SESSION['session_rotated_at'] = $now;
         return true;
     }
 
     public function logout(): void
     {
         $_SESSION = [];
-        if (session_status() === PHP_SESSION_ACTIVE) {
-            session_regenerate_id(true);
-        }
+        $this->rotateSessionId();
     }
 
     public function requireUser(): array
@@ -104,7 +132,7 @@ final class Auth
         $user = $this->user();
         if ($user === null) {
             $requestUri = (string)($_SERVER['REQUEST_URI'] ?? '/phase3.php');
-            if (!str_starts_with($requestUri, '/') || str_starts_with($requestUri, '//') || preg_match('/[\x00-\x1F\x7F]/', $requestUri)) {
+            if (!$this->isSafeLocalUrl($requestUri)) {
                 $requestUri = '/phase3.php';
             }
             $_SESSION['intended_url'] = $requestUri;
@@ -170,6 +198,21 @@ final class Auth
         if (!$this->can($user, $permission)) {
             http_response_code(403);
             throw new RuntimeException('You do not have permission to perform this action.');
+        }
+    }
+
+    private function isSafeLocalUrl(mixed $url): bool
+    {
+        return is_string($url)
+            && str_starts_with($url, '/')
+            && !str_starts_with($url, '//')
+            && preg_match('/[\x00-\x1F\x7F]/', $url) !== 1;
+    }
+
+    private function rotateSessionId(): void
+    {
+        if (session_status() === PHP_SESSION_ACTIVE && !headers_sent()) {
+            session_regenerate_id(true);
         }
     }
 }
