@@ -21,6 +21,7 @@ require_once __DIR__ . '/Database.php';
 require_once __DIR__ . '/HouseholdContext.php';
 require_once __DIR__ . '/Auth.php';
 require_once __DIR__ . '/RecipeService.php';
+require_once __DIR__ . '/StarterKitService.php';
 
 $database = new Homestead\Database($config['database'] ?? []);
 $pdo = $database->connection();
