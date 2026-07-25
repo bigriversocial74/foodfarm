@@ -5,16 +5,16 @@ Homestead is a household food system for growing, storing, cooking, preserving, 
 ## Interfaces
 
 - `/index.php` — visual application shell
-- `/phase2.php` — household, family, storage, inventory, and ledger workspace
+- `/phase2.php` — authenticated household, family, storage, inventory, and ledger workspace
 - `/login.php` — account login
-- `/phase3.php` — invitations, roles, permission overrides, and authentication history
+- `/phase3.php` — restricted invitations, roles, permission overrides, and authentication history
 - `/phase4.php` — recipes, family meal planning, ingredient deductions, and prepared food
-- `/phase5.php` — platform-admin starter-kit builder, immutable versions, fulfillment mapping, orders, recipes, tasks, and activation links
-- `/activate-kit.php?token=...` — purchaser-bound customer kit review and household provisioning
+- `/phase5.php` — platform-administrator starter-kit builder, versions, fulfillment mapping, orders, and activation links
+- `/activate-kit.php?token=...` — customer kit review and household provisioning
 - `/api/phase2-health.php` — Phase 2 database validation
 - `/api/phase3-health.php` — Phase 3 authentication validation
 - `/api/phase4-health.php` — Phase 4 food workflow validation
-- `/api/phase5-health.php` — Phase 5 starter-kit and hardening validation
+- `/api/phase5-health.php` — Phase 5 starter-kit validation
 
 ## Requirements
 
@@ -43,53 +43,58 @@ database/phase5_shopping_extension.sql
 database/phase5_hardening.sql
 ```
 
-The hardening migration adds the platform-administrator boundary, starter-kit shopping provenance, and supporting indexes. It promotes the first existing user only when no platform administrator exists; review that account immediately after import.
-
 Start a local server:
 
 ```bash
 php -S 127.0.0.1:8080
 ```
 
-Open `/api/phase5-health.php` and confirm `ok: true`. Sign in at `/login.php`; only a platform administrator can open `/phase5.php`.
+Open `/api/phase5-health.php` and confirm `ok: true`, sign in at `/login.php`, then verify the authenticated Phase 2–5 workflows.
 
-## Hardened Phase 5 capabilities
+## Whole-application audit
 
-- Administrator-defined basic and specialized starter kits
-- Draft-only editing with immutable published and retired versions
-- Published-version-only order activation
-- Shipped, local-shopping, optional-delivery, digital-only, and customer-supplied items
-- Required-item, shipping-eligibility, and delivery-eligibility enforcement
-- Ingredient, equipment, supply, seed, and digital item types
-- Suggested storage, reorder levels, supplier, and estimated-price metadata
-- Attached starter recipes and starter tasks
-- Purchased-kit and external-order records
-- Secure one-time activation links stored only as SHA-256 hashes
-- Purchaser email binding before activation
-- Database row locking and single-use activation enforcement
-- Transactional pantry, shopping-list, recipe, and task provisioning
-- Opening `received` food-ledger events with starter-kit provenance
-- Shopping and delivery entries with `starter_kit` source attribution
-- Platform-admin-only access to global customer order records
+The repository-wide audit and repair record is maintained in:
 
-## Validation
-
-Pull requests run:
-
-```bash
-find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
-php tests/phase5_static_audit.php
+```text
+docs/WHOLE_APP_AUDIT.md
 ```
 
-The health endpoint additionally checks required tables, shopping extensions, the platform-admin column, starter-kit source support, and the presence of at least one platform administrator.
+The initial whole-application score was **5.9/10**. The application is not certified as 10/10. A final score requires completed code review, passing CI, clean SQL imports, database-backed end-to-end tests, health validation, and deployed smoke testing.
+
+CI currently includes:
+
+- PHP syntax validation across all PHP files
+- Whole-application static security regression checks
+- Phase 5 starter-kit security regression checks
+
+## Phase 5 capabilities
+
+- Administrator-defined basic and specialized starter kits
+- Immutable version records and SKUs
+- Shipped, local-shopping, optional-delivery, digital-only, and customer-supplied items
+- Ingredient, equipment, supply, seed, and digital item types
+- Required and optional item configuration
+- Delivery and shipping eligibility
+- Suggested storage, reorder levels, supplier, and estimated price metadata
+- Purchased-kit and external-order records
+- Secure one-time activation links stored only as SHA-256 hashes
+- Customer confirmation of actual quantities and fulfillment choices
+- Transactional digital-pantry provisioning
+- Opening `received` food-ledger events with starter-kit provenance
+- Shopping-list and delivery-request generation for items not yet owned
+- Kit ownership and activation history
+
+## Starter-kit integrity
+
+Kit definitions, purchased kit versions, and household activations are separate records. Editing a future kit version does not change a customer's historical order or activated pantry contents. Items are stocked only after customer confirmation; local-shopping and delivery items remain pending until selected.
 
 ## Family wellness privacy
 
-Height, weight, and activity levels remain optional and private by default. They are not copied into kit orders, activation records, inventory provenance, shopping lists, delivery requests, recipes, or starter tasks.
+Height, weight, and activity levels remain optional and private by default. They are not copied into kit orders, activation records, inventory provenance, shopping lists, or delivery requests.
 
 ## Current scope boundary
 
-Phase 5 records optional delivery requests but does not dispatch drivers, calculate routes or delivery fees, charge customers, or integrate with grocery-delivery providers. Email delivery, password-reset email, multi-household switching, harvest-to-inventory posting, preservation posting, and physical device control remain deferred.
+Phase 5 records optional delivery requests but does not yet dispatch drivers, calculate delivery routes, charge delivery fees, or integrate with grocery-delivery providers. Email delivery, password-reset email, multi-household switching, harvest-to-inventory posting, preservation posting, and physical device control remain deferred.
 
 ## Safety boundary
 
