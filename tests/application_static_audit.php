@@ -20,9 +20,9 @@ $auth = $read('app/Auth.php');
 
 $checks = [
     'Phase 2 requires authenticated user' => str_contains($phase2, '$auth->requireUser()'),
-    'Phase 2 member writes require permission' => str_contains($phase2, "requirePermission($user, 'members.manage')"),
-    'Phase 2 storage writes require permission' => str_contains($phase2, "requirePermission($user, 'storage.manage')"),
-    'Phase 2 inventory writes require permission' => str_contains($phase2, "requirePermission($user, 'inventory.manage')"),
+    'Phase 2 member writes require permission' => str_contains($phase2, '$auth->requirePermission($user, \'members.manage\')'),
+    'Phase 2 storage writes require permission' => str_contains($phase2, '$auth->requirePermission($user, \'storage.manage\')'),
+    'Phase 2 inventory writes require permission' => str_contains($phase2, '$auth->requirePermission($user, \'inventory.manage\')'),
     'Phase 2 validates household storage ownership' => str_contains($phase2, 'The storage location is invalid.'),
     'Household context has no first-household fallback' => !str_contains($context, 'SELECT id FROM households ORDER BY id ASC LIMIT 1'),
     'Household context binds user member and household' => str_contains($context, 'user_id = ?') && str_contains($context, 'household_id = ?'),
@@ -31,10 +31,10 @@ $checks = [
     'Phase 3 exposes recipe permissions' => str_contains($phase3, "'recipes.manage'") && str_contains($phase3, "'meals.manage'"),
     'Phase 3 prevents duplicate invitations' => str_contains($phase3, 'active invitation already exists'),
     'Login no longer publishes seed credential' => !str_contains($login, 'ChangeMe123!'),
-    'Login rejects protocol-relative redirects' => str_contains($login, "str_starts_with($target, '//')"),
+    'Login rejects protocol-relative redirects' => str_contains($login, 'str_starts_with($target, \'//\')'),
     'Login hashes failed email metadata' => str_contains($login, "'email_hash'"),
     'Login has attempt throttling' => str_contains($login, 'Too many sign-in attempts'),
-    'Invitation token format is validated' => str_contains($invite, "preg_match('/^[a-f0-9]{64}$/', $token)"),
+    'Invitation token format is validated' => str_contains($invite, "preg_match('/^[a-f0-9]{64}$/', \$token)"),
     'Invitation acceptance locks row' => str_contains($invite, 'FOR UPDATE'),
     'Invitation acceptance verifies single consume' => str_contains($invite, 'rowCount() !== 1'),
 ];
