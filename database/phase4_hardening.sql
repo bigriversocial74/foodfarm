@@ -29,6 +29,27 @@ SET @sql := IF(
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
+SET @sql := IF(
+    (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'auth_version') = 0,
+    'ALTER TABLE users ADD COLUMN auth_version INT UNSIGNED NOT NULL DEFAULT 1 AFTER status',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := IF(
+    (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'authentication_events' AND INDEX_NAME = 'idx_auth_event_ip_type_time') = 0,
+    'CREATE INDEX idx_auth_event_ip_type_time ON authentication_events (ip_address, event_type, occurred_at)',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := IF(
+    (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'authentication_events' AND INDEX_NAME = 'idx_auth_event_user_type_time') = 0,
+    'CREATE INDEX idx_auth_event_user_type_time ON authentication_events (user_id, event_type, occurred_at)',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
 ALTER TABLE authentication_events
     MODIFY COLUMN event_type ENUM(
         'login_success','login_failure','logout','invitation_created','invitation_accepted',
