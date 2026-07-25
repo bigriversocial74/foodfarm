@@ -8,13 +8,6 @@ SET @sql := IF(
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
-SET @first_user_id := (SELECT id FROM users ORDER BY id ASC LIMIT 1);
-SET @platform_admin_count := (SELECT COUNT(*) FROM users WHERE is_platform_admin = 1);
-UPDATE users
-SET is_platform_admin = 1
-WHERE id = @first_user_id
-  AND @platform_admin_count = 0;
-
 ALTER TABLE shopping_list_items
     MODIFY COLUMN source_type ENUM('manual','low_stock','recipe','garden','preservation','maintenance','starter_kit') NOT NULL DEFAULT 'manual';
 
