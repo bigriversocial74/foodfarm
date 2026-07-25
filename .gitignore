@@ -1,0 +1,17 @@
+config.php
+.env
+.env.*
+!.env.example
+/vendor/
+/node_modules/
+/storage/logs/*
+/storage/cache/*
+/storage/uploads/*
+!storage/logs/.gitkeep
+!storage/cache/.gitkeep
+!storage/uploads/.gitkeep
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
