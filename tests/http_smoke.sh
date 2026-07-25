@@ -39,7 +39,10 @@ pass "protected routes redirect unauthenticated requests"
 pass "health endpoint hides from unauthorized requests"
 
 health_body="$(curl -sS -H "X-Homestead-Health-Key: ${HOMESTEAD_HEALTH_KEY}" "$base_url/api/phase5-health.php")"
-grep -q '"ok": true' <<<"$health_body" || fail "authorized health check did not pass"
+if ! grep -q '"ok": true' <<<"$health_body"; then
+  echo "$health_body" >&2
+  fail "authorized health check did not pass"
+fi
 pass "authorized health endpoint passes"
 
 curl -sS -c "$cookie_jar" "$base_url/login.php" > "$login_page"
