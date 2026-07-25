@@ -23,16 +23,21 @@ foreach ($files as $name => $path) {
 $content = array_map(static fn(string $path): string => (string)file_get_contents($path), $files);
 $checks = [
     'route requires authenticated user' => str_contains($content['route'], '$auth->requireUser()'),
-    'route enforces garden permission' => str_contains($content['route'], "requirePermission($user, 'garden.manage')"),
-    'route enforces harvest permission' => str_contains($content['route'], "requirePermission($user, 'harvest.record')"),
-    'route enforces preservation permission' => str_contains($content['route'], "requirePermission($user, 'preservation.manage')"),
+    'route enforces garden permission' => str_contains($content['route'], "$auth->requirePermission($user, 'garden.manage')"),
+    'route enforces harvest permission' => str_contains($content['route'], "$auth->requirePermission($user, 'harvest.record')"),
+    'route enforces preservation permission' => str_contains($content['route'], "$auth->requirePermission($user, 'preservation.manage')"),
+    'route scopes garden and preservation reads' => str_contains($content['route'], 'if ($canViewGarden)')
+        && str_contains($content['route'], 'if ($canViewPreservation)'),
     'harvest uses transaction' => str_contains($content['service'], 'public function recordHarvest')
         && str_contains($content['service'], '$this->pdo->beginTransaction()'),
     'harvest locks planting' => str_contains($content['service'], 'WHERE p.id = ? AND z.household_id = ? FOR UPDATE'),
+    'harvest form token is session-bound' => str_contains($content['route'], 'hash_equals($sessionKey, $submittedKey)')
+        && str_contains($content['route'], 'name="action_key"'),
     'harvest is idempotent' => str_contains($content['service'], 'SELECT id FROM harvests WHERE action_key = ? LIMIT 1'),
     'inventory harvest unit is validated' => str_contains($content['service'], 'Harvest and inventory units must match exactly.'),
     'preservation locks inventory' => str_contains($content['service'], "status = 'active' FOR UPDATE"),
     'preservation uses guarded deduction' => str_contains($content['service'], 'current_quantity >= ?'),
+    'planned preservation binds source inventory' => str_contains($content['service'], 'The preservation input must match the inventory created by the source harvest.'),
     'preservation records input provenance' => str_contains($content['service'], 'INSERT INTO preservation_batch_inputs'),
     'preservation creates output inventory' => str_contains($content['service'], "'preserved_food'"),
     'health endpoint is protected' => str_contains($content['health'], 'require_health_access'),
