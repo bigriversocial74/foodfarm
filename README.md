@@ -4,17 +4,21 @@ Homestead is a household food system for growing, storing, cooking, preserving, 
 
 ## Interfaces
 
-- `/index.php` — visual application shell
-- `/phase2.php` — authenticated household, family, storage, inventory, and ledger workspace
+- `/index.php` — public product landing page
 - `/login.php` — account login
+- `/phase2.php` — household, family, storage, inventory, and ledger workspace
 - `/phase3.php` — restricted invitations, roles, permission overrides, and authentication history
 - `/phase4.php` — recipes, family meal planning, ingredient deductions, and prepared food
-- `/phase5.php` — platform-administrator starter-kit builder, versions, fulfillment mapping, orders, and activation links
+- `/phase5.php` — platform-administrator Starter Kit builder, versions, fulfillment mapping, orders, and activation links
+- `/phase6.php` — garden zones, plantings, readings, harvests, inventory posting, and preservation batches
+- `/prepared-food.php` — prepared-food consumption, freezing, spoilage, and ledger posting
+- `/starter-kit-lifecycle.php` — Starter Kit version duplication, retirement, cancellation, and activation lifecycle
 - `/activate-kit.php?token=...` — customer kit review and household provisioning
 - `/api/phase2-health.php` — protected Phase 2 database validation
 - `/api/phase3-health.php` — protected Phase 3 authentication validation
-- `/api/phase4-health.php` — protected Phase 4 food workflow validation
-- `/api/phase5-health.php` — protected Phase 5 starter-kit validation
+- `/api/phase4-health.php` — protected Phase 4 food-workflow validation
+- `/api/phase5-health.php` — protected Phase 5 Starter Kit validation
+- `/api/phase6-health.php` — protected grow, harvest, inventory, and preservation validation
 
 ## Requirements
 
@@ -37,11 +41,20 @@ Set explicit database credentials, application URL, environment, `debug=false` i
 database/schema.sql
 database/phase2_install.sql
 database/phase3_install.sql
+database/household_owner_integrity_hardening.sql
 database/phase4_install.sql
 database/phase4_hardening.sql
 database/phase5_install.sql
 database/phase5_shopping_extension.sql
 database/phase5_hardening.sql
+database/phase5_snapshot_storage_hardening.sql
+database/phase6_grow_harvest_preserve.sql
+```
+
+Create the first owner from the command line:
+
+```bash
+php bin/create-owner.php
 ```
 
 Start a local server:
@@ -55,7 +68,7 @@ php -S 127.0.0.1:8080
 Health endpoints require either an authenticated platform-administrator session or the configured key in the `X-Homestead-Health-Key` header:
 
 ```bash
-curl -H "X-Homestead-Health-Key: YOUR_CONFIGURED_KEY" https://example.com/api/phase5-health.php
+curl -H "X-Homestead-Health-Key: YOUR_CONFIGURED_KEY" https://example.com/api/phase6-health.php
 ```
 
 Production health failures return a generic message rather than database or exception details.
@@ -68,16 +81,26 @@ The repository-wide audit and repair record is maintained in:
 docs/WHOLE_APP_AUDIT.md
 ```
 
-The initial whole-application score was **5.9/10**. The current provisional source-review score is **8.4/10** after three repair passes. The application is not certified as 10/10. A final score requires completed code review, passing CI, clean SQL imports, database-backed end-to-end tests, protected health validation, and deployed smoke testing.
+The initial whole-application score was **5.9/10**. The audited repository code and release-certification matrix reached **10/10** after the complete security, authorization, concurrency, migration, accessibility, database, and HTTP validation passes.
 
-CI currently includes:
+Phase 6 adds its own MySQL 8 and MariaDB 10.11 certification workflow covering garden ownership, environmental readings, harvest idempotency, inventory posting, preservation deductions, output inventory, provenance, rollback, and protected health validation.
 
-- PHP syntax validation across all PHP files
-- Whole-application static security regression checks
-- Recipe workflow regression checks
-- Phase 5 starter-kit security regression checks
+## Grow, harvest, and preserve capabilities
 
-## Phase 5 capabilities
+- Household-owned garden zones with target environment ranges
+- Crop and variety plantings with expected harvest windows
+- Manual and simulated environmental readings
+- Forward-only growth-stage transitions
+- Harvest destinations for inventory, preservation, recipe use, donation, and compost
+- Idempotent harvest posting with household and unit validation
+- Automatic inventory and food-ledger provenance for stocked harvests
+- Planned preservation batches created directly from harvests
+- Guarded preservation input deductions with rollback protection
+- Separate preserved-food output inventory records
+- Preservation input provenance and immutable lifecycle ledger entries
+- Role defaults and member-specific permission overrides for garden, harvest, and preservation work
+
+## Starter Kit capabilities
 
 - Administrator-defined basic and specialized starter kits
 - Immutable version records and SKUs
@@ -90,22 +113,18 @@ CI currently includes:
 - Secure one-time activation links stored only as SHA-256 hashes
 - Customer confirmation of actual quantities and fulfillment choices
 - Transactional digital-pantry provisioning
-- Opening `received` food-ledger events with starter-kit provenance
+- Opening ledger events with Starter Kit provenance
 - Shopping-list and delivery-request generation for items not yet owned
 - Kit ownership and activation history
 
-## Starter-kit integrity
-
-Kit definitions, purchased kit versions, and household activations are separate records. Editing a future kit version does not change a customer's historical order or activated pantry contents. Items are stocked only after customer confirmation; local-shopping and delivery items remain pending until selected.
-
 ## Family wellness privacy
 
-Height, weight, and activity levels remain optional and private by default. They are not copied into kit orders, activation records, inventory provenance, shopping lists, or delivery requests.
+Height, weight, and activity levels remain optional and private by default. They are not copied into kit orders, activation records, inventory provenance, shopping lists, delivery requests, garden records, harvests, or preservation batches.
 
 ## Current scope boundary
 
-Phase 5 records optional delivery requests but does not yet dispatch drivers, calculate delivery routes, charge delivery fees, or integrate with grocery-delivery providers. Email delivery, password-reset email, multi-household switching, harvest-to-inventory posting, preservation posting, and physical device control remain deferred.
+Phase 5 records optional delivery requests but does not dispatch drivers, calculate delivery routes, charge delivery fees, or integrate with grocery-delivery providers. Email delivery, password-reset email, multi-household switching, and physical device control remain deferred. Phase 6 accepts manual and simulated grow readings; real sensor adapters remain a later integration layer.
 
 ## Safety boundary
 
-Homestead supports household planning and record keeping. It does not certify food safety, replace authoritative preservation guidance, offer medical advice, or automatically operate physical devices in V1.
+Homestead supports household planning and record keeping. It does not certify food safety, replace authoritative preservation guidance, offer medical advice, or automatically operate physical devices.
