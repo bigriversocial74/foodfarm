@@ -127,6 +127,24 @@ $check('duplicate harvest is rejected', $expectException(static fn() => $service
 ])));
 $check('duplicate harvest does not stock twice', abs((float)$pdo->query('SELECT current_quantity FROM inventory_items WHERE id = ' . $inputItemId)->fetchColumn() - 5.0) < 0.0001);
 
+$pdo->prepare("INSERT INTO inventory_items (household_id, storage_location_id, name, item_type, current_quantity, unit, status) VALUES (?, ?, 'Phase 6 Unrelated Produce', 'ingredient', 4, 'lb', 'active')")
+    ->execute([$householdId, $locationId]);
+$unrelatedItemId = (int)$pdo->lastInsertId();
+$check('planned preservation rejects unrelated inventory input', $expectException(static fn() => $service->completePreservation($householdId, $memberId, [
+    'preservation_batch_id' => $plannedBatchId,
+    'input_inventory_item_id' => $unrelatedItemId,
+    'input_quantity' => 1,
+    'input_unit' => 'lb',
+    'name' => 'Wrong source batch',
+    'method' => 'dehydrating',
+    'output_name' => 'Wrong source output',
+    'output_quantity' => 1,
+    'output_unit' => 'bags',
+    'storage_location_id' => $locationId,
+    'action_key' => hash('sha256', 'phase6-wrong-source'),
+])));
+$check('rejected unrelated input remains unchanged', abs((float)$pdo->query('SELECT current_quantity FROM inventory_items WHERE id = ' . $unrelatedItemId)->fetchColumn() - 4.0) < 0.0001);
+
 $preservationKey = hash('sha256', 'phase6-preservation-integration');
 $completedBatchId = $service->completePreservation($householdId, $memberId, [
     'preservation_batch_id' => $plannedBatchId,
