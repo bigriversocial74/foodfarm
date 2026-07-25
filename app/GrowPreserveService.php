@@ -88,8 +88,8 @@ final class GrowPreserveService
         if ($harvestStart !== null && $harvestStart < $plantedOn) {
             throw new InvalidArgumentException('Expected harvest cannot begin before planting.');
         }
-        if ($harvestEnd !== null && $harvestStart !== null && $harvestEnd < $harvestStart) {
-            throw new InvalidArgumentException('Expected harvest end cannot precede its start.');
+        if ($harvestEnd !== null && $harvestEnd < ($harvestStart ?? $plantedOn)) {
+            throw new InvalidArgumentException('Expected harvest end cannot precede planting or its harvest start.');
         }
 
         $statement = $this->pdo->prepare(
@@ -182,14 +182,8 @@ final class GrowPreserveService
             if ($update->rowCount() !== 1) {
                 throw new RuntimeException('The planting changed while its stage was being updated.');
             }
-            $this->activity(
-                $householdId,
-                $memberId,
-                'planting_stage_updated',
-                'planting',
-                $plantingId,
-                (string)$planting['crop_name'] . ' moved to ' . str_replace('_', ' ', $stage)
-            );
+            $this->activity($householdId, $memberId, 'planting_stage_updated', 'planting', $plantingId,
+                (string)$planting['crop_name'] . ' moved to ' . str_replace('_', ' ', $stage));
             $this->pdo->commit();
         } catch (Throwable $exception) {
             if ($this->pdo->inTransaction()) {
@@ -336,6 +330,7 @@ final class GrowPreserveService
                 $harvestedAt,
             ]);
 
+            $preservationBatchId = null;
             if ($destination === 'preservation') {
                 $batch = $this->pdo->prepare(
                     "INSERT INTO preservation_batches
@@ -382,14 +377,8 @@ final class GrowPreserveService
                     ->execute([$plantingId]);
             }
 
-            $this->activity(
-                $householdId,
-                $memberId,
-                'harvest_recorded',
-                'harvest',
-                $harvestId,
-                $quantity . ' ' . $unit . ' of ' . $planting['crop_name'] . ' recorded'
-            );
+            $this->activity($householdId, $memberId, 'harvest_recorded', 'harvest', $harvestId,
+                $quantity . ' ' . $unit . ' of ' . $planting['crop_name'] . ' recorded');
             $this->pdo->commit();
 
             return $harvestId;
@@ -453,7 +442,8 @@ final class GrowPreserveService
             $sourceHarvestId = null;
             if ($batchId !== null) {
                 $batchQuery = $this->pdo->prepare(
-                    "SELECT pb.id, pb.method, h.id AS source_harvest_id
+                    "SELECT pb.id, pb.method, h.id AS source_harvest_id,
+                            h.inventory_item_id AS source_inventory_item_id
                      FROM preservation_batches pb
                      LEFT JOIN harvests h ON h.preservation_batch_id = pb.id
                      WHERE pb.id = ? AND pb.household_id = ? AND pb.status IN ('planned','prepared') FOR UPDATE"
@@ -467,6 +457,10 @@ final class GrowPreserveService
                     throw new InvalidArgumentException('The preservation method must match the planned batch.');
                 }
                 $sourceHarvestId = (int)$batch['source_harvest_id'] ?: null;
+                $sourceInventoryItemId = (int)$batch['source_inventory_item_id'] ?: null;
+                if ($sourceInventoryItemId !== null && $sourceInventoryItemId !== $inputItemId) {
+                    throw new InvalidArgumentException('The preservation input must match the inventory created by the source harvest.');
+                }
             } else {
                 $insertBatch = $this->pdo->prepare(
                     "INSERT INTO preservation_batches
@@ -584,14 +578,8 @@ final class GrowPreserveService
                 'Preserved output from ' . $input['name'],
             ]);
 
-            $this->activity(
-                $householdId,
-                $memberId,
-                'preservation_completed',
-                'preservation_batch',
-                $batchId,
-                $name . ' completed and stored'
-            );
+            $this->activity($householdId, $memberId, 'preservation_completed', 'preservation_batch', $batchId,
+                $name . ' completed and stored');
             $this->pdo->commit();
 
             return $batchId;
@@ -728,9 +716,13 @@ final class GrowPreserveService
         if ($value === '') {
             return gmdate('Y-m-d H:i:s');
         }
-        foreach (['!Y-m-d\TH:i', '!Y-m-d H:i:s'] as $format) {
+        foreach (['!Y-m-d\TH:i' => 'Y-m-d\TH:i', '!Y-m-d H:i:s' => 'Y-m-d H:i:s'] as $format => $expected) {
             $date = DateTimeImmutable::createFromFormat($format, $value);
-            if ($date instanceof DateTimeImmutable) {
+            $errors = DateTimeImmutable::getLastErrors();
+            $valid = $date instanceof DateTimeImmutable
+                && ($errors === false || ($errors['warning_count'] === 0 && $errors['error_count'] === 0))
+                && $date->format($expected) === $value;
+            if ($valid) {
                 return $date->format('Y-m-d H:i:s');
             }
         }
