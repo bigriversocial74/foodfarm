@@ -70,6 +70,14 @@ final class StarterKitAdminService
             );
             $copyRecipes->execute([$newVersionId, $sourceVersionId]);
 
+            $copySnapshots = $this->pdo->prepare(
+                'INSERT INTO starter_kit_recipe_snapshots
+                 (starter_kit_version_id, source_recipe_id, snapshot_hash, recipe_snapshot)
+                 SELECT ?, source_recipe_id, snapshot_hash, recipe_snapshot
+                 FROM starter_kit_recipe_snapshots WHERE starter_kit_version_id = ?'
+            );
+            $copySnapshots->execute([$newVersionId, $sourceVersionId]);
+
             $copyTasks = $this->pdo->prepare(
                 'INSERT INTO starter_kit_tasks
                  (starter_kit_version_id, title, area, due_offset_days, recurring_rule, instructions, sort_order)
