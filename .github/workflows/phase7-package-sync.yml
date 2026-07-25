@@ -1,4 +1,4 @@
-name: Phase 7 Package Sync
+name: Phase 7 Source Recovery
 
 on:
   pull_request:
@@ -8,130 +8,128 @@ on:
       - '.github/workflows/phase7-package-sync.yml'
 
 permissions:
-  contents: read
+  actions: read
+  contents: write
 
 jobs:
-  sync:
+  recover:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
-      - name: Clone Phase 7 branch
+      - name: Download recovered Phase 7 artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          git clone --depth 1 --branch "${{ github.head_ref }}" \
-            "https://github.com/${{ github.repository }}.git" repo
+          gh api repos/${{ github.repository }}/actions/artifacts/8621588480/zip > /tmp/phase7-artifact.zip
+          mkdir -p /tmp/phase7-artifact /tmp/phase7-source
+          unzip -q /tmp/phase7-artifact.zip -d /tmp/phase7-artifact
+          tar -xzf /tmp/phase7-artifact/phase7-recovered-source.tar.gz -C /tmp/phase7-source
 
-      - name: Salvage Phase 7 source from staged ZIP records
+      - name: Validate recovered source
         run: |
           set -euo pipefail
-          cd repo
+          files=(
+            phase7.php
+            app/PlanningAutomationService.php
+            api/phase7-health.php
+            docs/PHASE7_PLANNING_TASKS_AUTOMATION.md
+            PHASE7_HANDOFF.md
+            tests/phase7_http_smoke.sh
+            tests/phase7_static_audit.php
+          )
+          for file in "${files[@]}"; do
+            test -s "/tmp/phase7-source/${file}"
+          done
+          php -l /tmp/phase7-source/phase7.php
+          php -l /tmp/phase7-source/app/PlanningAutomationService.php
+          php -l /tmp/phase7-source/api/phase7-health.php
+          php -l /tmp/phase7-source/tests/phase7_static_audit.php
+          bash -n /tmp/phase7-source/tests/phase7_http_smoke.sh
+
+      - name: Upsert recovered source on Phase 7 branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          HEAD_BRANCH: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
           import base64
-          import binascii
-          import struct
-          import zlib
+          import json
+          import os
+          import urllib.error
+          import urllib.parse
+          import urllib.request
 
-          root = Path('.phase7-sync')
-          encoded = ''.join(
-              path.read_text(encoding='utf-8')
-              for path in sorted(root.glob('chunk-*'))
-          )
-          cleaned = ''.join(encoded.split())
-          padding = '=' * ((4 - len(cleaned) % 4) % 4)
-          payload = base64.b64decode(cleaned + padding, validate=False)
+          repository = os.environ['REPOSITORY']
+          branch = os.environ['HEAD_BRANCH']
+          token = os.environ['GH_TOKEN']
+          root = Path('/tmp/phase7-source')
+          files = [
+              'phase7.php',
+              'app/PlanningAutomationService.php',
+              'api/phase7-health.php',
+              'docs/PHASE7_PLANNING_TASKS_AUTOMATION.md',
+              'PHASE7_HANDOFF.md',
+              'tests/phase7_http_smoke.sh',
+              'tests/phase7_static_audit.php',
+          ]
 
-          position = 0
-          extracted = []
-          truncated = None
-          while position + 30 <= len(payload):
-              signature = payload[position:position + 4]
-              if signature != b'PK\x03\x04':
-                  if signature in {b'PK\x01\x02', b'PK\x05\x06'}:
-                      break
-                  next_header = payload.find(b'PK\x03\x04', position + 1)
-                  if next_header < 0:
-                      break
-                  position = next_header
+          def request(method: str, path: str, payload=None):
+              data = None if payload is None else json.dumps(payload).encode('utf-8')
+              req = urllib.request.Request(
+                  'https://api.github.com/' + path,
+                  data=data,
+                  method=method,
+                  headers={
+                      'Authorization': 'Bearer ' + token,
+                      'Accept': 'application/vnd.github+json',
+                      'X-GitHub-Api-Version': '2022-11-28',
+                      'User-Agent': 'homestead-phase7-recovery',
+                  },
+              )
+              try:
+                  with urllib.request.urlopen(req) as response:
+                      return json.loads(response.read().decode('utf-8'))
+              except urllib.error.HTTPError as error:
+                  body = error.read().decode('utf-8', errors='replace')
+                  if error.code == 404:
+                      return None
+                  raise RuntimeError(f'GitHub API {error.code}: {body}') from error
+
+          for path in files:
+              quoted = urllib.parse.quote(path, safe='/')
+              existing = request('GET', f'repos/{repository}/contents/{quoted}?ref={urllib.parse.quote(branch)}')
+              payload = {
+                  'message': 'Recover Phase 7 source: ' + path,
+                  'branch': branch,
+                  'content': base64.b64encode(root.joinpath(path).read_bytes()).decode('ascii'),
+              }
+              if existing and existing.get('sha'):
+                  payload['sha'] = existing['sha']
+              result = request('PUT', f'repos/{repository}/contents/{quoted}', payload)
+              print(f"Recovered {path} at {result['commit']['sha']}")
+
+          staging = [
+              '.phase7-sync/package.b64',
+              '.phase7-sync/chunk-00',
+              '.phase7-sync/chunk-01',
+              '.phase7-sync/chunk-02',
+              '.phase7-sync/chunk-03',
+              '.phase7-sync/chunk-04',
+              '.phase7-sync/trigger',
+          ]
+          for path in staging:
+              quoted = urllib.parse.quote(path, safe='/')
+              existing = request('GET', f'repos/{repository}/contents/{quoted}?ref={urllib.parse.quote(branch)}')
+              if not existing or not existing.get('sha'):
                   continue
-
-              (
-                  _signature,
-                  _version,
-                  flags,
-                  method,
-                  _mod_time,
-                  _mod_date,
-                  expected_crc,
-                  compressed_size,
-                  uncompressed_size,
-                  filename_length,
-                  extra_length,
-              ) = struct.unpack_from('<IHHHHHIIIHH', payload, position)
-
-              name_start = position + 30
-              name_end = name_start + filename_length
-              extra_end = name_end + extra_length
-              data_end = extra_end + compressed_size
-              if data_end > len(payload):
-                  truncated = payload[name_start:min(name_end, len(payload))].decode('utf-8', errors='replace')
-                  break
-
-              filename = payload[name_start:name_end].decode('utf-8')
-              if flags & 0x08:
-                  raise SystemExit(f'Unsupported data-descriptor entry: {filename}')
-              if filename.startswith('/') or '..' in Path(filename).parts:
-                  raise SystemExit(f'Unsafe archive path: {filename}')
-
-              compressed = payload[extra_end:data_end]
-              if method == 0:
-                  content = compressed
-              elif method == 8:
-                  content = zlib.decompress(compressed, -15)
-              else:
-                  raise SystemExit(f'Unsupported compression method {method} for {filename}')
-
-              if len(content) != uncompressed_size:
-                  raise SystemExit(f'Uncompressed length mismatch for {filename}')
-              if (binascii.crc32(content) & 0xFFFFFFFF) != expected_crc:
-                  raise SystemExit(f'CRC mismatch for {filename}')
-
-              destination = Path(filename)
-              if filename.endswith('/'):
-                  destination.mkdir(parents=True, exist_ok=True)
-              else:
-                  destination.parent.mkdir(parents=True, exist_ok=True)
-                  destination.write_bytes(content)
-              extracted.append(filename)
-              position = data_end
-
-          if not extracted:
-              raise SystemExit('No complete Phase 7 source entries could be recovered.')
-
-          Path('/tmp/phase7-recovered-files.txt').write_text(
-              '\n'.join(extracted) + '\n',
-              encoding='utf-8',
-          )
-          print(f'Recovered {len(extracted)} complete entries.')
-          if truncated:
-              print(f'First incomplete entry: {truncated}')
-          for filename in extracted:
-              print(filename)
+              request('DELETE', f'repos/{repository}/contents/{quoted}', {
+                  'message': 'Remove recovered Phase 7 staging data',
+                  'branch': branch,
+                  'sha': existing['sha'],
+              })
+              print('Removed ' + path)
           PY
-
-      - name: Package recovered source
-        run: |
-          set -euo pipefail
-          cd repo
-          tar -czf /tmp/phase7-recovered-source.tar.gz -T /tmp/phase7-recovered-files.txt
-          cp /tmp/phase7-recovered-files.txt /tmp/phase7-recovered-files-manifest.txt
-
-      - name: Upload recovered Phase 7 source
-        uses: actions/upload-artifact@v4
-        with:
-          name: phase7-recovered-source
-          path: |
-            /tmp/phase7-recovered-source.tar.gz
-            /tmp/phase7-recovered-files-manifest.txt
-          if-no-files-found: error
-          retention-days: 3
