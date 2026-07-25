@@ -30,6 +30,9 @@ $requestPath = parse_url((string)($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH);
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && $requestPath === '/phase4.php') {
     $_SESSION['recipe_completion_key'] = bin2hex(random_bytes(32));
 }
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $requestPath === '/phase4.php' && ($_POST['action'] ?? null) === 'complete_recipe') {
+    $_POST['completion_key'] = (string)($_SESSION['recipe_completion_key'] ?? '');
+}
 
 require_once __DIR__ . '/Support.php';
 require_once __DIR__ . '/Database.php';
