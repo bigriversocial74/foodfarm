@@ -1,0 +1,63 @@
+name: Phase 8 Package Sync
+
+on:
+  push:
+    branches:
+      - feature/phase8-forecasting-seasonal-self-sufficiency-20260725
+    paths:
+      - '.phase8-sync/**'
+      - '.github/workflows/phase8-package-sync.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out Phase 8 branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/phase8-forecasting-seasonal-self-sufficiency-20260725
+
+      - name: Reassemble and validate Phase 8 package
+        run: |
+          set -euo pipefail
+          cat .phase8-sync/chunk-* > /tmp/phase8-package.b64
+          test "$(wc -c < /tmp/phase8-package.b64)" -eq 52984
+          base64 --decode /tmp/phase8-package.b64 > /tmp/phase8-package.zip
+          echo 'cb15af923b9264e9595f70ad5172ba4956ae72c5256c706341c4e56625b7b2fb  /tmp/phase8-package.zip' | sha256sum --check
+          unzip -t /tmp/phase8-package.zip
+          unzip -Z1 /tmp/phase8-package.zip
+
+      - name: Extract authoritative Phase 8 source
+        run: |
+          set -euo pipefail
+          unzip -o /tmp/phase8-package.zip -d .
+          rm -rf .phase8-sync
+          rm -f .github/workflows/phase8-package-sync.yml
+
+      - name: Validate synchronized source
+        run: |
+          set -euo pipefail
+          php -l app/ForecastingService.php
+          php -l phase8.php
+          php -l api/phase8-health.php
+          php -l tests/phase8_static_audit.php
+          php -l tests/phase8_integration.php
+          bash -n tests/phase8_http_smoke.sh
+          php tests/phase8_static_audit.php
+
+      - name: Commit synchronized Phase 8 source
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          if git diff --cached --quiet; then
+            echo 'No Phase 8 changes to commit.'
+            exit 0
+          fi
+          git commit -m 'Synchronize Phase 8 forecasting and seasonal intelligence source'
+          git push origin HEAD:feature/phase8-forecasting-seasonal-self-sufficiency-20260725
