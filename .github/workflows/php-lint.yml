@@ -128,6 +128,9 @@ jobs:
       - name: Run database-backed workflow integration suite
         run: php tests/workflow_integration.php
 
+      - name: Run immutable Starter Kit recipe snapshot suite
+        run: php tests/starter_kit_snapshot_integration.php
+
       - name: Run Starter Kit lifecycle integration suite
         run: php tests/starter_kit_lifecycle_integration.php
 
