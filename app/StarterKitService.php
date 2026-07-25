@@ -21,82 +21,154 @@ final class StarterKitService
 
     public function createKit(array $data, int $userId): int
     {
-        $name = trim((string)($data['name'] ?? ''));
+        $name = $this->text($data['name'] ?? '', 'Kit name', 180, true);
         $slug = strtolower(trim((string)($data['slug'] ?? '')));
         $type = (string)($data['kit_type'] ?? 'basic');
-        $status = (string)($data['status'] ?? 'draft');
 
-        if ($name === '' || !preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug)) {
-            throw new InvalidArgumentException('Enter a kit name and a lowercase hyphenated slug.');
+        if (!preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug) || strlen($slug) > 190) {
+            throw new InvalidArgumentException('Use a lowercase, hyphenated slug no longer than 190 characters.');
         }
-        if (!in_array($type, ['basic', 'specialized'], true) || !in_array($status, ['draft', 'published', 'retired'], true)) {
-            throw new InvalidArgumentException('Invalid starter-kit type or status.');
+        if (!in_array($type, ['basic', 'specialized'], true)) {
+            throw new InvalidArgumentException('Invalid starter-kit type.');
+        }
+        if ($userId < 1) {
+            throw new RuntimeException('A valid platform administrator is required.');
         }
 
         $statement = $this->pdo->prepare(
-            'INSERT INTO starter_kits (name, slug, kit_type, category, description, status, created_by_user_id) VALUES (?, ?, ?, ?, ?, ?, ?)'
+            "INSERT INTO starter_kits (name, slug, kit_type, category, description, status, created_by_user_id)
+             VALUES (?, ?, ?, ?, ?, 'draft', ?)"
         );
         $statement->execute([
             $name,
             $slug,
             $type,
-            trim((string)($data['category'] ?? '')) ?: null,
-            trim((string)($data['description'] ?? '')) ?: null,
-            $status,
+            $this->text($data['category'] ?? '', 'Category', 100),
+            $this->text($data['description'] ?? '', 'Description', 5000),
             $userId,
         ]);
+
         return (int)$this->pdo->lastInsertId();
     }
 
     public function createVersion(int $kitId, array $data): int
     {
-        $version = (int)($data['version_number'] ?? 0);
+        $versionNumber = (int)($data['version_number'] ?? 0);
         $sku = strtoupper(trim((string)($data['sku'] ?? '')));
-        $status = (string)($data['status'] ?? 'draft');
-        $price = $this->nullableFloat($data['price'] ?? null);
+        $price = $this->nullableDecimal($data['price'] ?? null, 'Price');
+        $currency = strtoupper(trim((string)($data['currency_code'] ?? 'USD')));
 
-        if ($kitId < 1 || $version < 1 || $sku === '' || !in_array($status, ['draft', 'published', 'retired'], true)) {
-            throw new InvalidArgumentException('Kit, version number, SKU, and valid status are required.');
+        if ($kitId < 1 || $versionNumber < 1 || $versionNumber > 100000) {
+            throw new InvalidArgumentException('Choose a kit and a valid version number.');
+        }
+        if (!preg_match('/^[A-Z0-9][A-Z0-9._-]{1,99}$/', $sku)) {
+            throw new InvalidArgumentException('SKU must contain 2–100 uppercase letters, numbers, periods, underscores, or hyphens.');
+        }
+        if (!preg_match('/^[A-Z]{3}$/', $currency)) {
+            throw new InvalidArgumentException('Currency must be a three-letter code.');
         }
         if ($price !== null && $price < 0) {
             throw new InvalidArgumentException('Price cannot be negative.');
         }
-        $kit = $this->pdo->prepare('SELECT id FROM starter_kits WHERE id = ? AND status <> \'retired\' LIMIT 1');
+
+        $kit = $this->pdo->prepare("SELECT id FROM starter_kits WHERE id = ? AND status <> 'retired' LIMIT 1");
         $kit->execute([$kitId]);
         if (!$kit->fetchColumn()) {
             throw new RuntimeException('The selected starter kit is unavailable.');
         }
 
         $statement = $this->pdo->prepare(
-            'INSERT INTO starter_kit_versions (starter_kit_id, version_number, sku, price, currency_code, status, published_at) VALUES (?, ?, ?, ?, ?, ?, CASE WHEN ? = \'published\' THEN UTC_TIMESTAMP() ELSE NULL END)'
+            "INSERT INTO starter_kit_versions
+             (starter_kit_id, version_number, sku, price, currency_code, status, published_at)
+             VALUES (?, ?, ?, ?, ?, 'draft', NULL)"
         );
-        $statement->execute([
-            $kitId,
-            $version,
-            $sku,
-            $price,
-            strtoupper(trim((string)($data['currency_code'] ?? 'USD'))) ?: 'USD',
-            $status,
-            $status,
-        ]);
+        $statement->execute([$kitId, $versionNumber, $sku, $price, $currency]);
+
         return (int)$this->pdo->lastInsertId();
+    }
+
+    public function publishVersion(int $versionId): void
+    {
+        if ($versionId < 1) {
+            throw new InvalidArgumentException('Choose a draft version to publish.');
+        }
+
+        try {
+            $this->pdo->beginTransaction();
+            $statement = $this->pdo->prepare(
+                "SELECT v.id, v.starter_kit_id, v.status, k.status AS kit_status
+                 FROM starter_kit_versions v
+                 JOIN starter_kits k ON k.id = v.starter_kit_id
+                 WHERE v.id = ? FOR UPDATE"
+            );
+            $statement->execute([$versionId]);
+            $version = $statement->fetch();
+            if (!is_array($version) || $version['status'] !== 'draft' || $version['kit_status'] === 'retired') {
+                throw new RuntimeException('Only a draft version of an available kit can be published.');
+            }
+
+            $items = $this->pdo->prepare(
+                'SELECT item_name, item_kind, fulfillment_type, default_quantity, unit, delivery_eligible, shipping_eligible
+                 FROM starter_kit_items WHERE starter_kit_version_id = ? ORDER BY id FOR UPDATE'
+            );
+            $items->execute([$versionId]);
+            $rows = $items->fetchAll();
+            if ($rows === []) {
+                throw new RuntimeException('Add at least one item before publishing this version.');
+            }
+            foreach ($rows as $item) {
+                $this->validatePublishableItem($item);
+            }
+
+            $update = $this->pdo->prepare(
+                "UPDATE starter_kit_versions SET status = 'published', published_at = UTC_TIMESTAMP()
+                 WHERE id = ? AND status = 'draft'"
+            );
+            $update->execute([$versionId]);
+            if ($update->rowCount() !== 1) {
+                throw new RuntimeException('The starter-kit version changed before it could be published.');
+            }
+            $this->pdo->prepare("UPDATE starter_kits SET status = 'published' WHERE id = ? AND status = 'draft'")
+                ->execute([(int)$version['starter_kit_id']]);
+            $this->pdo->commit();
+        } catch (Throwable $exception) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $exception;
+        }
     }
 
     public function addItem(int $versionId, array $data): int
     {
         $version = $this->draftVersion($versionId);
-        $name = trim((string)($data['item_name'] ?? ''));
+        $name = $this->text($data['item_name'] ?? '', 'Item name', 180, true);
         $kind = (string)($data['item_kind'] ?? 'ingredient');
         $fulfillment = (string)($data['fulfillment_type'] ?? 'shopping_list');
-        $quantity = $this->nullableFloat($data['default_quantity'] ?? null);
+        $quantity = $this->nullableDecimal($data['default_quantity'] ?? null, 'Quantity');
+        $unit = $this->text($data['unit'] ?? '', 'Unit', 30);
+        $reorderLevel = $this->nullableDecimal($data['reorder_level'] ?? null, 'Reorder level');
+        $estimatedPrice = $this->nullableDecimal($data['estimated_price'] ?? null, 'Estimated price');
         $deliveryEligible = !empty($data['delivery_eligible']);
         $shippingEligible = !empty($data['shipping_eligible']);
+        $categoryId = (int)($data['inventory_category_id'] ?? 0) ?: null;
 
-        if ($name === '' || !in_array($kind, self::ITEM_KINDS, true) || !in_array($fulfillment, self::FULFILLMENT_TYPES, true)) {
-            throw new InvalidArgumentException('Item name, kind, and fulfillment type are required.');
+        if (!in_array($kind, self::ITEM_KINDS, true) || !in_array($fulfillment, self::FULFILLMENT_TYPES, true)) {
+            throw new InvalidArgumentException('Item kind or fulfillment type is invalid.');
         }
-        if ($quantity !== null && $quantity < 0) {
-            throw new InvalidArgumentException('Item quantity cannot be negative.');
+        if ($quantity !== null && $quantity < 0 || $reorderLevel !== null && $reorderLevel < 0 || $estimatedPrice !== null && $estimatedPrice < 0) {
+            throw new InvalidArgumentException('Quantities, reorder levels, and prices cannot be negative.');
+        }
+        if ($kind === 'digital') {
+            if ($fulfillment !== 'digital_only') {
+                throw new InvalidArgumentException('Digital items must use digital-only fulfillment.');
+            }
+            $quantity = null;
+            $unit = null;
+            $categoryId = null;
+            $reorderLevel = null;
+        } elseif ($quantity === null || $quantity <= 0 || $unit === null) {
+            throw new InvalidArgumentException('Physical kit items require a quantity greater than zero and a unit.');
         }
         if ($fulfillment === 'optional_delivery' && !$deliveryEligible) {
             throw new InvalidArgumentException('Optional-delivery items must be marked delivery eligible.');
@@ -104,14 +176,20 @@ final class StarterKitService
         if ($fulfillment === 'shipped' && !$shippingEligible) {
             throw new InvalidArgumentException('Shipped items must be marked shipping eligible.');
         }
-        if ($kind === 'digital' && $fulfillment !== 'digital_only') {
-            throw new InvalidArgumentException('Digital items must use digital-only fulfillment.');
+        if ($categoryId !== null) {
+            $category = $this->pdo->prepare('SELECT id FROM inventory_categories WHERE id = ? AND household_id IS NULL LIMIT 1');
+            $category->execute([$categoryId]);
+            if (!$category->fetchColumn()) {
+                throw new RuntimeException('Starter kits may use only platform inventory categories.');
+            }
         }
 
         $statement = $this->pdo->prepare(
             'INSERT INTO starter_kit_items
-            (starter_kit_version_id, item_name, item_kind, fulfillment_type, required, delivery_eligible, shipping_eligible, default_quantity, unit, inventory_category_id, suggested_storage_type, reorder_level, estimated_price, supplier_name, sort_order)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+             (starter_kit_version_id, item_name, item_kind, fulfillment_type, required, delivery_eligible,
+              shipping_eligible, default_quantity, unit, inventory_category_id, suggested_storage_type,
+              reorder_level, estimated_price, supplier_name, sort_order)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
         $statement->execute([
             $version['id'],
@@ -122,55 +200,82 @@ final class StarterKitService
             $deliveryEligible ? 1 : 0,
             $shippingEligible ? 1 : 0,
             $quantity,
-            trim((string)($data['unit'] ?? '')) ?: null,
-            (int)($data['inventory_category_id'] ?? 0) ?: null,
-            trim((string)($data['suggested_storage_type'] ?? '')) ?: null,
-            $this->nullableFloat($data['reorder_level'] ?? null),
-            $this->nullableFloat($data['estimated_price'] ?? null),
-            trim((string)($data['supplier_name'] ?? '')) ?: null,
-            (int)($data['sort_order'] ?? 0),
+            $unit,
+            $categoryId,
+            $this->text($data['suggested_storage_type'] ?? '', 'Suggested storage', 80),
+            $reorderLevel,
+            $estimatedPrice,
+            $this->text($data['supplier_name'] ?? '', 'Supplier', 180),
+            max(0, (int)($data['sort_order'] ?? 0)),
         ]);
+
         return (int)$this->pdo->lastInsertId();
     }
 
-    public function attachRecipe(int $versionId, int $recipeId): void
+    public function attachRecipe(int $versionId, int $recipeId, int $sourceHouseholdId): void
     {
         $this->draftVersion($versionId);
-        $recipe = $this->pdo->prepare('SELECT id FROM recipes WHERE id = ? AND status = \'active\' LIMIT 1');
-        $recipe->execute([$recipeId]);
-        if (!$recipe->fetchColumn()) {
-            throw new RuntimeException('The selected recipe is unavailable.');
+        if ($recipeId < 1 || $sourceHouseholdId < 1) {
+            throw new InvalidArgumentException('Choose a valid starter recipe.');
         }
-        $statement = $this->pdo->prepare('INSERT IGNORE INTO starter_kit_recipes (starter_kit_version_id, recipe_id) VALUES (?, ?)');
+        $recipe = $this->pdo->prepare(
+            "SELECT r.id, COUNT(ri.id) AS ingredient_count
+             FROM recipes r
+             LEFT JOIN recipe_ingredients ri ON ri.recipe_id = r.id
+             WHERE r.id = ? AND r.household_id = ? AND r.status = 'active'
+             GROUP BY r.id LIMIT 1"
+        );
+        $recipe->execute([$recipeId, $sourceHouseholdId]);
+        $record = $recipe->fetch();
+        if (!is_array($record) || (int)$record['ingredient_count'] < 1) {
+            throw new RuntimeException('The starter recipe must belong to your household and contain at least one ingredient.');
+        }
+        $statement = $this->pdo->prepare(
+            'INSERT IGNORE INTO starter_kit_recipes (starter_kit_version_id, recipe_id) VALUES (?, ?)'
+        );
         $statement->execute([$versionId, $recipeId]);
     }
 
     public function addTask(int $versionId, array $data): void
     {
         $this->draftVersion($versionId);
-        $title = trim((string)($data['title'] ?? ''));
-        if ($title === '') {
-            throw new InvalidArgumentException('Task title is required.');
+        $title = $this->text($data['title'] ?? '', 'Task title', 180, true);
+        $offset = (int)($data['due_offset_days'] ?? 0);
+        if ($offset < -365 || $offset > 3650) {
+            throw new InvalidArgumentException('Task due offset must be between -365 and 3,650 days.');
         }
-        $statement = $this->pdo->prepare('INSERT INTO starter_kit_tasks (starter_kit_version_id, title, area, due_offset_days, recurring_rule, instructions, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)');
+        $statement = $this->pdo->prepare(
+            'INSERT INTO starter_kit_tasks
+             (starter_kit_version_id, title, area, due_offset_days, recurring_rule, instructions, sort_order)
+             VALUES (?, ?, ?, ?, ?, ?, ?)'
+        );
         $statement->execute([
             $versionId,
             $title,
-            trim((string)($data['area'] ?? '')) ?: null,
-            (int)($data['due_offset_days'] ?? 0),
-            trim((string)($data['recurring_rule'] ?? '')) ?: null,
-            trim((string)($data['instructions'] ?? '')) ?: null,
-            (int)($data['sort_order'] ?? 0),
+            $this->text($data['area'] ?? '', 'Task area', 80),
+            $offset,
+            $this->text($data['recurring_rule'] ?? '', 'Recurrence rule', 190),
+            $this->text($data['instructions'] ?? '', 'Task instructions', 5000),
+            max(0, (int)($data['sort_order'] ?? 0)),
         ]);
     }
 
     public function createOrderAndActivation(int $versionId, string $customerEmail, ?string $externalOrderId = null): array
     {
         $email = strtolower(trim($customerEmail));
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $externalOrderId = $externalOrderId === null ? null : trim($externalOrderId);
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email) > 190) {
             throw new InvalidArgumentException('A valid customer email address is required.');
         }
-        $version = $this->pdo->prepare("SELECT v.id FROM starter_kit_versions v JOIN starter_kits k ON k.id=v.starter_kit_id WHERE v.id=? AND v.status='published' AND k.status='published' LIMIT 1");
+        if ($externalOrderId !== null && ($externalOrderId === '' || strlen($externalOrderId) > 190)) {
+            throw new InvalidArgumentException('External order ID must be 1–190 characters.');
+        }
+
+        $version = $this->pdo->prepare(
+            "SELECT v.id FROM starter_kit_versions v
+             JOIN starter_kits k ON k.id = v.starter_kit_id
+             WHERE v.id = ? AND v.status = 'published' AND k.status = 'published' LIMIT 1"
+        );
         $version->execute([$versionId]);
         if (!$version->fetchColumn()) {
             throw new RuntimeException('Only a published starter-kit version can be ordered.');
@@ -184,17 +289,28 @@ final class StarterKitService
         $token = bin2hex(random_bytes(32));
         try {
             $this->pdo->beginTransaction();
-            $statement = $this->pdo->prepare('INSERT INTO starter_kit_orders (starter_kit_version_id, external_order_id, customer_email) VALUES (?, ?, ?)');
-            $statement->execute([$versionId, $externalOrderId ?: null, $email]);
+            $statement = $this->pdo->prepare(
+                'INSERT INTO starter_kit_orders (starter_kit_version_id, external_order_id, customer_email) VALUES (?, ?, ?)'
+            );
+            $statement->execute([$versionId, $externalOrderId, $email]);
             $orderId = (int)$this->pdo->lastInsertId();
 
-            $statement = $this->pdo->prepare('INSERT INTO starter_kit_activations (starter_kit_order_id, token_hash, expires_at) VALUES (?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 30 DAY))');
+            $statement = $this->pdo->prepare(
+                'INSERT INTO starter_kit_activations (starter_kit_order_id, token_hash, expires_at)
+                 VALUES (?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 30 DAY))'
+            );
             $statement->execute([$orderId, hash('sha256', $token)]);
             $activationId = (int)$this->pdo->lastInsertId();
 
-            $statement = $this->pdo->prepare('INSERT INTO starter_kit_activation_items (starter_kit_activation_id, starter_kit_item_id, selected_fulfillment_type, confirmed_quantity, unit) SELECT ?, id, fulfillment_type, default_quantity, unit FROM starter_kit_items WHERE starter_kit_version_id = ?');
+            $statement = $this->pdo->prepare(
+                'INSERT INTO starter_kit_activation_items
+                 (starter_kit_activation_id, starter_kit_item_id, selected_fulfillment_type, confirmed_quantity, unit)
+                 SELECT ?, id, fulfillment_type, default_quantity, unit
+                 FROM starter_kit_items WHERE starter_kit_version_id = ?'
+            );
             $statement->execute([$activationId, $versionId]);
             $this->pdo->commit();
+
             return ['order_id' => $orderId, 'activation_id' => $activationId, 'token' => $token];
         } catch (Throwable $exception) {
             if ($this->pdo->inTransaction()) {
@@ -209,7 +325,8 @@ final class StarterKitService
         if (!preg_match('/^[a-f0-9]{64}$/', $token)) {
             throw new RuntimeException('This starter-kit activation is invalid.');
         }
-        $sql = "SELECT a.*, o.customer_email, o.starter_kit_version_id, o.external_order_id, k.name AS kit_name, k.kit_type, v.version_number, v.sku
+        $sql = "SELECT a.*, o.customer_email, o.starter_kit_version_id, o.external_order_id,
+                       k.name AS kit_name, k.kit_type, v.version_number, v.sku
                 FROM starter_kit_activations a
                 JOIN starter_kit_orders o ON o.id = a.starter_kit_order_id
                 JOIN starter_kit_versions v ON v.id = o.starter_kit_version_id
@@ -225,23 +342,33 @@ final class StarterKitService
         if (!is_array($activation)) {
             throw new RuntimeException('This starter-kit activation is invalid, expired, revoked, or already used.');
         }
+
         return $activation;
     }
 
     public function activate(string $token, array $user, array $selections): void
     {
-        $email = strtolower((string)$user['email']);
-        $householdId = (int)$user['household_id'];
-        $memberId = (int)$user['member_id'];
+        if (!preg_match('/^[a-f0-9]{64}$/', $token)) {
+            throw new RuntimeException('This starter-kit activation is invalid.');
+        }
+        $email = strtolower(trim((string)($user['email'] ?? '')));
+        $householdId = (int)($user['household_id'] ?? 0);
+        $memberId = (int)($user['member_id'] ?? 0);
+        if ($householdId < 1 || $memberId < 1 || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            throw new RuntimeException('A valid signed-in household member is required.');
+        }
 
         try {
             $this->pdo->beginTransaction();
-            $statement = $this->pdo->prepare("SELECT a.*, o.customer_email, o.starter_kit_version_id, o.id AS starter_kit_order_id, k.name AS kit_name
-                FROM starter_kit_activations a
-                JOIN starter_kit_orders o ON o.id=a.starter_kit_order_id
-                JOIN starter_kit_versions v ON v.id=o.starter_kit_version_id
-                JOIN starter_kits k ON k.id=v.starter_kit_id
-                WHERE a.token_hash=? AND a.activated_at IS NULL AND a.revoked_at IS NULL AND a.expires_at>UTC_TIMESTAMP() FOR UPDATE");
+            $statement = $this->pdo->prepare(
+                "SELECT a.*, o.customer_email, o.starter_kit_version_id, o.id AS starter_kit_order_id, k.name AS kit_name
+                 FROM starter_kit_activations a
+                 JOIN starter_kit_orders o ON o.id = a.starter_kit_order_id
+                 JOIN starter_kit_versions v ON v.id = o.starter_kit_version_id
+                 JOIN starter_kits k ON k.id = v.starter_kit_id
+                 WHERE a.token_hash = ? AND a.activated_at IS NULL AND a.revoked_at IS NULL
+                   AND a.expires_at > UTC_TIMESTAMP() FOR UPDATE"
+            );
             $statement->execute([hash('sha256', $token)]);
             $activation = $statement->fetch();
             if (!is_array($activation)) {
@@ -251,56 +378,152 @@ final class StarterKitService
                 throw new RuntimeException('Sign in with the customer email address assigned to this starter-kit order.');
             }
 
-            $itemsStatement = $this->pdo->prepare('SELECT ai.*, i.item_name, i.item_kind, i.fulfillment_type, i.required, i.delivery_eligible, i.shipping_eligible, i.inventory_category_id, i.reorder_level, i.suggested_storage_type FROM starter_kit_activation_items ai JOIN starter_kit_items i ON i.id=ai.starter_kit_item_id WHERE ai.starter_kit_activation_id=? ORDER BY ai.id FOR UPDATE');
+            $member = $this->pdo->prepare(
+                "SELECT id FROM household_members WHERE id = ? AND household_id = ? AND user_id = ? AND status = 'active' LIMIT 1"
+            );
+            $member->execute([$memberId, $householdId, (int)($user['id'] ?? 0)]);
+            if (!$member->fetchColumn()) {
+                throw new RuntimeException('The active household membership could not be verified.');
+            }
+
+            $itemsStatement = $this->pdo->prepare(
+                'SELECT ai.*, i.item_name, i.item_kind, i.fulfillment_type, i.required,
+                        i.delivery_eligible, i.shipping_eligible, i.inventory_category_id,
+                        i.reorder_level, i.suggested_storage_type
+                 FROM starter_kit_activation_items ai
+                 JOIN starter_kit_items i ON i.id = ai.starter_kit_item_id
+                 WHERE ai.starter_kit_activation_id = ? ORDER BY ai.id FOR UPDATE'
+            );
             $itemsStatement->execute([(int)$activation['id']]);
             $items = $itemsStatement->fetchAll();
-            if (count($items) !== count($selections)) {
+            if ($items === [] || count($items) !== count($selections)) {
                 throw new RuntimeException('Every starter-kit item must be reviewed before activation.');
             }
 
             foreach ($items as $item) {
-                $id = (int)$item['id'];
-                if (!isset($selections[$id]) || !is_array($selections[$id])) {
+                $activationItemId = (int)$item['id'];
+                if (!isset($selections[$activationItemId]) || !is_array($selections[$activationItemId])) {
                     throw new RuntimeException('A starter-kit item selection is missing.');
                 }
-                $selection = $selections[$id];
+                $selection = $selections[$activationItemId];
                 $status = (string)($selection['status'] ?? 'pending');
                 $fulfillment = (string)($selection['fulfillment_type'] ?? $item['selected_fulfillment_type']);
-                $quantity = is_numeric($selection['quantity'] ?? null) ? (float)$selection['quantity'] : (float)($item['confirmed_quantity'] ?? 0);
-                $unit = trim((string)($selection['unit'] ?? $item['unit'] ?? 'each')) ?: 'each';
+                $quantity = is_numeric($selection['quantity'] ?? null)
+                    ? (float)$selection['quantity']
+                    : (float)($item['confirmed_quantity'] ?? 0);
+                $unit = trim((string)($selection['unit'] ?? $item['unit'] ?? ''));
 
-                $this->validateSelection($item, $status, $fulfillment, $quantity);
+                $this->validateSelection($item, $status, $fulfillment, $quantity, $unit);
                 $inventoryId = null;
                 $shoppingId = null;
 
                 if ($status === 'stocked' && $item['item_kind'] !== 'digital') {
                     $locationId = $this->defaultLocation($householdId, (string)($item['suggested_storage_type'] ?? ''));
-                    $statement = $this->pdo->prepare("INSERT INTO inventory_items (household_id, category_id, storage_location_id, name, item_type, current_quantity, unit, reorder_level, status, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)");
-                    $statement->execute([$householdId, $item['inventory_category_id'] ?: null, $locationId, $item['item_name'], $this->inventoryType((string)$item['item_kind']), $quantity, $unit, $item['reorder_level'] ?: null, json_encode(['source_type'=>'starter_kit','activation_id'=>(int)$activation['id'],'starter_kit_item_id'=>(int)$item['starter_kit_item_id']], JSON_THROW_ON_ERROR)]);
+                    $metadata = json_encode([
+                        'source_type' => 'starter_kit',
+                        'activation_id' => (int)$activation['id'],
+                        'starter_kit_item_id' => (int)$item['starter_kit_item_id'],
+                    ], JSON_THROW_ON_ERROR);
+                    $statement = $this->pdo->prepare(
+                        "INSERT INTO inventory_items
+                         (household_id, category_id, storage_location_id, name, item_type, current_quantity,
+                          unit, reorder_level, status, metadata)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)"
+                    );
+                    $statement->execute([
+                        $householdId,
+                        $item['inventory_category_id'] ?: null,
+                        $locationId,
+                        $item['item_name'],
+                        $this->inventoryType((string)$item['item_kind']),
+                        $quantity,
+                        $unit,
+                        $item['reorder_level'] ?: null,
+                        $metadata,
+                    ]);
                     $inventoryId = (int)$this->pdo->lastInsertId();
-                    $ledger = $this->pdo->prepare("INSERT INTO food_ledger_events (household_id, inventory_item_id, member_id, event_type, quantity, unit, destination_location_id, related_type, related_id, notes) VALUES (?, ?, ?, 'received', ?, ?, ?, 'starter_kit_activation', ?, ?)");
-                    $ledger->execute([$householdId, $inventoryId, $memberId, $quantity, $unit, $locationId, (int)$activation['id'], 'Provisioned from starter kit '.$activation['kit_name']]);
+                    $ledger = $this->pdo->prepare(
+                        "INSERT INTO food_ledger_events
+                         (household_id, inventory_item_id, member_id, event_type, quantity, unit,
+                          destination_location_id, related_type, related_id, notes)
+                         VALUES (?, ?, ?, 'received', ?, ?, ?, 'starter_kit_activation', ?, ?)"
+                    );
+                    $ledger->execute([
+                        $householdId,
+                        $inventoryId,
+                        $memberId,
+                        $quantity,
+                        $unit,
+                        $locationId,
+                        (int)$activation['id'],
+                        'Provisioned from starter kit ' . $activation['kit_name'],
+                    ]);
                 } elseif (in_array($status, ['shopping', 'delivery_requested'], true)) {
                     $listId = $this->activeShoppingList($householdId);
                     $shoppingStatus = $status === 'delivery_requested' ? 'delivery_requested' : 'needed';
-                    $statement = $this->pdo->prepare("INSERT INTO shopping_list_items (shopping_list_id, item_name, quantity, unit, priority, source_type, supplier, estimated_cost, status, notes) SELECT ?, ?, ?, ?, 'medium', 'starter_kit', i.supplier_name, i.estimated_price, ?, ? FROM starter_kit_items i WHERE i.id=?");
-                    $statement->execute([$listId, $item['item_name'], max($quantity, 0.0001), $unit, $shoppingStatus, 'Starter kit: '.$activation['kit_name'], (int)$item['starter_kit_item_id']]);
+                    $statement = $this->pdo->prepare(
+                        "INSERT INTO shopping_list_items
+                         (shopping_list_id, item_name, quantity, unit, priority, source_type, supplier,
+                          estimated_cost, status, notes)
+                         SELECT ?, ?, ?, ?, 'medium', 'starter_kit', i.supplier_name, i.estimated_price, ?, ?
+                         FROM starter_kit_items i WHERE i.id = ?"
+                    );
+                    $statement->execute([
+                        $listId,
+                        $item['item_name'],
+                        $quantity,
+                        $unit,
+                        $shoppingStatus,
+                        'Starter kit: ' . $activation['kit_name'],
+                        (int)$item['starter_kit_item_id'],
+                    ]);
+                    if ($statement->rowCount() !== 1) {
+                        throw new RuntimeException('A starter-kit shopping item could not be created.');
+                    }
                     $shoppingId = (int)$this->pdo->lastInsertId();
                 }
 
-                $update = $this->pdo->prepare('UPDATE starter_kit_activation_items SET selected_fulfillment_type=?, confirmed_quantity=?, unit=?, status=?, inventory_item_id=?, shopping_list_item_id=? WHERE id=?');
-                $update->execute([$fulfillment, $quantity, $unit, $status, $inventoryId, $shoppingId, $id]);
+                $update = $this->pdo->prepare(
+                    'UPDATE starter_kit_activation_items
+                     SET selected_fulfillment_type = ?, confirmed_quantity = ?, unit = ?, status = ?,
+                         inventory_item_id = ?, shopping_list_item_id = ?
+                     WHERE id = ? AND starter_kit_activation_id = ?'
+                );
+                $update->execute([
+                    $fulfillment,
+                    $item['item_kind'] === 'digital' ? null : $quantity,
+                    $item['item_kind'] === 'digital' ? null : $unit,
+                    $status,
+                    $inventoryId,
+                    $shoppingId,
+                    $activationItemId,
+                    (int)$activation['id'],
+                ]);
+                if ($update->rowCount() !== 1) {
+                    throw new RuntimeException('A starter-kit activation item could not be finalized.');
+                }
             }
 
-            $this->provisionRecipes((int)$activation['starter_kit_version_id'], $householdId, $memberId);
+            $this->provisionRecipes((int)$activation['starter_kit_version_id'], $householdId, $memberId, (int)$activation['id']);
             $this->provisionTasks((int)$activation['starter_kit_version_id'], $householdId, $memberId, (int)$activation['id']);
 
-            $statement = $this->pdo->prepare('UPDATE starter_kit_activations SET household_id=?, activated_by_member_id=?, activated_at=UTC_TIMESTAMP() WHERE id=? AND activated_at IS NULL');
+            $statement = $this->pdo->prepare(
+                'UPDATE starter_kit_activations
+                 SET household_id = ?, activated_by_member_id = ?, activated_at = UTC_TIMESTAMP()
+                 WHERE id = ? AND activated_at IS NULL'
+            );
             $statement->execute([$householdId, $memberId, (int)$activation['id']]);
             if ($statement->rowCount() !== 1) {
                 throw new RuntimeException('The starter kit was activated by another request.');
             }
-            $this->pdo->prepare("UPDATE starter_kit_orders SET household_id=?, activation_status='activated' WHERE id=?")->execute([$householdId, (int)$activation['starter_kit_order_id']]);
+            $orderUpdate = $this->pdo->prepare(
+                "UPDATE starter_kit_orders SET household_id = ?, activation_status = 'activated'
+                 WHERE id = ? AND activation_status = 'pending'"
+            );
+            $orderUpdate->execute([$householdId, (int)$activation['starter_kit_order_id']]);
+            if ($orderUpdate->rowCount() !== 1) {
+                throw new RuntimeException('The starter-kit order could not be finalized.');
+            }
             $this->pdo->commit();
         } catch (Throwable $exception) {
             if ($this->pdo->inTransaction()) {
@@ -310,75 +533,173 @@ final class StarterKitService
         }
     }
 
-    private function validateSelection(array $item, string $status, string $fulfillment, float $quantity): void
+    private function validateSelection(array $item, string $status, string $fulfillment, float $quantity, string $unit): void
     {
         if (!in_array($status, self::ACTIVATION_STATUSES, true) || !in_array($fulfillment, self::FULFILLMENT_TYPES, true)) {
             throw new InvalidArgumentException('Invalid starter-kit selection.');
         }
-        if ($quantity < 0 || ($status === 'stocked' && $quantity <= 0)) {
-            throw new InvalidArgumentException('Stocked quantities must be greater than zero.');
+        if (!is_finite($quantity) || $quantity < 0) {
+            throw new InvalidArgumentException('Starter-kit quantities must be valid, non-negative numbers.');
         }
         if (!empty($item['required']) && $status === 'skipped') {
-            throw new InvalidArgumentException($item['item_name'].' is required and cannot be skipped.');
+            throw new InvalidArgumentException($item['item_name'] . ' is required and cannot be skipped.');
         }
-        if ($status === 'delivery_requested' && empty($item['delivery_eligible'])) {
-            throw new InvalidArgumentException($item['item_name'].' is not eligible for delivery.');
+        if ($item['item_kind'] === 'digital') {
+            if ($fulfillment !== 'digital_only' || !in_array($status, ['pending', 'received'], true)) {
+                throw new InvalidArgumentException('Digital items must remain digital-only and included with the activation.');
+            }
+            return;
+        }
+        if ($quantity <= 0 || $unit === '' || strlen($unit) > 30) {
+            throw new InvalidArgumentException($item['item_name'] . ' requires a quantity greater than zero and a valid unit.');
+        }
+        $configuredUnit = trim((string)($item['unit'] ?? ''));
+        if ($configuredUnit !== '' && strcasecmp($configuredUnit, $unit) !== 0) {
+            throw new InvalidArgumentException($item['item_name'] . ' must use the configured unit ' . $configuredUnit . '.');
+        }
+        if ($status === 'shopping' && $fulfillment !== 'shopping_list') {
+            throw new InvalidArgumentException('Shopping-list status requires local-shopping fulfillment.');
+        }
+        if ($status === 'delivery_requested' && ($fulfillment !== 'optional_delivery' || empty($item['delivery_eligible']))) {
+            throw new InvalidArgumentException($item['item_name'] . ' is not eligible for delivery.');
+        }
+        if (in_array($status, ['shipped', 'pending'], true) && $fulfillment === 'shipped' && empty($item['shipping_eligible'])) {
+            throw new InvalidArgumentException($item['item_name'] . ' is not eligible for shipping.');
         }
         if ($fulfillment === 'shipped' && empty($item['shipping_eligible'])) {
-            throw new InvalidArgumentException($item['item_name'].' is not eligible for shipping.');
+            throw new InvalidArgumentException($item['item_name'] . ' is not eligible for shipping.');
         }
-        if ($item['item_kind'] === 'digital' && $fulfillment !== 'digital_only') {
-            throw new InvalidArgumentException('Digital items must remain digital-only.');
+        if ($fulfillment === 'optional_delivery' && empty($item['delivery_eligible'])) {
+            throw new InvalidArgumentException($item['item_name'] . ' is not eligible for delivery.');
         }
     }
 
-    private function provisionRecipes(int $versionId, int $householdId, int $memberId): void
+    private function validatePublishableItem(array $item): void
     {
-        $recipes = $this->pdo->prepare('SELECT r.* FROM starter_kit_recipes skr JOIN recipes r ON r.id=skr.recipe_id WHERE skr.starter_kit_version_id=?');
+        if (!in_array((string)$item['item_kind'], self::ITEM_KINDS, true)
+            || !in_array((string)$item['fulfillment_type'], self::FULFILLMENT_TYPES, true)) {
+            throw new RuntimeException('A kit item has an invalid type or fulfillment method.');
+        }
+        if ($item['item_kind'] === 'digital') {
+            if ($item['fulfillment_type'] !== 'digital_only') {
+                throw new RuntimeException($item['item_name'] . ' must use digital-only fulfillment.');
+            }
+            return;
+        }
+        if ((float)$item['default_quantity'] <= 0 || trim((string)$item['unit']) === '') {
+            throw new RuntimeException($item['item_name'] . ' requires a positive quantity and unit before publishing.');
+        }
+        if ($item['fulfillment_type'] === 'shipped' && empty($item['shipping_eligible'])) {
+            throw new RuntimeException($item['item_name'] . ' must be shipping eligible.');
+        }
+        if ($item['fulfillment_type'] === 'optional_delivery' && empty($item['delivery_eligible'])) {
+            throw new RuntimeException($item['item_name'] . ' must be delivery eligible.');
+        }
+    }
+
+    private function provisionRecipes(int $versionId, int $householdId, int $memberId, int $activationId): void
+    {
+        $recipes = $this->pdo->prepare(
+            'SELECT r.* FROM starter_kit_recipes skr
+             JOIN recipes r ON r.id = skr.recipe_id
+             WHERE skr.starter_kit_version_id = ? AND r.status = \'active\''
+        );
         $recipes->execute([$versionId]);
         foreach ($recipes->fetchAll() as $recipe) {
-            $insert = $this->pdo->prepare("INSERT INTO recipes (household_id, name, category, servings, yield_quantity, yield_unit, prep_minutes, cook_minutes, rest_minutes, status, instructions, notes, created_by_member_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)");
-            $insert->execute([$householdId, $recipe['name'], $recipe['category'], $recipe['servings'], $recipe['yield_quantity'], $recipe['yield_unit'], $recipe['prep_minutes'], $recipe['cook_minutes'], $recipe['rest_minutes'], $recipe['instructions'], 'Provisioned from starter kit version '.$versionId, $memberId]);
+            $insert = $this->pdo->prepare(
+                "INSERT INTO recipes
+                 (household_id, name, category, servings, yield_quantity, yield_unit, prep_minutes,
+                  cook_minutes, rest_minutes, status, instructions, notes, created_by_member_id)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)"
+            );
+            $insert->execute([
+                $householdId,
+                $recipe['name'],
+                $recipe['category'],
+                $recipe['servings'],
+                $recipe['yield_quantity'],
+                $recipe['yield_unit'],
+                $recipe['prep_minutes'],
+                $recipe['cook_minutes'],
+                $recipe['rest_minutes'],
+                $recipe['instructions'],
+                'Provisioned from starter-kit activation #' . $activationId,
+                $memberId,
+            ]);
             $newRecipeId = (int)$this->pdo->lastInsertId();
-            $ingredients = $this->pdo->prepare('INSERT INTO recipe_ingredients (recipe_id, inventory_item_id, ingredient_name, quantity, unit, optional, sort_order) SELECT ?, NULL, ingredient_name, quantity, unit, optional, sort_order FROM recipe_ingredients WHERE recipe_id=?');
+            $ingredients = $this->pdo->prepare(
+                'INSERT INTO recipe_ingredients
+                 (recipe_id, inventory_item_id, ingredient_name, quantity, unit, optional, sort_order)
+                 SELECT ?, NULL, ingredient_name, quantity, unit, optional, sort_order
+                 FROM recipe_ingredients WHERE recipe_id = ?'
+            );
             $ingredients->execute([$newRecipeId, (int)$recipe['id']]);
         }
     }
 
     private function provisionTasks(int $versionId, int $householdId, int $memberId, int $activationId): void
     {
-        $statement = $this->pdo->prepare("INSERT INTO household_tasks (household_id, assigned_member_id, title, description, related_type, related_id, due_at, recurrence_rule, priority, status) SELECT ?, ?, title, instructions, 'starter_kit_activation', ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL due_offset_days DAY), recurring_rule, 'medium', 'planned' FROM starter_kit_tasks WHERE starter_kit_version_id=?");
+        $statement = $this->pdo->prepare(
+            "INSERT INTO household_tasks
+             (household_id, assigned_member_id, title, description, related_type, related_id,
+              due_at, recurrence_rule, priority, status)
+             SELECT ?, ?, title, instructions, 'starter_kit_activation', ?,
+                    DATE_ADD(UTC_TIMESTAMP(), INTERVAL due_offset_days DAY), recurring_rule, 'medium', 'planned'
+             FROM starter_kit_tasks WHERE starter_kit_version_id = ?"
+        );
         $statement->execute([$householdId, $memberId, $activationId, $versionId]);
     }
 
     private function draftVersion(int $versionId): array
     {
-        $statement = $this->pdo->prepare('SELECT id, status FROM starter_kit_versions WHERE id=? LIMIT 1');
+        $statement = $this->pdo->prepare(
+            'SELECT v.id, v.status, k.status AS kit_status
+             FROM starter_kit_versions v
+             JOIN starter_kits k ON k.id = v.starter_kit_id
+             WHERE v.id = ? LIMIT 1'
+        );
         $statement->execute([$versionId]);
         $version = $statement->fetch();
-        if (!is_array($version) || $version['status'] !== 'draft') {
+        if (!is_array($version) || $version['status'] !== 'draft' || $version['kit_status'] === 'retired') {
             throw new RuntimeException('Published and retired kit versions are immutable. Create a new draft version.');
         }
+
         return $version;
     }
 
     private function activeShoppingList(int $householdId): int
     {
-        $statement = $this->pdo->prepare("SELECT id FROM shopping_lists WHERE household_id=? AND status IN ('draft','active') ORDER BY id DESC LIMIT 1");
+        $lock = $this->pdo->prepare('SELECT id FROM households WHERE id = ? FOR UPDATE');
+        $lock->execute([$householdId]);
+        if (!$lock->fetchColumn()) {
+            throw new RuntimeException('The household could not be verified.');
+        }
+        $statement = $this->pdo->prepare(
+            "SELECT id FROM shopping_lists
+             WHERE household_id = ? AND status IN ('draft','active') ORDER BY id DESC LIMIT 1"
+        );
         $statement->execute([$householdId]);
         $id = (int)$statement->fetchColumn();
         if ($id > 0) {
             return $id;
         }
-        $statement = $this->pdo->prepare("INSERT INTO shopping_lists (household_id, name, status) VALUES (?, 'Starter Kit Shopping List', 'active')");
+        $statement = $this->pdo->prepare(
+            "INSERT INTO shopping_lists (household_id, name, status)
+             VALUES (?, 'Starter Kit Shopping List', 'active')"
+        );
         $statement->execute([$householdId]);
+
         return (int)$this->pdo->lastInsertId();
     }
 
     private function defaultLocation(int $householdId, string $type): ?int
     {
-        $statement = $this->pdo->prepare('SELECT id FROM storage_locations WHERE household_id=? AND (?=\'\' OR location_type=?) ORDER BY id LIMIT 1');
+        $statement = $this->pdo->prepare(
+            "SELECT id FROM storage_locations
+             WHERE household_id = ? AND (? = '' OR location_type = ?) ORDER BY id LIMIT 1"
+        );
         $statement->execute([$householdId, $type, $type]);
+
         return (int)$statement->fetchColumn() ?: null;
     }
 
@@ -391,8 +712,32 @@ final class StarterKitService
         };
     }
 
-    private function nullableFloat(mixed $value): ?float
+    private function nullableDecimal(mixed $value, string $field): ?float
     {
-        return $value === null || $value === '' ? null : (float)$value;
+        if ($value === null || $value === '') {
+            return null;
+        }
+        if (!is_numeric($value)) {
+            throw new InvalidArgumentException($field . ' must be a number.');
+        }
+        $number = (float)$value;
+        if (!is_finite($number)) {
+            throw new InvalidArgumentException($field . ' must be a finite number.');
+        }
+
+        return $number;
+    }
+
+    private function text(mixed $value, string $field, int $maximum, bool $required = false): ?string
+    {
+        $text = trim((string)$value);
+        if ($required && $text === '') {
+            throw new InvalidArgumentException($field . ' is required.');
+        }
+        if (mb_strlen($text) > $maximum) {
+            throw new InvalidArgumentException($field . ' is too long.');
+        }
+
+        return $text === '' ? null : $text;
     }
 }
