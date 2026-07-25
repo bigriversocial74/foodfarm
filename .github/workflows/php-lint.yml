@@ -91,7 +91,18 @@ jobs:
         run: bash -n tests/http_smoke.sh
 
       - name: Run whole-application security audit
-        run: php tests/application_static_audit.php
+        run: |
+          set -o pipefail
+          php tests/application_static_audit.php 2>&1 | tee "$RUNNER_TEMP/application-static-audit-${{ matrix.database }}.txt"
+
+      - name: Upload static audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: application-static-audit-${{ matrix.database }}
+          path: ${{ runner.temp }}/application-static-audit-${{ matrix.database }}.txt
+          if-no-files-found: warn
+          retention-days: 3
 
       - name: Run Phase 5 security audit
         run: php tests/phase5_static_audit.php
