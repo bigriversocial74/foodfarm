@@ -15,6 +15,9 @@ $phase2 = $read('phase2.php');
 $phase3 = $read('phase3.php');
 $phase4 = $read('phase4.php');
 $phase5 = $read('phase5.php');
+$phase6 = $read('phase6.php');
+$phase7 = $read('phase7.php');
+$phase8 = $read('phase8.php');
 $login = $read('login.php');
 $logout = $read('logout.php');
 $invite = $read('accept-invite.php');
@@ -31,12 +34,10 @@ $phase4Hardening = $read('database/phase4_hardening.sql');
 $phase5Migration = $read('database/phase5_hardening.sql');
 $css = $read('assets/css/app.css');
 $workflow = $read('.github/workflows/php-lint.yml');
-$healthFiles = [
-    $read('api/phase2-health.php'),
-    $read('api/phase3-health.php'),
-    $read('api/phase4-health.php'),
-    $read('api/phase5-health.php'),
-];
+$healthFiles = [];
+foreach (range(2, 8) as $phaseNumber) {
+    $healthFiles[] = $read('api/phase' . $phaseNumber . '-health.php');
+}
 
 $checks = [
     'Phase 2 requires authenticated user' => str_contains($phase2, '$auth->requireUser()'),
@@ -48,6 +49,7 @@ $checks = [
     'Household context binds user member and household' => str_contains($context, 'user_id = ?') && str_contains($context, 'household_id = ?'),
     'Auth binds session member household and auth version' => str_contains($auth, 'hm.id = ? AND hm.household_id = ?') && str_contains($auth, 'u.auth_version = ?'),
     'Auth clears session identity during logout' => str_contains($auth, '$_SESSION = []'),
+    'Auth uses centralized safe login redirect' => str_contains($auth, "redirect('/login.php')"),
     'Role permission defaults include view and task permissions' => str_contains($auth, "'storage.view'") && str_contains($auth, "'tasks.complete'"),
     'Phase 3 has administration access guard' => str_contains($phase3, 'You do not have permission to administer household access.'),
     'Phase 3 serializes invitation creation' => str_contains($phase3, 'SELECT id FROM households WHERE id = ? FOR UPDATE'),
@@ -87,13 +89,18 @@ $checks = [
     'Migrations contain no known owner password seed' => !str_contains($phase3Migration, '$2y$') && !str_contains($phase5Migration, 'ORDER BY id ASC LIMIT 1'),
     'Phase 4 uses permissions' => str_contains($phase4, 'recipes.manage') && str_contains($phase4, 'recipes.complete'),
     'Phase 5 requires platform administration' => str_contains($phase5, 'requirePlatformAdmin'),
+    'Phase 6 requires household permissions' => str_contains($phase6, 'garden.manage') && str_contains($phase6, 'preservation.manage'),
+    'Phase 7 requires task permissions' => str_contains($phase7, 'tasks.manage') && str_contains($phase7, 'tasks.complete'),
+    'Phase 8 requires forecast permissions' => str_contains($phase8, 'inventory.view') && str_contains($phase8, 'tasks.manage'),
     'Activation token suppresses referrer leakage' => str_contains($activation, 'Referrer-Policy: no-referrer'),
     'Keyboard focus treatment exists' => str_contains($css, ':focus-visible') && str_contains($css, '.skip-link'),
     'Reduced motion is supported' => str_contains($css, 'prefers-reduced-motion'),
     'High contrast mode is supported' => str_contains($css, 'forced-colors'),
     'CI validates migration replay' => str_contains($workflow, 'Replay incremental migrations'),
+    'CI imports Phase 8 migration' => str_contains($workflow, 'database/phase8_forecasting_seasonal_self_sufficiency.sql'),
     'CI runs database workflow integration' => str_contains($workflow, 'tests/workflow_integration.php'),
-    'CI runs authenticated HTTP smoke tests' => str_contains($workflow, 'tests/http_smoke.sh'),
+    'CI runs Phase 8 integration' => str_contains($workflow, 'tests/phase8_integration.php'),
+    'CI runs authenticated HTTP smoke tests' => str_contains($workflow, 'tests/http_smoke.sh') && str_contains($workflow, 'tests/phase8_http_smoke.sh'),
 ];
 
 $failed = [];
