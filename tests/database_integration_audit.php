@@ -34,6 +34,11 @@ $requiredTables = [
     'food_purchase_records', 'inventory_cost_basis', 'food_waste_events',
     'recipe_cost_snapshots', 'recipe_cost_snapshot_lines',
     'household_finance_snapshots', 'finance_recommendations', 'finance_lifecycle_events',
+    'household_nutrition_settings', 'member_nutrition_profiles', 'member_allergen_rules',
+    'inventory_nutrition_profiles', 'inventory_allergen_tags',
+    'recipe_nutrition_snapshots', 'recipe_nutrition_snapshot_lines',
+    'meal_nutrition_assessments', 'member_nutrition_assessment_lines',
+    'nutrition_recommendations', 'nutrition_lifecycle_events',
 ];
 
 $tables = array_map('strval', $pdo->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN));
@@ -80,6 +85,11 @@ $checks = [
     'Phase 9 purchase uniqueness installed' => $indexExists($pdo, 'food_purchase_records', 'uq_purchase_household_action'),
     'Phase 9 waste uniqueness installed' => $indexExists($pdo, 'food_waste_events', 'uq_waste_household_action'),
     'Phase 9 snapshot uniqueness installed' => $indexExists($pdo, 'household_finance_snapshots', 'uq_finance_snapshot_run'),
+    'Phase 10 member allergen uniqueness installed' => $indexExists($pdo, 'member_allergen_rules', 'uq_member_allergen_rule'),
+    'Phase 10 ingredient allergen uniqueness installed' => $indexExists($pdo, 'inventory_allergen_tags', 'uq_inventory_allergen_tag'),
+    'Phase 10 recipe snapshot uniqueness installed' => $indexExists($pdo, 'recipe_nutrition_snapshots', 'uq_recipe_nutrition_calculation'),
+    'Phase 10 assessment uniqueness installed' => $indexExists($pdo, 'meal_nutrition_assessments', 'uq_meal_nutrition_run'),
+    'Phase 10 recommendation uniqueness installed' => $indexExists($pdo, 'nutrition_recommendations', 'uq_nutrition_recommendation_generation'),
 ];
 
 $sourceType = $pdo->query("SHOW COLUMNS FROM shopping_list_items LIKE 'source_type'")->fetch();
@@ -94,7 +104,7 @@ $checks['password failure event installed'] = is_array($eventType)
 $foreignKeyCount = (int)$pdo->query(
     'SELECT COUNT(*) FROM information_schema.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE()'
 )->fetchColumn();
-$checks['foreign-key protections installed'] = $foreignKeyCount >= 70;
+$checks['foreign-key protections installed'] = $foreignKeyCount >= 90;
 
 $checks['no seeded application users'] = (int)$pdo->query('SELECT COUNT(*) FROM users')->fetchColumn() === 0;
 $checks['no seeded private households'] = (int)$pdo->query('SELECT COUNT(*) FROM households')->fetchColumn() === 0;
