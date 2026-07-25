@@ -21,15 +21,20 @@ final class Auth
         }
 
         $statement = $this->pdo->prepare(
-            "SELECT u.id, u.email, u.display_name, u.status,
+            "SELECT u.id, u.email, u.display_name, u.status, u.is_platform_admin,
                     hm.id AS member_id, hm.household_id, hm.role, hm.age_group,
                     hm.permission_overrides, hm.status AS member_status
              FROM users u
              JOIN household_members hm ON hm.user_id = u.id
-             WHERE u.id = ? AND u.status = 'active' AND hm.status = 'active'
+             WHERE u.id = ? AND hm.id = ? AND hm.household_id = ?
+               AND u.status = 'active' AND hm.status = 'active'
              LIMIT 1"
         );
-        $statement->execute([$userId]);
+        $statement->execute([
+            $userId,
+            (int)($_SESSION['member_id'] ?? 0),
+            (int)($_SESSION['household_id'] ?? 0),
+        ]);
         $user = $statement->fetch();
 
         if (!is_array($user)) {
@@ -37,6 +42,7 @@ final class Auth
             return null;
         }
 
+        $user['is_platform_admin'] = (bool)$user['is_platform_admin'];
         return $user;
     }
 
@@ -49,6 +55,7 @@ final class Auth
              WHERE LOWER(u.email) = LOWER(?)
                AND u.status = 'active'
                AND hm.status = 'active'
+             ORDER BY FIELD(hm.role, 'owner','administrator','adult_member','youth_member','guest_helper'), hm.id
              LIMIT 1"
         );
         $statement->execute([trim($email)]);
@@ -80,6 +87,14 @@ final class Auth
             exit;
         }
         return $user;
+    }
+
+    public function requirePlatformAdmin(array $user): void
+    {
+        if (empty($user['is_platform_admin'])) {
+            http_response_code(403);
+            throw new RuntimeException('Platform administrator access is required.');
+        }
     }
 
     public function can(array $user, string $permission): bool
