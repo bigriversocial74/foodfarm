@@ -20,7 +20,7 @@ pass() {
 extract_value() {
   local name="$1"
   local html="$2"
-  sed -n -E "s/.*name=\"${name}\" value=\"([^\"]*)\".*/\1/p" <<<"$html" | head -n1
+  sed -n -E "/name=\"${name}\" value=\"[^\"]*\"/ { s/.*name=\"${name}\" value=\"([^\"]*)\".*/\1/; p; q; }" <<<"$html"
 }
 
 login_page="$(curl -fsS -c "$COOKIE_JAR" "${BASE_URL}/login.php")" || fail "login page unavailable"
