@@ -34,11 +34,6 @@ jobs:
           cat /tmp/phase11-integration-output.txt
           if [ "$status" -ne 0 ]; then
             cp /tmp/phase11-integration-output.txt PHASE11_INTEGRATION_ERROR.txt
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add -A
-            git commit -m "Record Phase 11 integration diagnostic"
-            git push origin HEAD:feature/phase11-alerts-calendar-notifications-20260725
             exit "$status"
           fi
 
@@ -65,15 +60,31 @@ jobs:
           cat /tmp/phase11-validation-output.txt
           if [ "$status" -ne 0 ]; then
             cp /tmp/phase11-validation-output.txt PHASE11_VALIDATION_ERROR.txt
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add -A
-            git commit -m "Stage Phase 11 integration with validation diagnostic"
-            git push origin HEAD:feature/phase11-alerts-calendar-notifications-20260725
             exit "$status"
           fi
 
+      - name: Package validated integration files
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/phase11-validated
+          git diff --name-only --diff-filter=ACMRT HEAD | while IFS= read -r file; do
+            [ -f "$file" ] || continue
+            mkdir -p "/tmp/phase11-validated/$(dirname "$file")"
+            cp "$file" "/tmp/phase11-validated/$file"
+          done
+          cp /tmp/phase11-validation-output.txt /tmp/phase11-validated/PHASE11_VALIDATION.txt
+          tar -C /tmp/phase11-validated -czf /tmp/phase11-validated-files.tar.gz .
+
+      - name: Upload validated integration files
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase11-validated-files
+          path: /tmp/phase11-validated-files.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Commit final Phase 11 integration
+        continue-on-error: true
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
