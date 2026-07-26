@@ -1,9 +1,11 @@
 name: Build Homestead Full Install SQL
 
 on:
-  push:
+  pull_request:
     branches:
-      - utility/full-install-sql-20260725
+      - main
+    paths:
+      - .github/workflows/build-full-install-sql.yml
 
 permissions:
   contents: read
