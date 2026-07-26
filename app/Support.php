@@ -14,6 +14,50 @@ function e(string $value): string
     return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
 
+function app_base_path(): string
+{
+    if (defined('HOMESTEAD_BASE_PATH')) {
+        return (string)HOMESTEAD_BASE_PATH;
+    }
+
+    return '';
+}
+
+function app_url(string $path = '/'): string
+{
+    if ($path === '' || $path === '/') {
+        return app_base_path() !== '' ? app_base_path() . '/' : '/';
+    }
+    if (preg_match('#^[a-z][a-z0-9+.-]*:#i', $path) === 1 || str_starts_with($path, '//') || str_starts_with($path, '#')) {
+        return $path;
+    }
+    if (!str_starts_with($path, '/')) {
+        $path = '/' . $path;
+    }
+
+    $basePath = app_base_path();
+    if ($basePath === '' || $path === $basePath || str_starts_with($path, $basePath . '/')) {
+        return $path;
+    }
+
+    return $basePath . $path;
+}
+
+function rewrite_app_urls(string $content): string
+{
+    if (app_base_path() === '' || $content === '') {
+        return $content;
+    }
+
+    $rewritten = preg_replace_callback(
+        '/\\b(href|src|action)=("|\\\')(\\/(?!\\/)[^"\\\']*)\\2/i',
+        static fn(array $match): string => $match[1] . '=' . $match[2] . app_url($match[3]) . $match[2],
+        $content
+    );
+
+    return is_string($rewritten) ? $rewritten : $content;
+}
+
 function apply_security_headers(bool $isProduction): void
 {
     if (headers_sent()) {
@@ -71,7 +115,7 @@ function redirect(string $url): never
     if (!str_starts_with($url, '/') || str_starts_with($url, '//') || preg_match('/[\x00-\x1F\x7F]/', $url)) {
         throw new RuntimeException('Unsafe redirect target.');
     }
-    header('Location: ' . $url, true, 303);
+    header('Location: ' . app_url($url), true, 303);
     exit;
 }
 
