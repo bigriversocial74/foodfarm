@@ -88,7 +88,60 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 ?><!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sign in · Homestead</title><link rel="stylesheet" href="/assets/css/app.css"></head>
-<body><a class="skip-link" href="#main-content">Skip to sign-in</a><main id="main-content" class="page-container" style="max-width:620px;padding-top:8vh"><section class="panel"><p class="eyebrow">Homestead household access</p><h1>Sign in</h1><p class="page-description">Access your family, storage, inventory, and household activity.</p>
-<?php if ($error): ?><div class="status status-warning" role="alert" style="display:block;margin:20px 0"><?= e($error) ?></div><?php endif; ?>
-<form method="post" class="form-grid"><input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>"><label>Email<input class="search-field" type="email" name="email" autocomplete="email" maxlength="190" required></label><label>Password<input class="search-field" type="password" name="password" autocomplete="current-password" maxlength="4096" required></label><button class="button primary" type="submit">Sign in</button></form></section></main></body></html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="theme-color" content="#1f4b36">
+    <title>Sign in · Homestead</title>
+    <link rel="stylesheet" href="/assets/css/app.css">
+</head>
+<body>
+<a class="skip-link" href="#main-content">Skip to sign-in</a>
+<main id="main-content" class="auth-page">
+    <section class="auth-shell">
+        <div class="auth-story">
+            <div>
+                <a class="landing-brand" href="/" style="color:#fff" aria-label="Return to Homestead home">
+                    <span class="landing-brand-mark" aria-hidden="true" style="background:rgba(255,255,255,.14);box-shadow:none">H</span>
+                    <span><strong style="color:#fff">Homestead</strong><small style="color:rgba(255,255,255,.66)">Household food system</small></span>
+                </a>
+                <p class="eyebrow" style="margin-top:64px;color:#d5bf91">Welcome home</p>
+                <h1>Keep the household food cycle moving.</h1>
+                <p>Access pantry inventory, recipes, meal plans, garden work, preservation, household tasks, alerts, nutrition planning, and food-cost history.</p>
+            </div>
+            <div class="auth-points" aria-label="Homestead account features">
+                <span>Permission-aware family access</span>
+                <span>One connected household food record</span>
+                <span>Secure activity and authentication history</span>
+            </div>
+        </div>
+
+        <div class="auth-form">
+            <a class="auth-brand" href="/" aria-label="Return to Homestead home">
+                <span class="landing-brand-mark" aria-hidden="true">H</span>
+                <span><strong>Homestead</strong></span>
+            </a>
+            <p class="eyebrow">Household access</p>
+            <h2>Sign in</h2>
+            <p class="page-description" style="margin:10px 0 26px">Enter your account credentials to open your household workspace.</p>
+
+            <?php if ($error): ?>
+                <div class="status status-warning" role="alert" style="display:flex;width:100%;margin:0 0 20px;border-radius:12px;padding:11px 12px"><?= e($error) ?></div>
+            <?php endif; ?>
+
+            <form method="post" class="form-grid">
+                <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                <label>Email address
+                    <input type="email" name="email" autocomplete="email" maxlength="190" required>
+                </label>
+                <label>Password
+                    <input type="password" name="password" autocomplete="current-password" maxlength="4096" required>
+                </label>
+                <button class="button primary" type="submit">Sign in to Homestead</button>
+            </form>
+        </div>
+    </section>
+</main>
+</body>
+</html>
