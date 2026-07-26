@@ -1,0 +1,74 @@
+name: Build Homestead Full Install SQL
+
+on:
+  push:
+    branches:
+      - utility/full-install-sql-20260725
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Combine migrations in documented order
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          output="dist/homestead_full_install.sql"
+          files=(
+            "database/schema.sql"
+            "database/phase2_install.sql"
+            "database/phase3_install.sql"
+            "database/household_owner_integrity_hardening.sql"
+            "database/phase4_install.sql"
+            "database/phase4_hardening.sql"
+            "database/phase5_install.sql"
+            "database/phase5_shopping_extension.sql"
+            "database/phase5_hardening.sql"
+            "database/phase5_snapshot_storage_hardening.sql"
+            "database/phase6_grow_harvest_preserve.sql"
+            "database/phase7_planning_tasks_automation.sql"
+            "database/phase8_forecasting_seasonal_self_sufficiency.sql"
+            "database/phase9_cost_waste_savings_intelligence.sql"
+            "database/phase10_nutrition_dietary_wellness.sql"
+            "database/phase11_alerts_calendar_notifications.sql"
+          )
+
+          {
+            printf '%s\n' '-- Homestead complete initial database installer'
+            printf '%s\n' '-- Generated from the 16 documented migrations in README.md order.'
+            printf '%s\n' "-- Source commit: ${GITHUB_SHA}"
+            printf '%s\n\n' '-- Import this file into an empty MySQL 8+ or MariaDB 10.6+ database.'
+          } > "$output"
+
+          index=0
+          for file in "${files[@]}"; do
+            index=$((index + 1))
+            test -f "$file"
+            {
+              printf '\n-- ============================================================================\n'
+              printf '%s\n' "-- MIGRATION ${index}/16: ${file}"
+              printf '%s\n\n' '-- ============================================================================'
+              cat "$file"
+              printf '\n'
+            } >> "$output"
+          done
+
+          test "$(grep -c '^-- MIGRATION [0-9].*/16:' "$output")" -eq 16
+          test -s "$output"
+          sha256sum "$output"
+          wc -l -c "$output"
+
+      - name: Upload combined installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: homestead-full-install-sql
+          path: dist/homestead_full_install.sql
+          if-no-files-found: error
+          retention-days: 7
