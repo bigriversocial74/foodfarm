@@ -165,6 +165,7 @@ final class Auth
                 'tasks.manage', 'tasks.complete',
                 'finance.view', 'finance.manage',
                 'nutrition.view', 'nutrition.manage',
+                'notifications.view', 'notifications.manage',
             ],
             'adult_member' => [
                 'storage.view', 'inventory.view', 'inventory.manage',
@@ -174,11 +175,12 @@ final class Auth
                 'preservation.view', 'preservation.manage',
                 'finance.view', 'finance.manage',
                 'nutrition.view', 'nutrition.manage',
+                'notifications.view', 'notifications.manage',
             ],
             'youth_member' => [
                 'storage.view', 'inventory.view', 'tasks.complete',
                 'recipes.view', 'recipes.complete', 'garden.view', 'harvest.record',
-                'preservation.view', 'finance.view', 'nutrition.view',
+                'preservation.view', 'finance.view', 'nutrition.view', 'notifications.view',
             ],
             'guest_helper' => ['tasks.complete', 'recipes.view', 'garden.view'],
         ];
