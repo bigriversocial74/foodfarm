@@ -9,7 +9,7 @@ declare(strict_types=1);
     <meta name="theme-color" content="#17130f">
     <meta name="description" content="Homestead is a household food system for growing, storing, cooking, preserving, and coordinating real food.">
     <title>Homestead · Household Food System</title>
-    <link rel="stylesheet" href="/assets/css/app.css">
+    <link rel="stylesheet" href="assets/css/app.css">
 </head>
 <body>
 <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -20,7 +20,7 @@ declare(strict_types=1);
             <h1>Grow it. Store it.<br>Cook it. Preserve it.</h1>
             <p class="page-description">Homestead connects pantry inventory, family meal planning, recipes, leftovers, garden activity, preservation, shopping, and household responsibilities in one practical system.</p>
             <div class="toolbar" style="margin-top:24px">
-                <a class="button primary" href="/login.php">Sign in to Homestead</a>
+                <a class="button primary" href="login.php">Sign in to Homestead</a>
                 <a class="button secondary" href="#system">Explore the system</a>
             </div>
         </div>
@@ -61,7 +61,7 @@ declare(strict_types=1);
         <p class="eyebrow">Homestead V1</p>
         <h2>A household food system for growing, storing, cooking, and preserving real food.</h2>
         <p class="page-description" style="margin:14px auto 20px">Secure household access is required before any personal inventory, family, recipe, or Starter Kit data is displayed.</p>
-        <a class="button primary" href="/login.php">Open Homestead</a>
+        <a class="button primary" href="login.php">Open Homestead</a>
     </section>
 </main>
 </body>
