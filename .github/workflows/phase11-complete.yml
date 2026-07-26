@@ -1,0 +1,55 @@
+name: Phase 11 Complete Integration
+
+on:
+  pull_request:
+    types: [synchronize, reopened]
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: phase11-complete-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  complete:
+    if: github.head_ref == 'feature/phase11-alerts-calendar-notifications-20260725' && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/phase11-alerts-calendar-notifications-20260725
+          fetch-depth: 0
+
+      - name: Apply Phase 11 final source and test payloads
+        run: |
+          set -euo pipefail
+          python3 scripts/phase11_payload_core.py
+          python3 scripts/phase11_payload_tests.py
+          python3 scripts/phase11_integrate.py
+
+      - name: Validate final Phase 11 integration
+        run: |
+          set -euo pipefail
+          find app -maxdepth 1 -type f -name 'Notification*.php' -print0 | xargs -0 -n1 php -l
+          php -l phase3.php
+          php -l dashboard.php
+          php -l phase11.php
+          php -l phase11-calendar.php
+          php -l api/phase11-health.php
+          php -l tests/phase11_static_audit.php
+          php -l tests/phase11_integration.php
+          php -l tests/database_integration_audit.php
+          php -l tests/application_static_audit.php
+          bash -n tests/phase11_http_smoke.sh
+          php tests/phase11_static_audit.php
+          php tests/application_static_audit.php
+
+      - name: Commit final Phase 11 integration
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Complete Phase 11 privacy and application integration"
+          git push origin HEAD:feature/phase11-alerts-calendar-notifications-20260725
