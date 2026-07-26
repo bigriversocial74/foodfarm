@@ -64,6 +64,7 @@ try {
     )->execute([$otherHouseholdId]);
     $otherMemberId = (int)$pdo->lastInsertId();
 
+
     $pdo->prepare(
         "INSERT INTO household_members
          (household_id, display_name, age_group, role, status, joined_at)
