@@ -96,6 +96,7 @@ CREATE TABLE IF NOT EXISTS household_calendar_events (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     household_id BIGINT UNSIGNED NOT NULL,
     notification_id BIGINT UNSIGNED NULL,
+    recipient_member_id BIGINT UNSIGNED NULL,
     source_type VARCHAR(80) NOT NULL,
     source_id BIGINT UNSIGNED NULL,
     event_key CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
@@ -111,9 +112,11 @@ CREATE TABLE IF NOT EXISTS household_calendar_events (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_household_calendar_household FOREIGN KEY (household_id) REFERENCES households(id) ON DELETE CASCADE,
     CONSTRAINT fk_household_calendar_notification FOREIGN KEY (notification_id) REFERENCES household_notifications(id) ON DELETE SET NULL,
+    CONSTRAINT fk_household_calendar_recipient FOREIGN KEY (recipient_member_id) REFERENCES household_members(id) ON DELETE CASCADE,
     CONSTRAINT fk_household_calendar_creator FOREIGN KEY (created_by_member_id) REFERENCES household_members(id) ON DELETE SET NULL,
     UNIQUE KEY uq_household_calendar_event (household_id, event_key),
     INDEX idx_household_calendar_window (household_id, starts_at, status),
+    INDEX idx_household_calendar_recipient (household_id, recipient_member_id, starts_at),
     INDEX idx_household_calendar_source (household_id, source_type, source_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
