@@ -20,6 +20,8 @@ Every notification uses a stable household-scoped SHA-256 deduplication key. Hou
 
 States are `unread`, `acknowledged`, `completed`, `dismissed`, and `expired`. A notification can create one provenance-linked Phase 7 task; repeated conversion returns the existing task.
 
+Notification settings and member preferences are included in the sync source watermark so delivery-policy changes produce a fresh deterministic run without duplicating active alerts.
+
 ## Privacy and calendar access
 
 Notification and calendar visibility is enforced as household, adults-only, or member-private. Member-private task and seasonal events are available only to the assigned member. Adults-only financial notifications are excluded from youth and guest views, digests, task conversion, calendar queries, and external outbox candidates.
@@ -41,6 +43,10 @@ Phase 11 records adapter-ready payloads and attempt state but does not dispatch 
 - Source and recipient provenance
 - Stale sync and delivery-lock diagnostics
 - MySQL 8 and MariaDB 10.11 certification
+
+## Certification boundary
+
+The repository workflows certify PHP compatibility, replay-safe migration behavior, database-backed household isolation, permission-aware browser workflows, protected health diagnostics, and authenticated ICS export. They do not certify an external email or web-push provider because provider dispatch remains outside Phase 11.
 
 ## Migration
 
