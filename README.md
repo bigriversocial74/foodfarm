@@ -1,6 +1,6 @@
 # Homestead
 
-Homestead is a household food system for growing, storing, cooking, preserving, planning, forecasting, balancing household nutrition, measuring cost and waste, and coordinating real food.
+Homestead is a household food system for growing, storing, cooking, preserving, planning, forecasting, balancing household nutrition, measuring cost and waste, coordinating real food, and delivering the next household action.
 
 ## Interfaces
 
@@ -16,6 +16,8 @@ Homestead is a household food system for growing, storing, cooking, preserving, 
 - `/phase8.php` — food forecasting, seasonal planning, shortage projections, and self-sufficiency intelligence
 - `/phase9.php` — purchase costs, recipe economics, food waste, budgets, supplier comparisons, and savings intelligence
 - `/phase10.php` — ingredient nutrition, dietary patterns, allergen controls, recipe nutrition, meal-plan assessments, and household wellness planning
+- `/phase11.php` — household alerts, member preferences, digests, shared calendar, and adapter-ready delivery outbox
+- `/phase11-calendar.php` — authenticated, permission-aware ICS calendar export
 - `/prepared-food.php` — prepared-food consumption, freezing, spoilage, and ledger posting
 - `/starter-kit-lifecycle.php` — Starter Kit version duplication, retirement, cancellation, and activation lifecycle
 - `/activate-kit.php?token=...` — customer kit review and household provisioning
@@ -28,6 +30,7 @@ Homestead is a household food system for growing, storing, cooking, preserving, 
 - `/api/phase8-health.php` — protected forecast, projection, seasonal-plan, and recommendation validation
 - `/api/phase9-health.php` — protected purchase, cost-basis, waste, recipe-cost, finance-snapshot, and recommendation validation
 - `/api/phase10-health.php` — protected nutrition-profile, allergen, recipe-snapshot, meal-assessment, and recommendation validation
+- `/api/phase11-health.php` — protected notification, calendar, digest, outbox, and lifecycle validation
 
 ## Requirements
 
@@ -62,6 +65,7 @@ database/phase7_planning_tasks_automation.sql
 database/phase8_forecasting_seasonal_self_sufficiency.sql
 database/phase9_cost_waste_savings_intelligence.sql
 database/phase10_nutrition_dietary_wellness.sql
+database/phase11_alerts_calendar_notifications.sql
 ```
 
 Create the first owner from the command line:
@@ -97,6 +101,21 @@ docs/WHOLE_APP_AUDIT.md
 The initial whole-application score was **5.9/10**. The audited repository code and release-certification matrix reached **10/10** after the complete security, authorization, concurrency, migration, accessibility, database, and HTTP validation passes.
 
 Phase-specific MySQL 8 and MariaDB 10.11 workflows extend that baseline with clean migration, replay, database integration, protected-health, and authenticated HTTP certification.
+
+## Alerts, notifications, and shared calendar
+
+- Permission-aware household notification inbox
+- Deterministic alerts from tasks, low stock, prepared-food dates, forecasts, seasonal plans, finance, nutrition, meals, and harvest windows
+- Member-specific channel, category, priority, digest, quiet-hour, and preview preferences
+- Household, adults-only, and member-private visibility enforcement
+- Shared calendar and authenticated ICS export
+- Daily and weekly digest records
+- One provenance-linked Phase 7 task per notification
+- Adapter-ready email and web-push outbox, disabled until configured
+- Sensitive wellness preview redaction
+- Protected relational, lifecycle, and stale-run diagnostics
+
+Phase 11 does not dispatch email or web push through an external provider. It stores in-app notifications, calendar records, digests, and adapter-ready outbox payloads.
 
 ## Nutrition, dietary planning, and household wellness
 
