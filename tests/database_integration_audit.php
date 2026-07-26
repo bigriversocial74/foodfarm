@@ -39,6 +39,10 @@ $requiredTables = [
     'recipe_nutrition_snapshots', 'recipe_nutrition_snapshot_lines',
     'meal_nutrition_assessments', 'member_nutrition_assessment_lines',
     'nutrition_recommendations', 'nutrition_lifecycle_events',
+    'household_notification_settings', 'member_notification_preferences', 'notification_sync_runs',
+    'household_notifications', 'household_calendar_events', 'notification_delivery_outbox',
+    'notification_delivery_attempts', 'notification_digest_runs', 'notification_digest_items',
+    'notification_lifecycle_events',
 ];
 
 $tables = array_map('strval', $pdo->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN));
@@ -90,6 +94,10 @@ $checks = [
     'Phase 10 recipe snapshot uniqueness installed' => $indexExists($pdo, 'recipe_nutrition_snapshots', 'uq_recipe_nutrition_calculation'),
     'Phase 10 assessment uniqueness installed' => $indexExists($pdo, 'meal_nutrition_assessments', 'uq_meal_nutrition_run'),
     'Phase 10 recommendation uniqueness installed' => $indexExists($pdo, 'nutrition_recommendations', 'uq_nutrition_recommendation_generation'),
+    'Phase 11 notification uniqueness installed' => $indexExists($pdo, 'household_notifications', 'uq_household_notification_dedup'),
+    'Phase 11 calendar uniqueness installed' => $indexExists($pdo, 'household_calendar_events', 'uq_household_calendar_event'),
+    'Phase 11 outbox uniqueness installed' => $indexExists($pdo, 'notification_delivery_outbox', 'uq_notification_outbox_delivery'),
+    'Phase 11 digest uniqueness installed' => $indexExists($pdo, 'notification_digest_runs', 'uq_notification_digest_run'),
 ];
 
 $sourceType = $pdo->query("SHOW COLUMNS FROM shopping_list_items LIKE 'source_type'")->fetch();
@@ -104,7 +112,7 @@ $checks['password failure event installed'] = is_array($eventType)
 $foreignKeyCount = (int)$pdo->query(
     'SELECT COUNT(*) FROM information_schema.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE()'
 )->fetchColumn();
-$checks['foreign-key protections installed'] = $foreignKeyCount >= 90;
+$checks['foreign-key protections installed'] = $foreignKeyCount >= 105;
 
 $checks['no seeded application users'] = (int)$pdo->query('SELECT COUNT(*) FROM users')->fetchColumn() === 0;
 $checks['no seeded private households'] = (int)$pdo->query('SELECT COUNT(*) FROM households')->fetchColumn() === 0;

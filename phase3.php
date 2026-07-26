@@ -31,6 +31,7 @@ $permissions = [
     'tasks.manage', 'tasks.complete',
     'finance.view', 'finance.manage',
     'nutrition.view', 'nutrition.manage',
+    'notifications.view', 'notifications.manage',
 ];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {

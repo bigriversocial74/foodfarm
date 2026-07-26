@@ -17,6 +17,7 @@ $canViewPlanning = $auth->can($user, 'tasks.manage') || $auth->can($user, 'tasks
 $canViewForecast = $canViewInventory || $canViewGarden || $canViewPreservation || $canViewPlanning;
 $canViewFinance = $auth->can($user, 'finance.view') || $auth->can($user, 'finance.manage');
 $canViewNutrition = $auth->can($user, 'nutrition.view') || $auth->can($user, 'nutrition.manage');
+$canViewNotifications = $auth->can($user, 'notifications.view') || $auth->can($user, 'notifications.manage');
 $canManageAccess = $auth->can($user, 'members.manage') || $auth->can($user, 'members.invite') || $auth->can($user, 'permissions.manage');
 $isPlatformAdmin = !empty($user['is_platform_admin']);
 
@@ -59,7 +60,40 @@ if ($canViewNutrition) {
     $phase10Available = (int)$availability->fetchColumn() === 3;
 }
 
+$phase11Available = false;
+if ($canViewNotifications) {
+    $availability = $pdo->prepare(
+        "SELECT COUNT(*) FROM information_schema.tables
+         WHERE table_schema = DATABASE()
+           AND table_name IN ('household_notifications','household_calendar_events','notification_sync_runs')"
+    );
+    $availability->execute();
+    $phase11Available = (int)$availability->fetchColumn() === 3;
+}
+
 $metrics = [];
+if ($phase11Available) {
+    $adultAccess = in_array((string)$user['role'], ['owner','administrator','adult_member'], true) ? 1 : 0;
+    $notificationMetrics = $pdo->prepare(
+        "SELECT
+            SUM(status = 'unread') AS unread_count,
+            SUM(priority IN ('high','critical') AND status IN ('unread','acknowledged')) AS urgent_count
+         FROM household_notifications
+         WHERE household_id = ? AND status <> 'expired'
+           AND (
+               visibility = 'household'
+               OR (visibility = 'adults_only' AND ? = 1)
+               OR (visibility = 'private' AND recipient_member_id = ?)
+           )"
+    );
+    $notificationMetrics->execute([$householdId, $adultAccess, (int)$user['member_id']]);
+    $notificationCounts = $notificationMetrics->fetch();
+    if (is_array($notificationCounts)) {
+        $metrics[] = ['label' => 'Unread alerts', 'value' => (int)$notificationCounts['unread_count'], 'prefix' => '', 'suffix' => '', 'href' => '/phase11.php'];
+        $metrics[] = ['label' => 'Urgent alerts', 'value' => (int)$notificationCounts['urgent_count'], 'prefix' => '', 'suffix' => '', 'href' => '/phase11.php'];
+    }
+}
+
 if ($phase10Available) {
     $latestNutrition = $pdo->prepare(
         "SELECT household_balance_score, allergen_conflict_count
@@ -257,7 +291,7 @@ if ($canViewInventory) {
     <div>
         <p class="eyebrow">Household food operating system</p>
         <h1>Welcome, <?= e((string)$user['display_name']) ?></h1>
-        <p class="page-description">Forecast, plan, assign, stock, grow, cook, preserve, balance household nutrition, measure cost and waste, and improve the next food cycle.</p>
+        <p class="page-description">Detect, notify, assign, stock, grow, cook, preserve, balance household nutrition, measure cost and waste, and improve the next food cycle.</p>
     </div>
     <div class="toolbar">
         <a class="button secondary" href="/account.php">Account</a>
@@ -270,6 +304,7 @@ if ($canViewInventory) {
 </section><?php endif; ?>
 
 <section class="content-grid">
+    <?php if ($phase11Available): ?><a class="panel" href="/phase11.php"><p class="eyebrow">Notify</p><h2>Alerts & shared calendar</h2><p class="page-description" style="margin-top:12px">One permission-aware inbox for tasks, shortages, meals, harvest windows, use-by dates, finance reviews, nutrition follow-up, digests, and ICS calendar export.</p></a><?php endif; ?>
     <?php if ($phase10Available): ?><a class="panel" href="/phase10.php"><p class="eyebrow">Balance</p><h2>Nutrition & dietary planning</h2><p class="page-description" style="margin-top:12px">Ingredient label data, optional family targets, dietary patterns, allergen controls, recipe nutrition, meal-plan assessments, and task-ready recommendations.</p></a><?php endif; ?>
     <?php if ($phase9Available): ?><a class="panel" href="/phase9.php"><p class="eyebrow">Measure</p><h2>Cost, waste & savings</h2><p class="page-description" style="margin-top:12px">Purchase prices, weighted unit costs, recipe cost per serving, budgets, waste value, supplier comparisons, household-production value, and savings recommendations.</p></a><?php endif; ?>
     <?php if ($phase8Available): ?><a class="panel" href="/phase8.php"><p class="eyebrow">Forecast</p><h2>Seasons & self-sufficiency</h2><p class="page-description" style="margin-top:12px">Pantry coverage, planned demand, days on hand, expected harvests, preservation output, seasonal plans, and evidence-linked recommendations.</p></a><?php endif; ?>

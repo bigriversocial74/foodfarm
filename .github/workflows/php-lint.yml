@@ -54,6 +54,7 @@ jobs:
           php tests/phase8_static_audit.php
           php tests/phase9_static_audit.php
           php tests/phase10_static_audit.php
+          php tests/phase11_static_audit.php
           php tests/whole_codebase_audit.php | tee "$RUNNER_TEMP/whole-codebase-audit-php-${{ matrix.php }}.txt"
 
       - name: Upload whole-codebase audit
@@ -141,6 +142,7 @@ jobs:
             database/phase8_forecasting_seasonal_self_sufficiency.sql
             database/phase9_cost_waste_savings_intelligence.sql
             database/phase10_nutrition_dietary_wellness.sql
+            database/phase11_alerts_calendar_notifications.sql
           )
           for file in "${migrations[@]}"; do
             echo "Importing ${file}"
@@ -165,6 +167,7 @@ jobs:
             database/phase8_forecasting_seasonal_self_sufficiency.sql
             database/phase9_cost_waste_savings_intelligence.sql
             database/phase10_nutrition_dietary_wellness.sql
+            database/phase11_alerts_calendar_notifications.sql
           )
           for file in "${migrations[@]}"; do
             echo "Replaying ${file}"
@@ -194,6 +197,7 @@ jobs:
           php tests/phase8_integration.php
           php tests/phase9_integration.php
           php tests/phase10_integration.php
+          php tests/phase11_integration.php
 
       - name: Create CI application configuration
         run: |
@@ -270,6 +274,9 @@ jobs:
 
       - name: Run Phase 10 authenticated HTTP smoke suite
         run: bash tests/phase10_http_smoke.sh
+
+      - name: Run Phase 11 authenticated HTTP smoke suite
+        run: bash tests/phase11_http_smoke.sh
 
       - name: Show server log on failure
         if: failure()
