@@ -20,6 +20,13 @@ final class NotificationService
     use NotificationQueryTrait;
     use NotificationSupportTrait;
 
+    private const CATEGORIES = [
+        'task', 'inventory', 'prepared_food', 'forecast', 'garden',
+        'preservation', 'finance', 'nutrition', 'meal', 'system',
+    ];
+
+    private const PRIORITIES = ['low', 'medium', 'high', 'critical'];
+
     private const MODEL_VERSION = 'deterministic-v1';
 
     public function __construct(private PDO $pdo)
