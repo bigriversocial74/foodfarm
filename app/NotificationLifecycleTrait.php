@@ -36,9 +36,7 @@ trait NotificationLifecycleTrait
             if (!is_array($row)) {
                 throw new InvalidArgumentException('Notification was not found.');
             }
-            if ($row['recipient_member_id'] !== null && (int)$row['recipient_member_id'] !== $memberId) {
-                throw new InvalidArgumentException('This private notification belongs to another household member.');
-            }
+            $this->assertNotificationAccess($householdId, $memberId, $row);
 
             $from = (string)$row['status'];
             if ($from === $toStatus) {
@@ -109,9 +107,7 @@ trait NotificationLifecycleTrait
             if (!is_array($row)) {
                 throw new InvalidArgumentException('Notification was not found.');
             }
-            if ($row['recipient_member_id'] !== null && (int)$row['recipient_member_id'] !== $memberId) {
-                throw new InvalidArgumentException('This private notification belongs to another household member.');
-            }
+            $this->assertNotificationAccess($householdId, $memberId, $row);
             if ($row['related_task_id'] !== null) {
                 $this->pdo->commit();
                 return (int)$row['related_task_id'];
@@ -215,10 +211,19 @@ trait NotificationLifecycleTrait
                 return ['digest_id' => (int)$row['id'], 'item_count' => (int)$row['item_count'], 'reused' => true];
             }
 
+            $adultAccess = in_array(
+                $this->memberRole($householdId, $memberId),
+                ['owner', 'administrator', 'adult_member'],
+                true
+            ) ? 1 : 0;
             $items = $this->pdo->prepare(
                 "SELECT id FROM household_notifications
                  WHERE household_id = ?
-                   AND (recipient_member_id IS NULL OR recipient_member_id = ?)
+                   AND (
+                       visibility = 'household'
+                       OR (visibility = 'adults_only' AND ? = 1)
+                       OR (visibility = 'private' AND recipient_member_id = ?)
+                   )
                    AND status IN ('unread','acknowledged')
                    AND created_at >= ? AND created_at < ?
                  ORDER BY FIELD(priority, 'critical','high','medium','low'), due_at IS NULL, due_at, id
@@ -226,6 +231,7 @@ trait NotificationLifecycleTrait
             );
             $items->execute([
                 $householdId,
+                $adultAccess,
                 $memberId,
                 $periodStart->format('Y-m-d 00:00:00'),
                 $periodEnd->format('Y-m-d 00:00:00'),
