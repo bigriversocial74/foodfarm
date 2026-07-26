@@ -33,6 +33,8 @@ tests/phase11_integration.php
 tests/phase11_http_smoke.sh
 ```
 
+Certification covers PHP 8.1 and PHP 8.3, MySQL 8 and MariaDB 10.11, member-private calendar persistence, and visibility-aware notification delivery candidates.
+
 ## Delivery boundary
 
 The in-app inbox, permission-aware calendar, digests, and outbox persistence are implemented. Email and web-push providers are not integrated or dispatched by this phase.
