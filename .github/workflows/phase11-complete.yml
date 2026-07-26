@@ -36,7 +36,7 @@ jobs:
             cp /tmp/phase11-integration-output.txt PHASE11_INTEGRATION_ERROR.txt
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add PHASE11_INTEGRATION_ERROR.txt
+            git add -A
             git commit -m "Record Phase 11 integration diagnostic"
             git push origin HEAD:feature/phase11-alerts-calendar-notifications-20260725
             exit "$status"
@@ -44,20 +44,34 @@ jobs:
 
       - name: Validate final Phase 11 integration
         run: |
-          set -euo pipefail
-          find app -maxdepth 1 -type f -name 'Notification*.php' -print0 | xargs -0 -n1 php -l
-          php -l phase3.php
-          php -l dashboard.php
-          php -l phase11.php
-          php -l phase11-calendar.php
-          php -l api/phase11-health.php
-          php -l tests/phase11_static_audit.php
-          php -l tests/phase11_integration.php
-          php -l tests/database_integration_audit.php
-          php -l tests/application_static_audit.php
-          bash -n tests/phase11_http_smoke.sh
-          php tests/phase11_static_audit.php
-          php tests/application_static_audit.php
+          set +e
+          {
+            set -o pipefail
+            find app -maxdepth 1 -type f -name 'Notification*.php' -print0 | xargs -0 -n1 php -l
+            php -l phase3.php
+            php -l dashboard.php
+            php -l phase11.php
+            php -l phase11-calendar.php
+            php -l api/phase11-health.php
+            php -l tests/phase11_static_audit.php
+            php -l tests/phase11_integration.php
+            php -l tests/database_integration_audit.php
+            php -l tests/application_static_audit.php
+            bash -n tests/phase11_http_smoke.sh
+            php tests/phase11_static_audit.php
+            php tests/application_static_audit.php
+          } > /tmp/phase11-validation-output.txt 2>&1
+          status=$?
+          cat /tmp/phase11-validation-output.txt
+          if [ "$status" -ne 0 ]; then
+            cp /tmp/phase11-validation-output.txt PHASE11_VALIDATION_ERROR.txt
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -A
+            git commit -m "Stage Phase 11 integration with validation diagnostic"
+            git push origin HEAD:feature/phase11-alerts-calendar-notifications-20260725
+            exit "$status"
+          fi
 
       - name: Commit final Phase 11 integration
         run: |
