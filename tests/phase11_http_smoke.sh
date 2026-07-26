@@ -26,7 +26,7 @@ curl -fsS -L -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
 pass "owner login succeeds"
 
 page="$(curl -fsS -b "$COOKIE_JAR" "${BASE_URL}/phase11.php")" || fail "Phase 11 workspace unavailable"
-grep -q 'Alerts, Notifications &amp; Shared Calendar' <<<"$page" || fail "Phase 11 title missing"
+grep -Fq 'Alerts, Notifications & Shared Calendar' <<<"$page" || fail "Phase 11 title missing"
 grep -q 'In-app first, adapter-ready outside the app' <<<"$page" || fail "Phase 11 delivery boundary missing"
 csrf="$(extract_value csrf_token "$page")"
 action_key="$(extract_value action_key "$page")"
