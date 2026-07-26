@@ -33,7 +33,7 @@ tests/phase11_integration.php
 tests/phase11_http_smoke.sh
 ```
 
-Certification covers PHP 8.1 and PHP 8.3, MySQL 8 and MariaDB 10.11, member-private calendar persistence, and visibility-aware notification delivery candidates.
+Certification covers PHP 8.1 and PHP 8.3, MySQL 8 and MariaDB 10.11, member-private calendar persistence, visibility-aware notification delivery candidates, and complete-source integrity checks.
 
 ## Delivery boundary
 
