@@ -11,6 +11,11 @@ trait NotificationQueryTrait
         $this->assertActiveMember($householdId, $memberId);
         $settings = $this->settings($householdId);
         $preference = $this->memberPreference($householdId, $memberId);
+        $adultAccess = in_array(
+            $this->memberRole($householdId, $memberId),
+            ['owner', 'administrator', 'adult_member'],
+            true
+        ) ? 1 : 0;
 
         $members = $this->pdo->prepare(
             "SELECT hm.id, hm.display_name, hm.role, hm.age_group,
@@ -32,7 +37,11 @@ trait NotificationQueryTrait
              LEFT JOIN household_members hm
                ON hm.id = hn.recipient_member_id AND hm.household_id = hn.household_id
              WHERE hn.household_id = ?
-               AND (hn.recipient_member_id IS NULL OR hn.recipient_member_id = ?)
+               AND (
+                   hn.visibility = 'household'
+                   OR (hn.visibility = 'adults_only' AND ? = 1)
+                   OR (hn.visibility = 'private' AND hn.recipient_member_id = ?)
+               )
                AND hn.status <> 'expired'
              ORDER BY
                FIELD(hn.status,'unread','acknowledged','completed','dismissed'),
@@ -40,17 +49,22 @@ trait NotificationQueryTrait
                hn.due_at IS NULL, hn.due_at, hn.id DESC
              LIMIT 120"
         );
-        $notifications->execute([$householdId, $memberId]);
+        $notifications->execute([$householdId, $adultAccess, $memberId]);
 
         $calendar = $this->pdo->prepare(
             "SELECT hce.*
              FROM household_calendar_events hce
              WHERE hce.household_id = ? AND hce.status = 'scheduled'
+               AND (
+                   hce.visibility = 'household'
+                   OR (hce.visibility = 'adults_only' AND ? = 1)
+                   OR (hce.visibility = 'private' AND hce.recipient_member_id = ?)
+               )
                AND hce.starts_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 DAY)
              ORDER BY hce.starts_at, hce.id
              LIMIT 120"
         );
-        $calendar->execute([$householdId]);
+        $calendar->execute([$householdId, $adultAccess, $memberId]);
 
         $runs = $this->pdo->prepare(
             'SELECT * FROM notification_sync_runs
@@ -77,10 +91,14 @@ trait NotificationQueryTrait
                 SUM(related_task_id IS NOT NULL) AS task_link_count
              FROM household_notifications
              WHERE household_id = ?
-               AND (recipient_member_id IS NULL OR recipient_member_id = ?)
+               AND (
+                   visibility = 'household'
+                   OR (visibility = 'adults_only' AND ? = 1)
+                   OR (visibility = 'private' AND recipient_member_id = ?)
+               )
                AND status <> 'expired'"
         );
-        $countsStatement->execute([$householdId, $memberId]);
+        $countsStatement->execute([$householdId, $adultAccess, $memberId]);
         $counts = $countsStatement->fetch() ?: [
             'unread_count' => 0,
             'acknowledged_count' => 0,
@@ -117,6 +135,11 @@ trait NotificationQueryTrait
         $this->assertActiveMember($householdId, $memberId);
         $start = $this->date($startsOn, 'Calendar start');
         $end = $this->date($endsOn, 'Calendar end');
+        $adultAccess = in_array(
+            $this->memberRole($householdId, $memberId),
+            ['owner', 'administrator', 'adult_member'],
+            true
+        ) ? 1 : 0;
         if ($end < $start || $end->diff($start)->days > 366) {
             throw new \InvalidArgumentException('Calendar export window is invalid.');
         }
@@ -124,11 +147,18 @@ trait NotificationQueryTrait
             "SELECT hce.*
              FROM household_calendar_events hce
              WHERE hce.household_id = ? AND hce.status = 'scheduled'
+               AND (
+                   hce.visibility = 'household'
+                   OR (hce.visibility = 'adults_only' AND ? = 1)
+                   OR (hce.visibility = 'private' AND hce.recipient_member_id = ?)
+               )
                AND hce.starts_at >= ? AND hce.starts_at < ?
              ORDER BY hce.starts_at, hce.id"
         );
         $statement->execute([
             $householdId,
+            $adultAccess,
+            $memberId,
             $start->format('Y-m-d 00:00:00'),
             $end->modify('+1 day')->format('Y-m-d 00:00:00'),
         ]);
