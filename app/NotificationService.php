@@ -8,6 +8,7 @@ use PDO;
 
 require_once __DIR__ . '/NotificationSettingsTrait.php';
 require_once __DIR__ . '/NotificationSyncTrait.php';
+require_once __DIR__ . '/NotificationPrivacyTrait.php';
 require_once __DIR__ . '/NotificationLifecycleTrait.php';
 require_once __DIR__ . '/NotificationQueryTrait.php';
 require_once __DIR__ . '/NotificationSupportTrait.php';
@@ -15,7 +16,10 @@ require_once __DIR__ . '/NotificationSupportTrait.php';
 final class NotificationService
 {
     use NotificationSettingsTrait;
-    use NotificationSyncTrait;
+    use NotificationSyncTrait, NotificationPrivacyTrait {
+        NotificationPrivacyTrait::upsertCalendarEvent insteadof NotificationSyncTrait;
+        NotificationPrivacyTrait::queueDeliveryCandidates insteadof NotificationSyncTrait;
+    }
     use NotificationLifecycleTrait;
     use NotificationQueryTrait;
     use NotificationSupportTrait;
