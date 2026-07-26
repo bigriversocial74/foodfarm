@@ -1,0 +1,37 @@
+name: Build Homestead Deploy ZIP
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build exact merged-main deployment archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          git archive \
+            --format=zip \
+            --output=dist/homestead-deploy-d7f25eaf.zip \
+            d7f25eaf7a1ba96e5181b7ca212e6515330c3f75
+          unzip -t dist/homestead-deploy-d7f25eaf.zip
+          sha256sum dist/homestead-deploy-d7f25eaf.zip
+          unzip -Z1 dist/homestead-deploy-d7f25eaf.zip | head -50
+
+      - name: Upload deployment archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: homestead-deploy-d7f25eaf
+          path: dist/homestead-deploy-d7f25eaf.zip
+          if-no-files-found: error
+          retention-days: 7
