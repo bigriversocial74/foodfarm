@@ -1,0 +1,21 @@
+name: Phase 11 Source Artifact
+
+on:
+  pull_request:
+    types: [synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    if: github.head_ref == 'feature/phase11-alerts-calendar-notifications-20260725'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: phase11-notification-sync-source
+          path: app/NotificationSyncTrait.php
+          if-no-files-found: error
+          retention-days: 1
