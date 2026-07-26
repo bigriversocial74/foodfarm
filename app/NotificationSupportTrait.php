@@ -12,13 +12,6 @@ use RuntimeException;
 
 trait NotificationSupportTrait
 {
-    private const CATEGORIES = [
-        'task', 'inventory', 'prepared_food', 'forecast', 'garden',
-        'preservation', 'finance', 'nutrition', 'meal', 'system',
-    ];
-
-    private const PRIORITIES = ['low', 'medium', 'high', 'critical'];
-
     private function assertActiveMember(int $householdId, int $memberId): void
     {
         if ($householdId < 1 || $memberId < 1) {
