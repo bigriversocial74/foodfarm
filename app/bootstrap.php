@@ -72,6 +72,63 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
 
 $requestPath = (string)(parse_url((string)($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH) ?? '');
 $routeName = basename($requestPath);
+
+$uiRouteClasses = [
+    'dashboard.php' => 'ui-dashboard',
+    'phase2.php' => 'ui-household',
+    'phase4.php' => 'ui-recipes',
+    'phase6.php' => 'ui-grow',
+    'prepared-food.php' => 'ui-preserve',
+];
+$uiPageClass = $uiRouteClasses[$routeName] ?? null;
+if ($uiPageClass !== null) {
+    $sectionClass = '';
+    if ($routeName === 'phase2.php') {
+        $section = (string)($_GET['section'] ?? 'family');
+        if (in_array($section, ['family', 'storage', 'inventory', 'ledger'], true)) {
+            $sectionClass = ' ui-household-' . $section;
+        }
+    } elseif ($routeName === 'phase6.php') {
+        $section = (string)($_GET['section'] ?? 'garden');
+        if (in_array($section, ['garden', 'harvests', 'preservation'], true)) {
+            $sectionClass = ' ui-grow-' . $section;
+        }
+    }
+    $uiPageClass .= $sectionClass;
+
+    ob_start(static function (string $html) use ($uiPageClass): string {
+        if (!str_contains(strtolower($html), '<!doctype html')) {
+            return $html;
+        }
+
+        if (!str_contains($html, '/assets/css/core-pages.css')) {
+            $html = str_ireplace(
+                '</head>',
+                '<link rel="stylesheet" href="/assets/css/core-pages.css?v=20260726"></head>',
+                $html
+            );
+        }
+
+        $safeClass = htmlspecialchars($uiPageClass, ENT_QUOTES, 'UTF-8');
+        return (string)preg_replace_callback(
+            '/<body\b([^>]*)>/i',
+            static function (array $matches) use ($safeClass): string {
+                $attributes = $matches[1];
+                if (preg_match('/\bclass\s*=\s*(["\'])(.*?)\1/i', $attributes, $classMatch)) {
+                    $updatedClass = trim($classMatch[2] . ' ' . $safeClass);
+                    $updatedAttribute = 'class=' . $classMatch[1] . $updatedClass . $classMatch[1];
+                    $attributes = (string)preg_replace('/\bclass\s*=\s*(["\'])(.*?)\1/i', $updatedAttribute, $attributes, 1);
+                    return '<body' . $attributes . '>';
+                }
+
+                return '<body' . $attributes . ' class="' . $safeClass . '">';
+            },
+            $html,
+            1
+        );
+    });
+}
+
 $isFoodWorkflowRoute = in_array($routeName, ['phase4.php', 'prepared-food.php'], true);
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && $isFoodWorkflowRoute) {
     $_SESSION['recipe_action_key'] = bin2hex(random_bytes(32));
