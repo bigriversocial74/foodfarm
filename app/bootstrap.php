@@ -44,8 +44,33 @@ if ($environment === 'production') {
     }
 }
 
+$appRoot = str_replace('\\', '/', (string)(realpath(dirname(__DIR__)) ?: dirname(__DIR__)));
+$scriptFilename = str_replace('\\', '/', (string)(realpath((string)($_SERVER['SCRIPT_FILENAME'] ?? '')) ?: ($_SERVER['SCRIPT_FILENAME'] ?? '')));
+$scriptName = str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? ''));
+$basePath = '';
+if ($scriptFilename !== '' && str_starts_with($scriptFilename, $appRoot)) {
+    $relativeScript = substr($scriptFilename, strlen($appRoot));
+    if ($relativeScript !== '' && str_ends_with($scriptName, $relativeScript)) {
+        $basePath = substr($scriptName, 0, -strlen($relativeScript));
+    }
+}
+if ($basePath === '') {
+    $configuredPath = parse_url((string)($config['app']['base_url'] ?? ''), PHP_URL_PATH);
+    if (is_string($configuredPath)) {
+        $basePath = $configuredPath;
+    }
+}
+$basePath = '/' . trim($basePath, '/');
+if ($basePath === '/') {
+    $basePath = '';
+}
+define('HOMESTEAD_BASE_PATH', $basePath);
+
 require_once __DIR__ . '/Support.php';
 Homestead\apply_security_headers($environment === 'production');
+if (PHP_SAPI !== 'cli') {
+    ob_start(static fn(string $content): string => Homestead\rewrite_app_urls($content));
+}
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
     ini_set('session.use_strict_mode', '1');
@@ -65,7 +90,7 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
         'httponly' => true,
         'secure' => $environment === 'production' || (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
         'samesite' => 'Lax',
-        'path' => '/',
+        'path' => $basePath !== '' ? $basePath . '/' : '/',
     ]);
     session_start();
 }
