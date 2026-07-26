@@ -24,10 +24,23 @@ jobs:
 
       - name: Apply Phase 11 final source and test payloads
         run: |
-          set -euo pipefail
-          python3 scripts/phase11_payload_core.py
-          python3 scripts/phase11_payload_tests.py
-          python3 scripts/phase11_integrate.py
+          set +e
+          {
+            python3 scripts/phase11_payload_core.py
+            python3 scripts/phase11_payload_tests.py
+            python3 scripts/phase11_integrate.py
+          } > /tmp/phase11-integration-output.txt 2>&1
+          status=$?
+          cat /tmp/phase11-integration-output.txt
+          if [ "$status" -ne 0 ]; then
+            cp /tmp/phase11-integration-output.txt PHASE11_INTEGRATION_ERROR.txt
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add PHASE11_INTEGRATION_ERROR.txt
+            git commit -m "Record Phase 11 integration diagnostic"
+            git push origin HEAD:feature/phase11-alerts-calendar-notifications-20260725
+            exit "$status"
+          fi
 
       - name: Validate final Phase 11 integration
         run: |
