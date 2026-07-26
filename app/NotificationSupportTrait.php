@@ -141,7 +141,59 @@ trait NotificationSupportTrait
 
     private function priorityRank(string $priority): int
     {
-        return array_search($priority, self::PRIORITIES, true) ?: 0;
+        $rank = array_search($priority, self::PRIORITIES, true);
+        return $rank === false ? 0 : $rank;
+    }
+
+    private function memberRole(int $householdId, int $memberId): string
+    {
+        $statement = $this->pdo->prepare(
+            "SELECT role FROM household_members
+             WHERE id = ? AND household_id = ? AND status = 'active'"
+        );
+        $statement->execute([$memberId, $householdId]);
+        $role = $statement->fetchColumn();
+        if (!is_string($role) || $role === '') {
+            throw new InvalidArgumentException('The household member is unavailable.');
+        }
+        return $role;
+    }
+
+    private function canAccessVisibility(
+        int $householdId,
+        int $memberId,
+        string $visibility,
+        ?int $recipientMemberId
+    ): bool {
+        if ($visibility === 'household') {
+            return true;
+        }
+        if ($visibility === 'private') {
+            return $recipientMemberId !== null && $recipientMemberId === $memberId;
+        }
+        if ($visibility === 'adults_only') {
+            return in_array(
+                $this->memberRole($householdId, $memberId),
+                ['owner', 'administrator', 'adult_member'],
+                true
+            );
+        }
+        return false;
+    }
+
+    private function assertNotificationAccess(int $householdId, int $memberId, array $notification): void
+    {
+        $recipientId = $notification['recipient_member_id'] !== null
+            ? (int)$notification['recipient_member_id']
+            : null;
+        if (!$this->canAccessVisibility(
+            $householdId,
+            $memberId,
+            (string)$notification['visibility'],
+            $recipientId
+        )) {
+            throw new InvalidArgumentException('This notification is not visible to the household member.');
+        }
     }
 
     private function sourceWatermark(int $householdId): string
@@ -167,6 +219,10 @@ trait NotificationSupportTrait
             'plantings' => "SELECT COUNT(*), COALESCE(MAX(p.id),0), COALESCE(MAX(p.expected_harvest_start),'1970-01-01')
                 FROM plantings p JOIN garden_zones gz ON gz.id = p.garden_zone_id
                 WHERE gz.household_id = ?",
+            'notification_settings' => "SELECT COUNT(*), 0, COALESCE(MAX(updated_at),'1970-01-01')
+                FROM household_notification_settings WHERE household_id = ?",
+            'notification_preferences' => "SELECT COUNT(*), COALESCE(MAX(household_member_id),0), COALESCE(MAX(updated_at),'1970-01-01')
+                FROM member_notification_preferences WHERE household_id = ?",
         ];
         $parts = [];
         foreach ($queries as $name => $sql) {
