@@ -22,16 +22,55 @@ jobs:
           ref: feature/phase11-alerts-calendar-notifications-20260725
           fetch-depth: 0
 
-      - name: Apply deterministic repair
+      - name: Apply deterministic Phase 11 repairs
         run: |
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
 
-          path = Path('app/NotificationSyncTrait.php')
-          text = path.read_text()
+          def replace_once(path: str, old: str, new: str) -> None:
+              target = Path(path)
+              text = target.read_text()
+              if new in text:
+                  return
+              if old not in text:
+                  raise SystemExit(f'Missing expected marker in {path}: {old!r}')
+              target.write_text(text.replace(old, new, 1))
 
-          replacements = [
+          # PHP 8.1 does not support constants declared in traits. Move the
+          # shared notification constants onto the consuming service class.
+          support = Path('app/NotificationSupportTrait.php')
+          support_text = support.read_text()
+          constant_block = """    private const CATEGORIES = [
+        'task', 'inventory', 'prepared_food', 'forecast', 'garden',
+        'preservation', 'finance', 'nutrition', 'meal', 'system',
+    ];
+
+    private const PRIORITIES = ['low', 'medium', 'high', 'critical'];
+
+"""
+          if constant_block in support_text:
+              support.write_text(support_text.replace(constant_block, '', 1))
+
+          service = Path('app/NotificationService.php')
+          service_text = service.read_text()
+          service_constants = """    private const CATEGORIES = [
+        'task', 'inventory', 'prepared_food', 'forecast', 'garden',
+        'preservation', 'finance', 'nutrition', 'meal', 'system',
+    ];
+
+    private const PRIORITIES = ['low', 'medium', 'high', 'critical'];
+
+"""
+          marker = "    private const MODEL_VERSION = 'deterministic-v1';\n"
+          if service_constants not in service_text:
+              if marker not in service_text:
+                  raise SystemExit('NotificationService constant marker missing')
+              service.write_text(service_text.replace(marker, service_constants + marker, 1))
+
+          sync = Path('app/NotificationSyncTrait.php')
+          text = sync.read_text()
+          event_replacements = [
               ("                    'event_seed' => 'task|' . (int)$task['id'],\n", "                    'event_seed' => 'task|' . (int)$task['id'],\n                    'recipient_member_id' => $recipientId,\n"),
               ("                    'event_seed' => 'prepared-use-by|' . (int)$batch['id'],\n", "                    'event_seed' => 'prepared-use-by|' . (int)$batch['id'],\n                    'recipient_member_id' => null,\n"),
               ("                        'event_seed' => 'forecast-shortage|' . (int)$projection['inventory_item_id'],\n", "                        'event_seed' => 'forecast-shortage|' . (int)$projection['inventory_item_id'],\n                        'recipient_member_id' => null,\n"),
@@ -39,14 +78,14 @@ jobs:
               ("                    'event_seed' => 'meal|' . (int)$meal['id'],\n", "                    'event_seed' => 'meal|' . (int)$meal['id'],\n                    'recipient_member_id' => null,\n"),
               ("                    'event_seed' => 'harvest-window|' . (int)$planting['id'],\n", "                    'event_seed' => 'harvest-window|' . (int)$planting['id'],\n                    'recipient_member_id' => null,\n"),
           ]
-          for old, new in replacements:
+          for old, new in event_replacements:
               if new in text:
                   continue
               if old not in text:
-                  raise SystemExit(f'Missing event marker: {old!r}')
+                  raise SystemExit(f'Missing calendar event marker: {old!r}')
               text = text.replace(old, new, 1)
 
-          old = """        $statement = $this->pdo->prepare(
+          old_insert = """        $statement = $this->pdo->prepare(
             'INSERT INTO household_calendar_events
              (household_id, notification_id, source_type, source_id, event_key, title, description,
               starts_at, ends_at, all_day, visibility, status, created_by_member_id)
@@ -54,7 +93,7 @@ jobs:
              ON DUPLICATE KEY UPDATE
                 notification_id = VALUES(notification_id),
 """
-          new = """        $recipientId = $data['recipient_member_id'] !== null
+          new_insert = """        $recipientId = $data['recipient_member_id'] !== null
             ? (int)$data['recipient_member_id']
             : null;
         if ($recipientId !== null) {
@@ -70,31 +109,31 @@ jobs:
                 notification_id = VALUES(notification_id),
                 recipient_member_id = VALUES(recipient_member_id),
 """
-          if new not in text:
-              if old not in text:
+          if new_insert not in text:
+              if old_insert not in text:
                   raise SystemExit('Calendar insert marker missing')
-              text = text.replace(old, new, 1)
+              text = text.replace(old_insert, new_insert, 1)
 
-          old = """        $statement->execute([
+          old_execute = """        $statement->execute([
             $householdId,
             $notificationId,
             $this->text($data['source_type'], 80, 'Calendar source type'),
 """
-          new = """        $statement->execute([
+          new_execute = """        $statement->execute([
             $householdId,
             $notificationId,
             $recipientId,
             $this->text($data['source_type'], 80, 'Calendar source type'),
 """
-          if new not in text:
-              if old not in text:
+          if new_execute not in text:
+              if old_execute not in text:
                   raise SystemExit('Calendar execute marker missing')
-              text = text.replace(old, new, 1)
+              text = text.replace(old_execute, new_execute, 1)
 
-          old = """        foreach ($memberIds as $recipientId) {
+          old_outbox = """        foreach ($memberIds as $recipientId) {
             $preference = $this->memberPreference($householdId, $recipientId);
 """
-          new = """        foreach ($memberIds as $recipientId) {
+          new_outbox = """        foreach ($memberIds as $recipientId) {
             $notificationRecipientId = $notification['recipient_member_id'] !== null
                 ? (int)$notification['recipient_member_id']
                 : null;
@@ -108,12 +147,12 @@ jobs:
             }
             $preference = $this->memberPreference($householdId, $recipientId);
 """
-          if new not in text:
-              if old not in text:
+          if new_outbox not in text:
+              if old_outbox not in text:
                   raise SystemExit('Outbox visibility marker missing')
-              text = text.replace(old, new, 1)
+              text = text.replace(old_outbox, new_outbox, 1)
 
-          path.write_text(text)
+          sync.write_text(text)
 
           for temporary in [
               '.github/workflows/phase11-repair-runner.yml',
@@ -128,14 +167,16 @@ jobs:
       - name: Validate repaired source
         run: |
           set -euo pipefail
+          php -l app/NotificationService.php
+          php -l app/NotificationSupportTrait.php
           php -l app/NotificationSyncTrait.php
           php tests/phase11_static_audit.php
           php tests/application_static_audit.php
 
-      - name: Commit repair
+      - name: Commit repairs
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "Fix Phase 11 private calendar and delivery visibility"
+          git commit -m "Fix Phase 11 PHP 8.1 and private calendar integration"
           git push origin HEAD:feature/phase11-alerts-calendar-notifications-20260725
