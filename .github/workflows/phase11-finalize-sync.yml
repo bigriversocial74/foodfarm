@@ -1,0 +1,466 @@
+name: Phase 11 Finalize Sync
+
+on:
+  push:
+    branches:
+      - feature/phase11-alerts-calendar-notifications-20260725
+
+permissions:
+  contents: write
+
+concurrency:
+  group: phase11-finalize-sync
+  cancel-in-progress: false
+
+jobs:
+  finalize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/phase11-alerts-calendar-notifications-20260725
+          fetch-depth: 0
+
+      - name: Apply Phase 11 privacy and application integration
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              if old not in text:
+                  raise SystemExit(f"Expected text not found in {path}: {old[:100]!r}")
+              p.write_text(text.replace(old, new, 1))
+
+          def replace_all(path, old, new, expected=None):
+              p = Path(path)
+              text = p.read_text()
+              count = text.count(old)
+              if count == 0 or (expected is not None and count != expected):
+                  raise SystemExit(f"Unexpected replacement count {count} in {path}: {old[:100]!r}")
+              p.write_text(text.replace(old, new))
+
+          replace_once(
+              'app/NotificationSupportTrait.php',
+              "    private function priorityRank(string $priority): int\n    {\n        return array_search($priority, self::PRIORITIES, true) ?: 0;\n    }\n",
+              """    private function priorityRank(string $priority): int
+    {
+        $rank = array_search($priority, self::PRIORITIES, true);
+        return $rank === false ? 0 : $rank;
+    }
+
+    private function memberRole(int $householdId, int $memberId): string
+    {
+        $statement = $this->pdo->prepare(
+            \"SELECT role FROM household_members
+             WHERE id = ? AND household_id = ? AND status = 'active'\"
+        );
+        $statement->execute([$memberId, $householdId]);
+        $role = $statement->fetchColumn();
+        if (!is_string($role) || $role === '') {
+            throw new InvalidArgumentException('The household member is unavailable.');
+        }
+        return $role;
+    }
+
+    private function canAccessVisibility(
+        int $householdId,
+        int $memberId,
+        string $visibility,
+        ?int $recipientMemberId
+    ): bool {
+        if ($visibility === 'household') {
+            return true;
+        }
+        if ($visibility === 'private') {
+            return $recipientMemberId !== null && $recipientMemberId === $memberId;
+        }
+        if ($visibility === 'adults_only') {
+            return in_array(
+                $this->memberRole($householdId, $memberId),
+                ['owner', 'administrator', 'adult_member'],
+                true
+            );
+        }
+        return false;
+    }
+
+    private function assertNotificationAccess(int $householdId, int $memberId, array $notification): void
+    {
+        $recipientId = $notification['recipient_member_id'] !== null
+            ? (int)$notification['recipient_member_id']
+            : null;
+        if (!$this->canAccessVisibility(
+            $householdId,
+            $memberId,
+            (string)$notification['visibility'],
+            $recipientId
+        )) {
+            throw new InvalidArgumentException('This notification is not visible to the household member.');
+        }
+    }
+"""
+          )
+          replace_once(
+              'app/NotificationSupportTrait.php',
+              """            'plantings' => \"SELECT COUNT(*), COALESCE(MAX(p.id),0), COALESCE(MAX(p.expected_harvest_start),'1970-01-01')
+                FROM plantings p JOIN garden_zones gz ON gz.id = p.garden_zone_id
+                WHERE gz.household_id = ?\",
+""",
+              """            'plantings' => \"SELECT COUNT(*), COALESCE(MAX(p.id),0), COALESCE(MAX(p.expected_harvest_start),'1970-01-01')
+                FROM plantings p JOIN garden_zones gz ON gz.id = p.garden_zone_id
+                WHERE gz.household_id = ?\",
+            'notification_settings' => \"SELECT COUNT(*), 0, COALESCE(MAX(updated_at),'1970-01-01')
+                FROM household_notification_settings WHERE household_id = ?\",
+            'notification_preferences' => \"SELECT COUNT(*), COALESCE(MAX(household_member_id),0), COALESCE(MAX(updated_at),'1970-01-01')
+                FROM member_notification_preferences WHERE household_id = ?\",
+"""
+          )
+
+          replace_all(
+              'app/NotificationLifecycleTrait.php',
+              """            if ($row['recipient_member_id'] !== null && (int)$row['recipient_member_id'] !== $memberId) {
+                throw new InvalidArgumentException('This private notification belongs to another household member.');
+            }
+""",
+              "            $this->assertNotificationAccess($householdId, $memberId, $row);\n",
+              expected=2,
+          )
+          replace_once(
+              'app/NotificationLifecycleTrait.php',
+              """            $items = $this->pdo->prepare(
+                \"SELECT id FROM household_notifications
+                 WHERE household_id = ?
+                   AND (recipient_member_id IS NULL OR recipient_member_id = ?)
+                   AND status IN ('unread','acknowledged')
+                   AND created_at >= ? AND created_at < ?
+                 ORDER BY FIELD(priority, 'critical','high','medium','low'), due_at IS NULL, due_at, id
+                 LIMIT 200\"
+            );
+            $items->execute([
+                $householdId,
+                $memberId,
+                $periodStart->format('Y-m-d 00:00:00'),
+                $periodEnd->format('Y-m-d 00:00:00'),
+            ]);
+""",
+              """            $adultAccess = in_array(
+                $this->memberRole($householdId, $memberId),
+                ['owner', 'administrator', 'adult_member'],
+                true
+            ) ? 1 : 0;
+            $items = $this->pdo->prepare(
+                \"SELECT id FROM household_notifications
+                 WHERE household_id = ?
+                   AND (
+                       visibility = 'household'
+                       OR (visibility = 'adults_only' AND ? = 1)
+                       OR (visibility = 'private' AND recipient_member_id = ?)
+                   )
+                   AND status IN ('unread','acknowledged')
+                   AND created_at >= ? AND created_at < ?
+                 ORDER BY FIELD(priority, 'critical','high','medium','low'), due_at IS NULL, due_at, id
+                 LIMIT 200\"
+            );
+            $items->execute([
+                $householdId,
+                $adultAccess,
+                $memberId,
+                $periodStart->format('Y-m-d 00:00:00'),
+                $periodEnd->format('Y-m-d 00:00:00'),
+            ]);
+"""
+          )
+
+          replace_once(
+              'app/NotificationQueryTrait.php',
+              "        $settings = $this->settings($householdId);\n        $preference = $this->memberPreference($householdId, $memberId);\n",
+              """        $settings = $this->settings($householdId);
+        $preference = $this->memberPreference($householdId, $memberId);
+        $adultAccess = in_array(
+            $this->memberRole($householdId, $memberId),
+            ['owner', 'administrator', 'adult_member'],
+            true
+        ) ? 1 : 0;
+"""
+          )
+          replace_once(
+              'app/NotificationQueryTrait.php',
+              """             WHERE hn.household_id = ?
+               AND (hn.recipient_member_id IS NULL OR hn.recipient_member_id = ?)
+               AND hn.status <> 'expired'
+""",
+              """             WHERE hn.household_id = ?
+               AND (
+                   hn.visibility = 'household'
+                   OR (hn.visibility = 'adults_only' AND ? = 1)
+                   OR (hn.visibility = 'private' AND hn.recipient_member_id = ?)
+               )
+               AND hn.status <> 'expired'
+"""
+          )
+          replace_once('app/NotificationQueryTrait.php', '$notifications->execute([$householdId, $memberId]);', '$notifications->execute([$householdId, $adultAccess, $memberId]);')
+          replace_once(
+              'app/NotificationQueryTrait.php',
+              """             WHERE hce.household_id = ? AND hce.status = 'scheduled'
+               AND hce.starts_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 DAY)
+""",
+              """             WHERE hce.household_id = ? AND hce.status = 'scheduled'
+               AND (
+                   hce.visibility = 'household'
+                   OR (hce.visibility = 'adults_only' AND ? = 1)
+                   OR (hce.visibility = 'private' AND hce.recipient_member_id = ?)
+               )
+               AND hce.starts_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 DAY)
+"""
+          )
+          replace_once('app/NotificationQueryTrait.php', '$calendar->execute([$householdId]);', '$calendar->execute([$householdId, $adultAccess, $memberId]);')
+          replace_once(
+              'app/NotificationQueryTrait.php',
+              """             WHERE household_id = ?
+               AND (recipient_member_id IS NULL OR recipient_member_id = ?)
+               AND status <> 'expired'\"
+""",
+              """             WHERE household_id = ?
+               AND (
+                   visibility = 'household'
+                   OR (visibility = 'adults_only' AND ? = 1)
+                   OR (visibility = 'private' AND recipient_member_id = ?)
+               )
+               AND status <> 'expired'\"
+"""
+          )
+          replace_once('app/NotificationQueryTrait.php', '$countsStatement->execute([$householdId, $memberId]);', '$countsStatement->execute([$householdId, $adultAccess, $memberId]);')
+          replace_once(
+              'app/NotificationQueryTrait.php',
+              "        $start = $this->date($startsOn, 'Calendar start');\n        $end = $this->date($endsOn, 'Calendar end');\n",
+              """        $start = $this->date($startsOn, 'Calendar start');
+        $end = $this->date($endsOn, 'Calendar end');
+        $adultAccess = in_array(
+            $this->memberRole($householdId, $memberId),
+            ['owner', 'administrator', 'adult_member'],
+            true
+        ) ? 1 : 0;
+"""
+          )
+          replace_once(
+              'app/NotificationQueryTrait.php',
+              """             WHERE hce.household_id = ? AND hce.status = 'scheduled'
+               AND hce.starts_at >= ? AND hce.starts_at < ?
+""",
+              """             WHERE hce.household_id = ? AND hce.status = 'scheduled'
+               AND (
+                   hce.visibility = 'household'
+                   OR (hce.visibility = 'adults_only' AND ? = 1)
+                   OR (hce.visibility = 'private' AND hce.recipient_member_id = ?)
+               )
+               AND hce.starts_at >= ? AND hce.starts_at < ?
+"""
+          )
+          replace_once(
+              'app/NotificationQueryTrait.php',
+              """        $statement->execute([
+            $householdId,
+            $start->format('Y-m-d 00:00:00'),
+            $end->modify('+1 day')->format('Y-m-d 00:00:00'),
+        ]);
+""",
+              """        $statement->execute([
+            $householdId,
+            $adultAccess,
+            $memberId,
+            $start->format('Y-m-d 00:00:00'),
+            $end->modify('+1 day')->format('Y-m-d 00:00:00'),
+        ]);
+"""
+          )
+
+          sync = Path('app/NotificationSyncTrait.php')
+          text = sync.read_text()
+          replacements = [
+              ("                    'event_seed' => 'task|' . (int)$task['id'],\n", "                    'event_seed' => 'task|' . (int)$task['id'],\n                    'recipient_member_id' => $recipientId,\n"),
+              ("                    'event_seed' => 'prepared-use-by|' . (int)$batch['id'],\n", "                    'event_seed' => 'prepared-use-by|' . (int)$batch['id'],\n                    'recipient_member_id' => null,\n"),
+              ("                        'event_seed' => 'forecast-shortage|' . (int)$projection['inventory_item_id'],\n", "                        'event_seed' => 'forecast-shortage|' . (int)$projection['inventory_item_id'],\n                        'recipient_member_id' => null,\n"),
+              ("                    'event_seed' => 'seasonal|' . (int)$entry['id'],\n", "                    'event_seed' => 'seasonal|' . (int)$entry['id'],\n                    'recipient_member_id' => $recipientId,\n"),
+              ("                    'event_seed' => 'meal|' . (int)$meal['id'],\n", "                    'event_seed' => 'meal|' . (int)$meal['id'],\n                    'recipient_member_id' => null,\n"),
+              ("                    'event_seed' => 'harvest-window|' . (int)$planting['id'],\n", "                    'event_seed' => 'harvest-window|' . (int)$planting['id'],\n                    'recipient_member_id' => null,\n"),
+          ]
+          for old, new in replacements:
+              if old not in text:
+                  raise SystemExit(f'Missing sync event marker: {old!r}')
+              text = text.replace(old, new, 1)
+          old = """        $statement = $this->pdo->prepare(
+            'INSERT INTO household_calendar_events
+             (household_id, notification_id, source_type, source_id, event_key, title, description,
+              starts_at, ends_at, all_day, visibility, status, created_by_member_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, \"scheduled\", ?)
+             ON DUPLICATE KEY UPDATE
+                notification_id = VALUES(notification_id),
+"""
+          new = """        $recipientId = $data['recipient_member_id'] !== null
+            ? (int)$data['recipient_member_id']
+            : null;
+        if ($recipientId !== null) {
+            $this->assertHouseholdMember($householdId, $recipientId);
+        }
+        $statement = $this->pdo->prepare(
+            'INSERT INTO household_calendar_events
+             (household_id, notification_id, recipient_member_id, source_type, source_id,
+              event_key, title, description, starts_at, ends_at, all_day, visibility,
+              status, created_by_member_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, \"scheduled\", ?)
+             ON DUPLICATE KEY UPDATE
+                notification_id = VALUES(notification_id),
+                recipient_member_id = VALUES(recipient_member_id),
+"""
+          if old not in text: raise SystemExit('Missing calendar insert block')
+          text = text.replace(old, new, 1)
+          old = """        $statement->execute([
+            $householdId,
+            $notificationId,
+            $this->text($data['source_type'], 80, 'Calendar source type'),
+"""
+          new = """        $statement->execute([
+            $householdId,
+            $notificationId,
+            $recipientId,
+            $this->text($data['source_type'], 80, 'Calendar source type'),
+"""
+          if old not in text: raise SystemExit('Missing calendar execute block')
+          text = text.replace(old, new, 1)
+          old = """        foreach ($memberIds as $recipientId) {
+            $preference = $this->memberPreference($householdId, $recipientId);
+"""
+          new = """        foreach ($memberIds as $recipientId) {
+            $notificationRecipientId = $notification['recipient_member_id'] !== null
+                ? (int)$notification['recipient_member_id']
+                : null;
+            if (!$this->canAccessVisibility(
+                $householdId,
+                $recipientId,
+                (string)$notification['visibility'],
+                $notificationRecipientId
+            )) {
+                continue;
+            }
+            $preference = $this->memberPreference($householdId, $recipientId);
+"""
+          if old not in text: raise SystemExit('Missing outbox loop block')
+          sync.write_text(text.replace(old, new, 1))
+
+          replace_once('database/phase11_alerts_calendar_notifications.sql', '    notification_id BIGINT UNSIGNED NULL,\n    source_type VARCHAR(80) NOT NULL,\n', '    notification_id BIGINT UNSIGNED NULL,\n    recipient_member_id BIGINT UNSIGNED NULL,\n    source_type VARCHAR(80) NOT NULL,\n')
+          replace_once('database/phase11_alerts_calendar_notifications.sql', '    CONSTRAINT fk_household_calendar_notification FOREIGN KEY (notification_id) REFERENCES household_notifications(id) ON DELETE SET NULL,\n    CONSTRAINT fk_household_calendar_creator', '    CONSTRAINT fk_household_calendar_notification FOREIGN KEY (notification_id) REFERENCES household_notifications(id) ON DELETE SET NULL,\n    CONSTRAINT fk_household_calendar_recipient FOREIGN KEY (recipient_member_id) REFERENCES household_members(id) ON DELETE CASCADE,\n    CONSTRAINT fk_household_calendar_creator')
+          replace_once('database/phase11_alerts_calendar_notifications.sql', '    INDEX idx_household_calendar_window (household_id, starts_at, status),\n', '    INDEX idx_household_calendar_window (household_id, starts_at, status),\n    INDEX idx_household_calendar_recipient (household_id, recipient_member_id, starts_at),\n')
+
+          auth = Path('app/Auth.php')
+          text = auth.read_text()
+          text = text.replace("                'nutrition.view', 'nutrition.manage',\n", "                'nutrition.view', 'nutrition.manage',\n                'notifications.view', 'notifications.manage',\n", 2)
+          text = text.replace("                'preservation.view', 'finance.view', 'nutrition.view',\n", "                'preservation.view', 'finance.view', 'nutrition.view', 'notifications.view',\n", 1)
+          auth.write_text(text)
+          replace_once('phase3.php', "    'nutrition.view', 'nutrition.manage',\n];", "    'nutrition.view', 'nutrition.manage',\n    'notifications.view', 'notifications.manage',\n];")
+
+          replace_once('dashboard.php', "$canViewNutrition = $auth->can($user, 'nutrition.view') || $auth->can($user, 'nutrition.manage');\n", "$canViewNutrition = $auth->can($user, 'nutrition.view') || $auth->can($user, 'nutrition.manage');\n$canViewNotifications = $auth->can($user, 'notifications.view') || $auth->can($user, 'notifications.manage');\n")
+          replace_once(
+              'dashboard.php',
+              "$metrics = [];",
+              """$phase11Available = false;
+if ($canViewNotifications) {
+    $availability = $pdo->prepare(
+        \"SELECT COUNT(*) FROM information_schema.tables
+         WHERE table_schema = DATABASE()
+           AND table_name IN ('household_notifications','household_calendar_events','notification_sync_runs')\"
+    );
+    $availability->execute();
+    $phase11Available = (int)$availability->fetchColumn() === 3;
+}
+
+$metrics = [];
+if ($phase11Available) {
+    $adultAccess = in_array((string)$user['role'], ['owner','administrator','adult_member'], true) ? 1 : 0;
+    $notificationMetrics = $pdo->prepare(
+        \"SELECT
+            SUM(status = 'unread') AS unread_count,
+            SUM(priority IN ('high','critical') AND status IN ('unread','acknowledged')) AS urgent_count
+         FROM household_notifications
+         WHERE household_id = ? AND status <> 'expired'
+           AND (
+               visibility = 'household'
+               OR (visibility = 'adults_only' AND ? = 1)
+               OR (visibility = 'private' AND recipient_member_id = ?)
+           )\"
+    );
+    $notificationMetrics->execute([$householdId, $adultAccess, (int)$user['member_id']]);
+    $notificationCounts = $notificationMetrics->fetch();
+    if (is_array($notificationCounts)) {
+        $metrics[] = ['label' => 'Unread alerts', 'value' => (int)$notificationCounts['unread_count'], 'prefix' => '', 'suffix' => '', 'href' => '/phase11.php'];
+        $metrics[] = ['label' => 'Urgent alerts', 'value' => (int)$notificationCounts['urgent_count'], 'prefix' => '', 'suffix' => '', 'href' => '/phase11.php'];
+    }
+}
+"""
+          )
+          replace_once('dashboard.php', 'Forecast, plan, assign, stock, grow, cook, preserve, balance household nutrition, measure cost and waste, and improve the next food cycle.', 'Detect, notify, assign, stock, grow, cook, preserve, balance household nutrition, measure cost and waste, and improve the next food cycle.')
+          replace_once('dashboard.php', '    <?php if ($phase10Available): ?><a class="panel" href="/phase10.php">', '    <?php if ($phase11Available): ?><a class="panel" href="/phase11.php"><p class="eyebrow">Notify</p><h2>Alerts & shared calendar</h2><p class="page-description" style="margin-top:12px">One permission-aware inbox for tasks, shortages, meals, harvest windows, use-by dates, finance reviews, nutrition follow-up, digests, and ICS calendar export.</p></a><?php endif; ?>\n    <?php if ($phase10Available): ?><a class="panel" href="/phase10.php">')
+
+          replace_once('README.md', 'Homestead is a household food system for growing, storing, cooking, preserving, planning, forecasting, balancing household nutrition, measuring cost and waste, and coordinating real food.', 'Homestead is a household food system for growing, storing, cooking, preserving, planning, forecasting, balancing household nutrition, measuring cost and waste, coordinating real food, and delivering the next household action.')
+          replace_once('README.md', '- `/phase10.php` — ingredient nutrition, dietary patterns, allergen controls, recipe nutrition, meal-plan assessments, and household wellness planning\n', '- `/phase10.php` — ingredient nutrition, dietary patterns, allergen controls, recipe nutrition, meal-plan assessments, and household wellness planning\n- `/phase11.php` — household alerts, member preferences, digests, shared calendar, and adapter-ready delivery outbox\n- `/phase11-calendar.php` — authenticated, permission-aware ICS calendar export\n')
+          replace_once('README.md', '- `/api/phase10-health.php` — protected nutrition-profile, allergen, recipe-snapshot, meal-assessment, and recommendation validation\n', '- `/api/phase10-health.php` — protected nutrition-profile, allergen, recipe-snapshot, meal-assessment, and recommendation validation\n- `/api/phase11-health.php` — protected notification, calendar, digest, outbox, and lifecycle validation\n')
+          replace_once('README.md', 'database/phase10_nutrition_dietary_wellness.sql\n```', 'database/phase10_nutrition_dietary_wellness.sql\ndatabase/phase11_alerts_calendar_notifications.sql\n```')
+          replace_once('README.md', '## Nutrition, dietary planning, and household wellness\n', """## Alerts, notifications, and shared calendar
+
+- Permission-aware household notification inbox
+- Deterministic alerts from tasks, low stock, prepared-food dates, forecasts, seasonal plans, finance, nutrition, meals, and harvest windows
+- Member-specific channel, category, priority, digest, quiet-hour, and preview preferences
+- Household, adults-only, and member-private visibility enforcement
+- Shared calendar and authenticated ICS export
+- Daily and weekly digest records
+- One provenance-linked Phase 7 task per notification
+- Adapter-ready email and web-push outbox, disabled until configured
+- Sensitive wellness preview redaction
+- Protected relational, lifecycle, and stale-run diagnostics
+
+Phase 11 does not dispatch email or web push through an external provider. It stores in-app notifications, calendar records, digests, and adapter-ready outbox payloads.
+
+## Nutrition, dietary planning, and household wellness
+""")
+
+          replace_once('.github/workflows/php-lint.yml', '          php tests/phase10_static_audit.php\n', '          php tests/phase10_static_audit.php\n          php tests/phase11_static_audit.php\n')
+          replace_all('.github/workflows/php-lint.yml', '            database/phase10_nutrition_dietary_wellness.sql\n', '            database/phase10_nutrition_dietary_wellness.sql\n            database/phase11_alerts_calendar_notifications.sql\n', expected=2)
+          replace_once('.github/workflows/php-lint.yml', '          php tests/phase10_integration.php\n', '          php tests/phase10_integration.php\n          php tests/phase11_integration.php\n')
+          replace_once('.github/workflows/php-lint.yml', '      - name: Show server log on failure\n', '      - name: Run Phase 11 authenticated HTTP smoke suite\n        run: bash tests/phase11_http_smoke.sh\n\n      - name: Show server log on failure\n')
+
+          replace_once('tests/database_integration_audit.php', "    'nutrition_recommendations', 'nutrition_lifecycle_events',\n];", "    'nutrition_recommendations', 'nutrition_lifecycle_events',\n    'household_notification_settings', 'member_notification_preferences', 'notification_sync_runs',\n    'household_notifications', 'household_calendar_events', 'notification_delivery_outbox',\n    'notification_delivery_attempts', 'notification_digest_runs', 'notification_digest_items',\n    'notification_lifecycle_events',\n];")
+          replace_once('tests/database_integration_audit.php', "    'Phase 10 recommendation uniqueness installed' => $indexExists($pdo, 'nutrition_recommendations', 'uq_nutrition_recommendation_generation'),\n", "    'Phase 10 recommendation uniqueness installed' => $indexExists($pdo, 'nutrition_recommendations', 'uq_nutrition_recommendation_generation'),\n    'Phase 11 notification uniqueness installed' => $indexExists($pdo, 'household_notifications', 'uq_household_notification_dedup'),\n    'Phase 11 calendar uniqueness installed' => $indexExists($pdo, 'household_calendar_events', 'uq_household_calendar_event'),\n    'Phase 11 outbox uniqueness installed' => $indexExists($pdo, 'notification_delivery_outbox', 'uq_notification_outbox_delivery'),\n    'Phase 11 digest uniqueness installed' => $indexExists($pdo, 'notification_digest_runs', 'uq_notification_digest_run'),\n")
+          replace_once('tests/database_integration_audit.php', "$checks['foreign-key protections installed'] = $foreignKeyCount >= 90;", "$checks['foreign-key protections installed'] = $foreignKeyCount >= 105;")
+
+          replace_once('tests/application_static_audit.php', "$phase10 = $read('phase10.php');\n", "$phase10 = $read('phase10.php');\n$phase11 = $read('phase11.php');\n")
+          replace_once('tests/application_static_audit.php', "    $read('api/phase10-health.php'),\n", "    $read('api/phase10-health.php'),\n    $read('api/phase11-health.php'),\n")
+          replace_once('tests/application_static_audit.php', "'Role permission defaults include task finance and nutrition permissions'", "'Role permission defaults include task finance nutrition and notification permissions'")
+          replace_once('tests/application_static_audit.php', "&& str_contains($auth, \"'nutrition.manage'\")", "&& str_contains($auth, \"'nutrition.manage'\") && str_contains($auth, \"'notifications.view'\") && str_contains($auth, \"'notifications.manage'\")")
+          replace_once('tests/application_static_audit.php', "    'Phase 10 requires nutrition permissions and safety boundary' => str_contains($phase10, 'nutrition.view') && str_contains($phase10, 'nutrition.manage') && str_contains($phase10, 'not diagnosis, treatment, or medical advice'),\n", "    'Phase 10 requires nutrition permissions and safety boundary' => str_contains($phase10, 'nutrition.view') && str_contains($phase10, 'nutrition.manage') && str_contains($phase10, 'not diagnosis, treatment, or medical advice'),\n    'Phase 11 requires notification permissions and delivery boundary' => str_contains($phase11, 'notifications.view') && str_contains($phase11, 'notifications.manage') && str_contains($phase11, 'adapter-ready outside the app'),\n")
+          replace_once('tests/application_static_audit.php', "    'CI imports Phase 10 migration' => str_contains($workflow, 'database/phase10_nutrition_dietary_wellness.sql'),\n", "    'CI imports Phase 10 migration' => str_contains($workflow, 'database/phase10_nutrition_dietary_wellness.sql'),\n    'CI imports Phase 11 migration' => str_contains($workflow, 'database/phase11_alerts_calendar_notifications.sql'),\n")
+          replace_once('tests/application_static_audit.php', "    'CI runs Phase 10 integration' => str_contains($workflow, 'tests/phase10_integration.php'),\n", "    'CI runs Phase 10 integration' => str_contains($workflow, 'tests/phase10_integration.php'),\n    'CI runs Phase 11 integration' => str_contains($workflow, 'tests/phase11_integration.php'),\n")
+          replace_once('tests/application_static_audit.php', "str_contains($workflow, 'tests/phase10_http_smoke.sh')", "str_contains($workflow, 'tests/phase10_http_smoke.sh') && str_contains($workflow, 'tests/phase11_http_smoke.sh')")
+
+          Path('.github/workflows/phase11-finalize-sync.yml').unlink()
+          PY
+
+      - name: Validate integrated Phase 11 files
+        run: |
+          set -euo pipefail
+          find app -maxdepth 1 -type f -name 'Notification*.php' -print0 | xargs -0 -n1 php -l
+          php -l phase3.php
+          php -l dashboard.php
+          php -l tests/database_integration_audit.php
+          php -l tests/application_static_audit.php
+          php tests/phase11_static_audit.php
+          php tests/application_static_audit.php
+
+      - name: Commit Phase 11 integration
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Finalize Phase 11 privacy and application integration"
+          git push origin HEAD:feature/phase11-alerts-calendar-notifications-20260725
