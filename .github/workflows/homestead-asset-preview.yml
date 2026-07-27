@@ -9,7 +9,7 @@ on:
       - .github/workflows/homestead-asset-preview.yml
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   sheet-04-preview:
@@ -23,13 +23,11 @@ jobs:
       - name: Install Pillow
         run: python -m pip install --disable-pip-version-check Pillow
 
-      - name: Export Sheet 4 preview text
+      - name: Build Sheet 4 preview artifact
         shell: bash
         run: |
           mkdir -p .homestead-preview
           python - <<'PY'
-          from base64 import b64encode
-          from io import BytesIO
           from pathlib import Path
           from PIL import Image
 
@@ -37,28 +35,24 @@ jobs:
           source.load()
           preview = source.convert('RGB')
           preview.thumbnail((1600, 1600), Image.Resampling.LANCZOS)
-
-          buffer = BytesIO()
-          preview.save(buffer, format='JPEG', quality=82, optimize=True)
-          encoded = b64encode(buffer.getvalue()).decode('ascii')
-
-          output = Path('.homestead-preview/sheet-04-preview.b64.txt')
-          with output.open('w', encoding='utf-8', newline='\n') as handle:
-              handle.write(f'META source={source.width}x{source.height} mode={source.mode} format={source.format} preview={preview.width}x{preview.height} bytes={len(buffer.getvalue())}\n')
-              for index in range(0, len(encoded), 4000):
-                  handle.write(encoded[index:index + 4000] + '\n')
-          print(output.read_text(encoding='utf-8').splitlines()[0])
+          preview.save('.homestead-preview/sheet-04-preview.jpg', format='JPEG', quality=88, optimize=True)
+          Path('.homestead-preview/sheet-04-metadata.txt').write_text(
+              f'source={source.width}x{source.height}\n'
+              f'mode={source.mode}\n'
+              f'format={source.format}\n'
+              f'preview={preview.width}x{preview.height}\n',
+              encoding='utf-8'
+          )
+          print(Path('.homestead-preview/sheet-04-metadata.txt').read_text(encoding='utf-8'))
           PY
 
-      - name: Commit temporary preview text
-        shell: bash
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .homestead-preview/sheet-04-preview.b64.txt
-          if git diff --cached --quiet; then
-            echo "Preview text is unchanged."
-            exit 0
-          fi
-          git commit -m "Export temporary Sheet 4 preview"
-          git push origin HEAD:${{ github.event.pull_request.head.ref }}
+      - name: Upload Sheet 4 source and preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: homestead-sheet-04-source-preview
+          path: |
+            homestead_4.png
+            .homestead-preview/sheet-04-preview.jpg
+            .homestead-preview/sheet-04-metadata.txt
+          if-no-files-found: error
+          retention-days: 7
