@@ -1,18 +1,17 @@
-name: Homestead Asset Preview
+name: Homestead Sheet 4 Asset Build
 
 on:
   pull_request:
     branches:
       - main
     paths:
-      - homestead_4.png
       - .github/workflows/homestead-asset-preview.yml
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  sheet-04-preview:
+  build-sheet-04-assets:
     runs-on: ubuntu-latest
     steps:
       - name: Check out rebuild branch
@@ -23,36 +22,146 @@ jobs:
       - name: Install Pillow
         run: python -m pip install --disable-pip-version-check Pillow
 
-      - name: Build Sheet 4 preview artifact
+      - name: Extract and validate Sheet 4 panels
         shell: bash
         run: |
-          mkdir -p .homestead-preview
           python - <<'PY'
+          from __future__ import annotations
+
+          import hashlib
+          import json
           from pathlib import Path
           from PIL import Image
 
-          source = Image.open('homestead_4.png')
+          source_path = Path('homestead_4.png')
+          output_dir = Path('assets/images/homestead/sheet-04')
+          output_dir.mkdir(parents=True, exist_ok=True)
+
+          assets = [
+              {
+                  'filename': 'garden-monitoring-wide.png',
+                  'crop_box': [44, 231, 1077, 645],
+                  'dimensions': [1033, 414],
+                  'intended_use': 'Landing or garden page wide monitoring scene with grow racks and wall sensor.',
+              },
+              {
+                  'filename': 'basil-grow-light-closeup.png',
+                  'crop_box': [44, 672, 348, 1074],
+                  'dimensions': [304, 402],
+                  'intended_use': 'Garden detail card for grow lights, herbs, and indoor planting.',
+              },
+              {
+                  'filename': 'soil-sensor-closeup.png',
+                  'crop_box': [367, 672, 733, 1074],
+                  'dimensions': [366, 402],
+                  'intended_use': 'Garden monitoring card for temperature, humidity, and soil readings.',
+              },
+              {
+                  'filename': 'indoor-grow-racks.png',
+                  'crop_box': [752, 672, 1077, 1074],
+                  'dimensions': [325, 402],
+                  'intended_use': 'Garden overview card for indoor grow racks and seedling inventory.',
+              },
+              {
+                  'filename': 'temperature-monitoring-icon.png',
+                  'crop_box': [46, 1113, 213, 1328],
+                  'dimensions': [167, 215],
+                  'intended_use': 'Temperature monitoring feature card.',
+              },
+              {
+                  'filename': 'humidity-monitoring-icon.png',
+                  'crop_box': [228, 1113, 390, 1328],
+                  'dimensions': [162, 215],
+                  'intended_use': 'Humidity monitoring feature card.',
+              },
+              {
+                  'filename': 'plant-growth-icon.png',
+                  'crop_box': [406, 1113, 559, 1328],
+                  'dimensions': [153, 215],
+                  'intended_use': 'Plant growth and seedling feature card.',
+              },
+              {
+                  'filename': 'soil-moisture-icon.png',
+                  'crop_box': [575, 1113, 729, 1328],
+                  'dimensions': [154, 215],
+                  'intended_use': 'Soil moisture monitoring feature card.',
+              },
+              {
+                  'filename': 'airflow-icon.png',
+                  'crop_box': [745, 1113, 900, 1328],
+                  'dimensions': [155, 215],
+                  'intended_use': 'Airflow and ventilation monitoring feature card.',
+              },
+              {
+                  'filename': 'garden-camera-icon.png',
+                  'crop_box': [915, 1113, 1076, 1328],
+                  'dimensions': [161, 215],
+                  'intended_use': 'Garden camera and visual inspection feature card.',
+              },
+          ]
+
+          source = Image.open(source_path)
           source.load()
-          preview = source.convert('RGB')
-          preview.thumbnail((1600, 1600), Image.Resampling.LANCZOS)
-          preview.save('.homestead-preview/sheet-04-preview.jpg', format='JPEG', quality=88, optimize=True)
-          Path('.homestead-preview/sheet-04-metadata.txt').write_text(
-              f'source={source.width}x{source.height}\n'
-              f'mode={source.mode}\n'
-              f'format={source.format}\n'
-              f'preview={preview.width}x{preview.height}\n',
-              encoding='utf-8'
+          if source.size != (1122, 1402):
+              raise SystemExit(f'Unexpected Sheet 4 source dimensions: {source.size}')
+          if source.format != 'PNG':
+              raise SystemExit(f'Unexpected Sheet 4 source format: {source.format}')
+
+          for asset in assets:
+              output_path = output_dir / asset['filename']
+              crop = source.crop(tuple(asset['crop_box'])).convert('RGB')
+              expected_size = tuple(asset['dimensions'])
+              if crop.size != expected_size:
+                  raise SystemExit(
+                      f"{asset['filename']} dimensions {crop.size} do not match {expected_size}"
+                  )
+              crop.save(output_path, format='PNG', optimize=True)
+              verify = Image.open(output_path)
+              verify.load()
+              if verify.size != expected_size or verify.format != 'PNG':
+                  raise SystemExit(f"Failed output validation for {asset['filename']}")
+              asset['format'] = 'PNG'
+              asset['sha256'] = hashlib.sha256(output_path.read_bytes()).hexdigest()
+
+          manifest = {
+              'sheet': 4,
+              'source_file': source_path.name,
+              'source_dimensions': list(source.size),
+              'source_format': source.format,
+              'source_sha256': hashlib.sha256(source_path.read_bytes()).hexdigest(),
+              'panel_count': len(assets),
+              'assets': assets,
+          }
+          (output_dir / 'manifest.json').write_text(
+              json.dumps(manifest, indent=2) + '\n',
+              encoding='utf-8',
           )
-          print(Path('.homestead-preview/sheet-04-metadata.txt').read_text(encoding='utf-8'))
+
+          print(f"Created and validated {len(assets)} Sheet 4 panel assets.")
+          for asset in assets:
+              print(
+                  f"{asset['filename']}: "
+                  f"{asset['dimensions'][0]}x{asset['dimensions'][1]} PNG"
+              )
           PY
 
-      - name: Upload Sheet 4 source and preview
+      - name: Commit completed Sheet 4 asset batch
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/images/homestead/sheet-04
+          if git diff --cached --quiet; then
+            echo "Sheet 4 assets are unchanged."
+            exit 0
+          fi
+          git commit -m "Add Homestead Sheet 4 garden monitoring assets"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
+
+      - name: Upload completed Sheet 4 asset batch
         uses: actions/upload-artifact@v4
         with:
-          name: homestead-sheet-04-source-preview
-          path: |
-            homestead_4.png
-            .homestead-preview/sheet-04-preview.jpg
-            .homestead-preview/sheet-04-metadata.txt
+          name: homestead-sheet-04-assets
+          path: assets/images/homestead/sheet-04
           if-no-files-found: error
           retention-days: 7
