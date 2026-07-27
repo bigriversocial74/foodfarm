@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title description">
+  <title id="title">Homestead</title>
+  <desc id="description">A forest green Homestead H with growing leaves.</desc>
+  <rect width="512" height="512" rx="112" fill="#1f4b36"/>
+  <rect x="72" y="72" width="368" height="368" rx="92" fill="#2d5d45" stroke="#adc3a5" stroke-width="10"/>
+  <path d="M256 342V166" fill="none" stroke="#d5bf91" stroke-width="18" stroke-linecap="round"/>
+  <path d="M247 224c-54-4-88-31-95-79 53 2 88 27 95 79Z" fill="#dfe9d9"/>
+  <path d="M265 270c55-3 90-30 98-79-54 1-90 26-98 79Z" fill="#dfe9d9"/>
+  <path d="M153 174h47v63h112v-63h47v166h-47v-64H200v64h-47V174Z" fill="#fffdf8"/>
+</svg>
