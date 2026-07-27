@@ -44,7 +44,7 @@ jobs:
           for action in save_settings run_forecast create_seasonal_entry seasonal_status accept_recommendation dismiss_recommendation complete_recommendation; do
             grep -q "'$action'" /tmp/phase8-build/phase8.php
           done
-          grep -q 'Forecasting, Seasons & Self-Sufficiency' /tmp/phase8-build/phase8.php
+          grep -q 'Forecasting, Seasons &amp; Self-Sufficiency' /tmp/phase8-build/phase8.php
           grep -q 'Forecast recommendations' /tmp/phase8-build/phase8.php
           grep -q 'Coverage outlook' /tmp/phase8-build/phase8.php
           grep -q 'Resilience trend' /tmp/phase8-build/phase8.php
