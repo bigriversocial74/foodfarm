@@ -83,6 +83,7 @@ $uiRoutes = [
     'phase5.php' => ['class' => 'ui-kits', 'stylesheet' => 'intelligence-pages.css'],
     'starter-kit-lifecycle.php' => ['class' => 'ui-kits', 'stylesheet' => 'intelligence-pages.css'],
     'phase7.php' => ['class' => 'ui-planning', 'stylesheet' => 'intelligence-pages.css'],
+    'shopping-list.php' => ['class' => 'ui-shopping', 'stylesheet' => 'homestead-list.css'],
     'phase8.php' => ['class' => 'ui-forecast', 'stylesheet' => 'intelligence-pages.css'],
     'phase9.php' => ['class' => 'ui-finance', 'stylesheet' => 'intelligence-pages.css'],
     'phase10.php' => ['class' => 'ui-nutrition', 'stylesheet' => 'intelligence-pages.css'],
@@ -94,7 +95,7 @@ $uiRoutes = [
 ];
 $shellRoutes = [
     'dashboard.php', 'phase2.php', 'phase3.php', 'phase4.php', 'phase5.php',
-    'starter-kit-lifecycle.php', 'phase6.php', 'prepared-food.php', 'phase7.php',
+    'starter-kit-lifecycle.php', 'phase6.php', 'prepared-food.php', 'phase7.php', 'shopping-list.php',
     'phase8.php', 'phase9.php', 'phase10.php', 'phase11.php', 'account.php',
 ];
 
@@ -120,6 +121,7 @@ if (is_array($uiRoute)) {
         'phase6.php' => (string)($_GET['section'] ?? 'garden') === 'preservation' ? 'preserve' : 'garden',
         'prepared-food.php' => 'preserve',
         'phase7.php' => 'planning',
+        'shopping-list.php' => 'shopping',
         'phase8.php' => 'forecast',
         'phase9.php' => 'finance',
         'phase10.php' => 'nutrition',
@@ -218,6 +220,7 @@ if (is_array($uiRoute)) {
                 ])],
             ],
             'Manage' => [
+                ['key' => 'shopping', 'label' => 'Shopping List', 'href' => 'shopping-list.php', 'icon' => '☷', 'visible' => $canAny(['tasks.manage', 'tasks.complete'])],
                 ['key' => 'household', 'label' => 'Family & Household', 'href' => 'phase2.php?section=family', 'icon' => '♙', 'visible' => true],
                 ['key' => 'storage', 'label' => 'Storage Locations', 'href' => 'phase2.php?section=storage', 'icon' => '▤', 'visible' => $canAny(['storage.view', 'storage.manage'])],
                 ['key' => 'finance', 'label' => 'Costs & Reports', 'href' => 'phase9.php', 'icon' => '▥', 'visible' => $canAny(['finance.view', 'finance.manage'])],
