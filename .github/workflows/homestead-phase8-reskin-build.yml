@@ -1,0 +1,73 @@
+name: Homestead Phase 8 Reskin Build
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/homestead-phase8-reskin-build.yml'
+      - '.reskin/phase8/**'
+
+permissions:
+  contents: write
+
+jobs:
+  build-phase8:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out forecast branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Reconstruct Phase 8 package
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .reskin/phase8/chunk-* > /tmp/phase8.b64
+          test "$(wc -c < /tmp/phase8.b64)" = "19948"
+          echo "67f697e4f588b0dc06c8943b5f5f95662999a05f9be9b80802a0f9b59f6e4d0f  /tmp/phase8.b64" | sha256sum -c -
+          base64 -d /tmp/phase8.b64 > /tmp/phase8.tar.gz
+          echo "76ed29068d731e6fd7d17525277029882991c7d4a20350dd540027ab364091c4  /tmp/phase8.tar.gz" | sha256sum -c -
+          rm -rf /tmp/phase8-build
+          mkdir -p /tmp/phase8-build
+          tar -xzf /tmp/phase8.tar.gz -C /tmp/phase8-build
+
+      - name: Validate Phase 8 rebuild
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -l /tmp/phase8-build/phase8.php
+          php -l /tmp/phase8-build/app/bootstrap.php
+          node --check /tmp/phase8-build/assets/js/homestead-forecast.js
+          for action in save_settings run_forecast create_seasonal_entry seasonal_status accept_recommendation dismiss_recommendation complete_recommendation; do
+            grep -q "'$action'" /tmp/phase8-build/phase8.php
+          done
+          grep -q 'Forecasting, Seasons & Self-Sufficiency' /tmp/phase8-build/phase8.php
+          grep -q 'Forecast recommendations' /tmp/phase8-build/phase8.php
+          grep -q 'Coverage outlook' /tmp/phase8-build/phase8.php
+          grep -q 'Resilience trend' /tmp/phase8-build/phase8.php
+          grep -q "phase8.php'.*homestead-forecast.css" /tmp/phase8-build/app/bootstrap.php
+          ! grep -Eiq '\b(CREATE|ALTER|DROP)[[:space:]]+TABLE\b' /tmp/phase8-build/phase8.php
+          ! grep -E 'href="/|src="/' /tmp/phase8-build/phase8.php
+
+      - name: Commit Phase 8 rebuild
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp /tmp/phase8-build/phase8.php phase8.php
+          cp /tmp/phase8-build/app/bootstrap.php app/bootstrap.php
+          cp /tmp/phase8-build/assets/css/homestead-forecast.css assets/css/homestead-forecast.css
+          cp /tmp/phase8-build/assets/js/homestead-forecast.js assets/js/homestead-forecast.js
+          rm -f .github/workflows/homestead-forecast-source.yml
+          rm -f .github/workflows/homestead-phase8-reskin-build.yml
+          rm -rf .reskin/phase8
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          changed="$(git diff --cached --name-only)"
+          echo "$changed"
+          ! echo "$changed" | grep -E '^(database/|app/(ForecastingService|Auth|Database|.*Service)\.php)'
+          git commit -m "Reskin Homestead forecast and seasonal intelligence"
+          git push origin HEAD:${{ github.head_ref }}
