@@ -1,0 +1,71 @@
+name: Homestead Prepared Food Reskin Build
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/homestead-prepared-reskin-build.yml'
+      - '.reskin/prepared/**'
+
+permissions:
+  contents: write
+
+jobs:
+  build-prepared:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out prepared-food branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Reconstruct prepared-food package
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .reskin/prepared/chunk-* > /tmp/prepared.b64
+          test "$(wc -c < /tmp/prepared.b64)" = "17548"
+          echo "8ae679523098276eceb5d336e6eb4d1da63dc0c092d76c2ee66ed9bd54a6afa2  /tmp/prepared.b64" | sha256sum -c -
+          base64 -d /tmp/prepared.b64 > /tmp/prepared.tar.gz
+          echo "4df4bdada67944246ed89f5646666237d522e62ade5ac77f35a1670228ba5bc6  /tmp/prepared.tar.gz" | sha256sum -c -
+          rm -rf /tmp/prepared-build
+          mkdir -p /tmp/prepared-build
+          tar -xzf /tmp/prepared.tar.gz -C /tmp/prepared-build
+
+      - name: Validate prepared-food rebuild
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -l /tmp/prepared-build/prepared-food.php
+          php -l /tmp/prepared-build/app/bootstrap.php
+          node --check /tmp/prepared-build/assets/js/homestead-prepared.js
+          grep -q "update_prepared_food" /tmp/prepared-build/prepared-food.php
+          grep -q "updatePreparedFood" /tmp/prepared-build/prepared-food.php
+          grep -q "Prepared Food & Leftovers" /tmp/prepared-build/prepared-food.php
+          grep -q "Current prepared food" /tmp/prepared-build/prepared-food.php
+          grep -q "Lifecycle history" /tmp/prepared-build/prepared-food.php
+          grep -q "Food utilization" /tmp/prepared-build/prepared-food.php
+          grep -q "prepared-food.php'.*homestead-prepared.css" /tmp/prepared-build/app/bootstrap.php
+          ! grep -Eiq '\b(CREATE|ALTER|DROP)[[:space:]]+TABLE\b' /tmp/prepared-build/prepared-food.php
+          ! grep -E 'href="/|src="/' /tmp/prepared-build/prepared-food.php
+
+      - name: Commit prepared-food rebuild
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp /tmp/prepared-build/prepared-food.php prepared-food.php
+          cp /tmp/prepared-build/app/bootstrap.php app/bootstrap.php
+          cp /tmp/prepared-build/assets/css/homestead-prepared.css assets/css/homestead-prepared.css
+          cp /tmp/prepared-build/assets/js/homestead-prepared.js assets/js/homestead-prepared.js
+          rm -f .github/workflows/homestead-prepared-reskin-build.yml
+          rm -rf .reskin/prepared
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          changed="$(git diff --cached --name-only)"
+          echo "$changed"
+          ! echo "$changed" | grep -E '^(database/|app/(RecipeService|Auth|Database|.*Service)\.php)'
+          git commit -m "Reskin Homestead prepared food and leftovers"
+          git push origin HEAD:${{ github.head_ref }}
