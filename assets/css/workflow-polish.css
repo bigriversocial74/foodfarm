@@ -1,0 +1,190 @@
+/* Contextual navigation and post-shell page cleanup. */
+body.has-homestead-shell:not(.ui-alerts) .page-header > :nth-child(2){
+    display:none!important;
+}
+body.has-homestead-shell .page-header > :first-child{
+    width:min(980px,100%);
+}
+body.has-homestead-shell .page-header h1{
+    text-wrap:balance;
+}
+body.has-homestead-shell .page-header .page-description{
+    max-width:860px;
+}
+
+/* Alerts keeps its one unique header action: calendar export. */
+body.ui-alerts .page-header > :nth-child(2){
+    display:flex;
+    align-items:flex-start;
+    justify-content:flex-end;
+}
+body.ui-alerts .page-header > :nth-child(2) > strong,
+body.ui-alerts .page-header > :nth-child(2) > br,
+body.ui-alerts .page-header > :nth-child(2) > a:not([href="/phase11-calendar.php"]){
+    display:none!important;
+}
+body.ui-alerts .page-header > :nth-child(2) > a[href="/phase11-calendar.php"]{
+    min-height:44px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    padding:0 16px;
+    border:1px solid rgba(255,255,255,.28);
+    border-radius:12px;
+    color:#fff;
+    background:rgba(255,255,255,.1);
+    box-shadow:0 12px 30px rgba(28,30,27,.15);
+    text-decoration:none;
+    font-size:12px;
+    font-weight:800;
+    backdrop-filter:blur(12px);
+}
+body.ui-alerts .page-header > :nth-child(2) > a[href="/phase11-calendar.php"]:hover{
+    background:rgba(255,255,255,.18);
+}
+
+/* Existing workflow section links become a consistent sticky segmented control. */
+body.ui-household nav.toolbar[aria-label="Household sections"],
+body.ui-grow nav.toolbar[aria-label="Grow and preserve sections"]{
+    position:sticky;
+    top:82px;
+    z-index:140;
+    width:fit-content;
+    max-width:100%;
+    display:flex;
+    align-items:center;
+    gap:5px;
+    overflow-x:auto;
+    margin:0 0 24px;
+    padding:7px;
+    border:1px solid rgba(53,83,61,.14);
+    border-radius:16px;
+    background:rgba(255,254,249,.93);
+    box-shadow:0 14px 34px rgba(33,58,42,.11);
+    backdrop-filter:blur(16px);
+    -webkit-backdrop-filter:blur(16px);
+    scrollbar-width:none;
+}
+body.ui-household nav.toolbar[aria-label="Household sections"]::-webkit-scrollbar,
+body.ui-grow nav.toolbar[aria-label="Grow and preserve sections"]::-webkit-scrollbar{
+    display:none;
+}
+body.ui-household nav.toolbar[aria-label="Household sections"] .button,
+body.ui-grow nav.toolbar[aria-label="Grow and preserve sections"] .button{
+    flex:0 0 auto;
+    min-height:40px;
+    padding:0 14px;
+    border:0;
+    border-radius:11px;
+    color:#667269;
+    background:transparent;
+    box-shadow:none;
+    font-size:12px;
+    font-weight:800;
+    white-space:nowrap;
+}
+body.ui-household nav.toolbar[aria-label="Household sections"] .button:hover,
+body.ui-grow nav.toolbar[aria-label="Grow and preserve sections"] .button:hover{
+    color:#244c37;
+    background:#eef3eb;
+    transform:none;
+}
+
+/* Household active section. */
+body.ui-household-family nav[aria-label="Household sections"] a[href="?section=family"],
+body.ui-household-storage nav[aria-label="Household sections"] a[href="?section=storage"],
+body.ui-household-inventory nav[aria-label="Household sections"] a[href="?section=inventory"],
+body.ui-household-ledger nav[aria-label="Household sections"] a[href="?section=ledger"]{
+    color:#fff;
+    background:#315f49;
+    box-shadow:0 8px 18px rgba(37,79,56,.2);
+}
+
+/* Grow and preserve active section. The :has rule identifies the real default Overview screen. */
+body.ui-grow:has(.metrics-grid + .content-grid > .panel:first-child > .eyebrow)
+nav[aria-label="Grow and preserve sections"] a[href="?section=overview"],
+body.ui-grow-garden:not(:has(.metrics-grid + .content-grid > .panel:first-child > .eyebrow))
+nav[aria-label="Grow and preserve sections"] a[href="?section=garden"],
+body.ui-grow-harvests nav[aria-label="Grow and preserve sections"] a[href="?section=harvests"],
+body.ui-grow-preservation nav[aria-label="Grow and preserve sections"] a[href="?section=preservation"]{
+    color:#fff;
+    background:#315f49;
+    box-shadow:0 8px 18px rgba(37,79,56,.2);
+}
+
+/* Recipe anchors remain easy to land beneath the sticky application shell. */
+body.ui-recipes #meal-planning,
+body.ui-recipes #prepared-food{
+    scroll-margin-top:96px;
+}
+
+/* Data-heavy workflows receive clearer scrolling and focus treatment. */
+body.has-homestead-shell .table-wrap{
+    scrollbar-color:#9eb09f transparent;
+    scrollbar-width:thin;
+}
+body.has-homestead-shell .table-wrap:focus-visible{
+    outline:3px solid rgba(49,95,73,.24);
+    outline-offset:3px;
+}
+body.has-homestead-shell .table-wrap::-webkit-scrollbar{
+    height:10px;
+    width:10px;
+}
+body.has-homestead-shell .table-wrap::-webkit-scrollbar-thumb{
+    border:3px solid transparent;
+    border-radius:999px;
+    background:#9eb09f;
+    background-clip:padding-box;
+}
+body.has-homestead-shell .table-wrap::-webkit-scrollbar-track{
+    background:transparent;
+}
+
+@media(max-width:1180px){
+    body.ui-household nav.toolbar[aria-label="Household sections"],
+    body.ui-grow nav.toolbar[aria-label="Grow and preserve sections"]{
+        top:76px;
+    }
+}
+@media(max-width:760px){
+    body.has-homestead-shell .page-header{
+        min-height:unset;
+    }
+    body.ui-alerts .page-header > :nth-child(2){
+        width:100%;
+        justify-content:flex-start;
+    }
+    body.ui-household nav.toolbar[aria-label="Household sections"],
+    body.ui-grow nav.toolbar[aria-label="Grow and preserve sections"]{
+        top:68px;
+        width:100%;
+        margin-bottom:18px;
+        border-radius:14px;
+    }
+    body.ui-household nav.toolbar[aria-label="Household sections"] .button,
+    body.ui-grow nav.toolbar[aria-label="Grow and preserve sections"] .button{
+        min-height:42px;
+        padding-inline:13px;
+    }
+}
+@media(max-width:560px){
+    body.ui-household nav.toolbar[aria-label="Household sections"],
+    body.ui-grow nav.toolbar[aria-label="Grow and preserve sections"]{
+        top:62px;
+        margin-inline:-2px;
+    }
+}
+@media(prefers-reduced-motion:reduce){
+    body.ui-household nav.toolbar[aria-label="Household sections"] .button,
+    body.ui-grow nav.toolbar[aria-label="Grow and preserve sections"] .button{
+        transition:none!important;
+    }
+}
+@media(forced-colors:active){
+    body.ui-household nav.toolbar[aria-label="Household sections"],
+    body.ui-grow nav.toolbar[aria-label="Grow and preserve sections"],
+    body.ui-alerts .page-header > :nth-child(2) > a[href="/phase11-calendar.php"]{
+        border:1px solid CanvasText;
+    }
+}
