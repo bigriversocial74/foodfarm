@@ -84,7 +84,7 @@ $uiRoutes = [
     'starter-kit-lifecycle.php' => ['class' => 'ui-kit-lifecycle', 'stylesheet' => 'homestead-kit-lifecycle.css'],
     'phase7.php' => ['class' => 'ui-planning', 'stylesheet' => 'homestead-planning.css'],
     'shopping-list.php' => ['class' => 'ui-shopping', 'stylesheet' => 'homestead-list.css'],
-    'phase8.php' => ['class' => 'ui-forecast', 'stylesheet' => 'intelligence-pages.css'],
+    'phase8.php' => ['class' => 'ui-forecast', 'stylesheet' => 'homestead-forecast.css'],
     'phase9.php' => ['class' => 'ui-finance', 'stylesheet' => 'intelligence-pages.css'],
     'phase10.php' => ['class' => 'ui-nutrition', 'stylesheet' => 'intelligence-pages.css'],
     'phase11.php' => ['class' => 'ui-alerts', 'stylesheet' => 'intelligence-pages.css'],
