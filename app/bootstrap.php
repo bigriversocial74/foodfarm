@@ -78,7 +78,7 @@ $uiRoutes = [
     'phase2.php' => ['class' => 'ui-household', 'stylesheet' => 'homestead-pantry.css'],
     'phase4.php' => ['class' => 'ui-recipes', 'stylesheet' => 'homestead-recipes.css'],
     'phase6.php' => ['class' => 'ui-grow', 'stylesheet' => 'homestead-garden.css'],
-    'prepared-food.php' => ['class' => 'ui-preserve', 'stylesheet' => 'core-pages.css'],
+    'prepared-food.php' => ['class' => 'ui-prepared', 'stylesheet' => 'homestead-prepared.css'],
     'phase3.php' => ['class' => 'ui-access', 'stylesheet' => 'intelligence-pages.css'],
     'phase5.php' => ['class' => 'ui-kits', 'stylesheet' => 'intelligence-pages.css'],
     'starter-kit-lifecycle.php' => ['class' => 'ui-kits', 'stylesheet' => 'intelligence-pages.css'],
