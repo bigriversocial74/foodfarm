@@ -218,7 +218,7 @@ $formatDue = static function (?string $value) use ($today, $now): array {
     <section class="planning-hero" aria-labelledby="planning-title">
         <div class="planning-hero__copy">
             <p class="planning-kicker">Daily household operating system</p>
-            <h1 id="planning-title">Plan the work.<br><span>Run the household.</span></h1>
+            <h1 id="planning-title" aria-label="Planning, Tasks & Automation">Plan the work.<br><span>Run the household.</span></h1>
             <p>Coordinate meals, pantry shortages, harvest windows, preservation work, leftovers, and recurring responsibilities in one daily command view.</p>
             <div class="planning-hero__meta" aria-label="Current planning state">
                 <span><?= count($tasks) ?> active tasks</span>
