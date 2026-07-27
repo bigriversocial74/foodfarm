@@ -46,7 +46,6 @@ jobs:
           cp /tmp/login-session-fix/app/bootstrap.php app/bootstrap.php
           cp /tmp/login-session-fix/login.php login.php
           cp /tmp/login-session-fix/tests/session_cookie_policy_test.php tests/session_cookie_policy_test.php
-          cp /tmp/login-session-fix/.github/workflows/login-session-hardening.yml .github/workflows/login-session-hardening.yml
           php tests/session_cookie_policy_test.php
           grep -Fq "'path' => \$basePath !== '' ? \$basePath . '/' : '/'" app/bootstrap.php
           grep -Fq "'secure' => \$requestUsesHttps" app/bootstrap.php
@@ -64,7 +63,6 @@ jobs:
           test -f app/bootstrap.php
           test -f login.php
           test -f tests/session_cookie_policy_test.php
-          test -f .github/workflows/login-session-hardening.yml
           test ! -e .github/workflows/login-session-fix-build.yml
           test ! -e .release-fix/login-session
           git config user.name "github-actions[bot]"
