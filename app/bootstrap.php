@@ -31,35 +31,6 @@ if (!in_array($timezone, timezone_identifiers_list(), true)) {
 }
 date_default_timezone_set($timezone);
 
-$configuredBaseUrl = trim((string)($config['app']['base_url'] ?? ''));
-$configuredBasePath = '';
-if ($configuredBaseUrl !== '') {
-    $parsedBasePath = parse_url($configuredBaseUrl, PHP_URL_PATH);
-    if (!is_string($parsedBasePath)) {
-        http_response_code(503);
-        exit('Homestead base URL configuration is invalid.');
-    }
-    $trimmedConfiguredPath = trim($parsedBasePath, '/');
-    $configuredBasePath = $trimmedConfiguredPath === '' ? '' : '/' . $trimmedConfiguredPath;
-}
-
-$basePath = $configuredBasePath;
-if (PHP_SAPI !== 'cli') {
-    $scriptName = str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? $_SERVER['PHP_SELF'] ?? ''));
-    if ($scriptName !== '' && str_starts_with($scriptName, '/')) {
-        $scriptDirectory = str_replace('\\', '/', dirname($scriptName));
-        $trimmedScriptDirectory = trim($scriptDirectory, '/.');
-        $basePath = $trimmedScriptDirectory === '' ? '' : '/' . $trimmedScriptDirectory;
-    }
-}
-if ($basePath !== '' && !preg_match('#^/(?:[A-Za-z0-9._~-]+/?)*$#', $basePath)) {
-    http_response_code(503);
-    exit('Homestead base URL path is invalid.');
-}
-if (!defined('HOMESTEAD_BASE_PATH')) {
-    define('HOMESTEAD_BASE_PATH', $basePath);
-}
-
 if ($environment === 'production') {
     $healthKey = trim((string)($config['security']['health_key'] ?? ''));
     if (strlen($healthKey) < 32 || str_contains(strtolower($healthKey), 'replace-with')) {
@@ -94,7 +65,7 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
         'httponly' => true,
         'secure' => $environment === 'production' || (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
         'samesite' => 'Lax',
-        'path' => $basePath === '' ? '/' : $basePath . '/',
+        'path' => '/',
     ]);
     session_start();
 }
@@ -167,34 +138,15 @@ if (is_array($uiRoute)) {
         $uiStylesheet,
         $injectShell,
         $activeShellKey,
-        $basePath,
         &$auth
     ): string {
         if (!str_contains(strtolower($html), '<!doctype html')) {
             return $html;
         }
 
-        $rewriteRootUrls = static function (string $markup) use ($basePath): string {
-            if ($basePath === '') {
-                return $markup;
-            }
-
-            return (string)preg_replace_callback(
-                '/\b(href|src|action)=(["\'])\/(?!\/)([^"\']*)\2/i',
-                static function (array $matches) use ($basePath): string {
-                    $target = '/' . $matches[3];
-                    if ($target === $basePath || str_starts_with($target, $basePath . '/')) {
-                        return $matches[0];
-                    }
-                    return $matches[1] . '=' . $matches[2] . $basePath . $target . $matches[2];
-                },
-                $markup
-            );
-        };
-
-        $stylesheets = [$basePath . '/assets/css/' . $uiStylesheet];
+        $stylesheets = ['assets/css/' . $uiStylesheet];
         if ($injectShell) {
-            $stylesheets[] = $basePath . '/assets/css/app-shell.css';
+            $stylesheets[] = 'assets/css/app-shell.css';
         }
         foreach ($stylesheets as $stylesheetPath) {
             if (!str_contains($html, $stylesheetPath)) {
@@ -226,12 +178,12 @@ if (is_array($uiRoute)) {
         );
 
         if (!$injectShell || !is_object($auth)) {
-            return $rewriteRootUrls($html);
+            return $html;
         }
 
         $user = $auth->user();
         if (!is_array($user)) {
-            return $rewriteRootUrls($html);
+            return $html;
         }
 
         $canAny = static function (array $permissions) use ($auth, $user): bool {
@@ -305,14 +257,12 @@ if (is_array($uiRoute)) {
             . '</div>'
             . '</header>';
 
-        $html = (string)preg_replace_callback(
+        return (string)preg_replace_callback(
             '/<body\b[^>]*>/i',
             static fn(array $matches): string => $matches[0] . $navigation,
             $html,
             1
         );
-
-        return $rewriteRootUrls($html);
     });
 }
 
