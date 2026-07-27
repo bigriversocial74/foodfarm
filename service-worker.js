@@ -10,19 +10,19 @@ const CACHE_NAME = `${CACHE_PREFIX}20260727-2`;
 const scopedPath = (path) => `${SCOPE_PATH}/${path.replace(/^\//, '')}`;
 const OFFLINE_URL = scopedPath('offline.html');
 const STATIC_ASSET_PATHS = Object.freeze([
-  'offline.html',
-  'manifest.webmanifest',
-  'assets/css/app.css',
-  'assets/css/app-shell.css',
-  'assets/css/app-shell-base.css',
-  'assets/css/workflow-polish.css',
-  'assets/css/operations-polish.css',
-  'assets/css/mobile-workflows.css',
-  'assets/css/core-pages.css',
-  'assets/css/intelligence-pages.css',
-  'assets/css/access-flow.css',
-  'assets/js/pwa.js',
-  'assets/icons/homestead-icon.svg'
+  "offline.html",
+  "manifest.webmanifest",
+  "assets/css/app.css",
+  "assets/css/app-shell.css",
+  "assets/css/app-shell-base.css",
+  "assets/css/workflow-polish.css",
+  "assets/css/operations-polish.css",
+  "assets/css/mobile-workflows.css",
+  "assets/css/core-pages.css",
+  "assets/css/intelligence-pages.css",
+  "assets/css/access-flow.css",
+  "assets/js/pwa.js",
+  "assets/icons/homestead-icon.svg"
 ]);
 const STATIC_ASSETS = Object.freeze(STATIC_ASSET_PATHS.map(scopedPath));
 
