@@ -92,11 +92,33 @@ $uiRoutes = [
     'accept-invite.php' => ['class' => 'ui-auth-flow ui-invite', 'stylesheet' => 'access-flow.css'],
     'activate-kit.php' => ['class' => 'ui-auth-flow ui-kit-activation', 'stylesheet' => 'access-flow.css'],
 ];
+$shellRoutes = [
+    'dashboard.php', 'phase2.php', 'phase3.php', 'phase4.php', 'phase5.php',
+    'starter-kit-lifecycle.php', 'phase6.php', 'prepared-food.php', 'phase7.php',
+    'phase8.php', 'phase9.php', 'phase10.php', 'phase11.php', 'account.php',
+];
+
 $uiRoute = $uiRoutes[$routeName] ?? null;
 if (is_array($uiRoute)) {
     $uiPageClass = (string)$uiRoute['class'];
     $uiStylesheet = (string)$uiRoute['stylesheet'];
     $sectionClass = '';
+    $activeShellKey = match ($routeName) {
+        'dashboard.php' => 'home',
+        'phase2.php' => (string)($_GET['section'] ?? 'family') === 'family' ? 'household' : 'pantry',
+        'phase3.php' => 'access',
+        'phase4.php' => 'recipes',
+        'phase5.php', 'starter-kit-lifecycle.php' => 'kits',
+        'phase6.php' => (string)($_GET['section'] ?? 'garden') === 'preservation' ? 'preserve' : 'garden',
+        'prepared-food.php' => 'preserve',
+        'phase7.php' => 'planning',
+        'phase8.php' => 'forecast',
+        'phase9.php' => 'finance',
+        'phase10.php' => 'nutrition',
+        'phase11.php' => 'alerts',
+        'account.php' => 'account',
+        default => '',
+    };
     if ($routeName === 'phase2.php') {
         $section = (string)($_GET['section'] ?? 'family');
         if (in_array($section, ['family', 'storage', 'inventory', 'ledger'], true)) {
@@ -108,25 +130,37 @@ if (is_array($uiRoute)) {
             $sectionClass = ' ui-grow-' . $section;
         }
     }
-    $uiPageClass .= $sectionClass;
+    $injectShell = in_array($routeName, $shellRoutes, true);
+    $uiPageClass .= $sectionClass . ($injectShell ? ' has-homestead-shell' : '');
 
-    ob_start(static function (string $html) use ($uiPageClass, $uiStylesheet): string {
+    ob_start(static function (string $html) use (
+        $uiPageClass,
+        $uiStylesheet,
+        $injectShell,
+        $activeShellKey,
+        &$auth
+    ): string {
         if (!str_contains(strtolower($html), '<!doctype html')) {
             return $html;
         }
 
-        $stylesheetPath = '/assets/css/' . $uiStylesheet;
-        if (!str_contains($html, $stylesheetPath)) {
-            $safeStylesheet = htmlspecialchars($stylesheetPath, ENT_QUOTES, 'UTF-8');
-            $html = str_ireplace(
-                '</head>',
-                '<link rel="stylesheet" href="' . $safeStylesheet . '?v=20260726"></head>',
-                $html
-            );
+        $stylesheets = ['/assets/css/' . $uiStylesheet];
+        if ($injectShell) {
+            $stylesheets[] = '/assets/css/app-shell.css';
+        }
+        foreach ($stylesheets as $stylesheetPath) {
+            if (!str_contains($html, $stylesheetPath)) {
+                $safeStylesheet = htmlspecialchars($stylesheetPath, ENT_QUOTES, 'UTF-8');
+                $html = str_ireplace(
+                    '</head>',
+                    '<link rel="stylesheet" href="' . $safeStylesheet . '?v=20260727"></head>',
+                    $html
+                );
+            }
         }
 
         $safeClass = htmlspecialchars($uiPageClass, ENT_QUOTES, 'UTF-8');
-        return (string)preg_replace_callback(
+        $html = (string)preg_replace_callback(
             '/<body\b([^>]*)>/i',
             static function (array $matches) use ($safeClass): string {
                 $attributes = $matches[1];
@@ -139,6 +173,93 @@ if (is_array($uiRoute)) {
 
                 return '<body' . $attributes . ' class="' . $safeClass . '">';
             },
+            $html,
+            1
+        );
+
+        if (!$injectShell || !is_object($auth)) {
+            return $html;
+        }
+
+        $user = $auth->user();
+        if (!is_array($user)) {
+            return $html;
+        }
+
+        $canAny = static function (array $permissions) use ($auth, $user): bool {
+            foreach ($permissions as $permission) {
+                if ($auth->can($user, $permission)) {
+                    return true;
+                }
+            }
+            return false;
+        };
+        $navigationItems = [
+            ['key' => 'home', 'label' => 'Home', 'href' => '/dashboard.php', 'visible' => true],
+            ['key' => 'household', 'label' => 'Household', 'href' => '/phase2.php?section=family', 'visible' => true],
+            ['key' => 'pantry', 'label' => 'Pantry', 'href' => '/phase2.php?section=inventory', 'visible' => $canAny(['storage.view', 'storage.manage', 'inventory.view', 'inventory.manage'])],
+            ['key' => 'recipes', 'label' => 'Recipes', 'href' => '/phase4.php', 'visible' => $canAny(['recipes.view', 'recipes.manage', 'recipes.complete', 'meals.manage'])],
+            ['key' => 'garden', 'label' => 'Garden', 'href' => '/phase6.php?section=garden', 'visible' => $canAny(['garden.view', 'garden.manage', 'harvest.record'])],
+            ['key' => 'preserve', 'label' => 'Preserve', 'href' => '/phase6.php?section=preservation', 'visible' => $canAny(['preservation.view', 'preservation.manage'])],
+            ['key' => 'planning', 'label' => 'Planning', 'href' => '/phase7.php', 'visible' => $canAny(['tasks.manage', 'tasks.complete'])],
+            ['key' => 'forecast', 'label' => 'Forecast', 'href' => '/phase8.php', 'visible' => $canAny([
+                'inventory.view', 'inventory.manage', 'garden.view', 'garden.manage',
+                'harvest.record', 'preservation.view', 'preservation.manage',
+                'tasks.manage', 'tasks.complete',
+            ])],
+            ['key' => 'finance', 'label' => 'Finance', 'href' => '/phase9.php', 'visible' => $canAny(['finance.view', 'finance.manage'])],
+            ['key' => 'nutrition', 'label' => 'Nutrition', 'href' => '/phase10.php', 'visible' => $canAny(['nutrition.view', 'nutrition.manage'])],
+            ['key' => 'alerts', 'label' => 'Alerts', 'href' => '/phase11.php', 'visible' => $canAny(['notifications.view', 'notifications.manage'])],
+            ['key' => 'access', 'label' => 'Access', 'href' => '/phase3.php', 'visible' => $canAny(['members.manage', 'members.invite', 'permissions.manage'])],
+            ['key' => 'kits', 'label' => 'Starter Kits', 'href' => '/phase5.php', 'visible' => !empty($user['is_platform_admin'])],
+            ['key' => 'account', 'label' => 'Account', 'href' => '/account.php', 'visible' => true],
+        ];
+
+        $desktopLinks = '';
+        $mobileLinks = '';
+        foreach ($navigationItems as $item) {
+            if (!$item['visible']) {
+                continue;
+            }
+            $isActive = $item['key'] === $activeShellKey;
+            $safeHref = htmlspecialchars((string)$item['href'], ENT_QUOTES, 'UTF-8');
+            $safeLabel = htmlspecialchars((string)$item['label'], ENT_QUOTES, 'UTF-8');
+            $activeClass = $isActive ? ' is-active' : '';
+            $current = $isActive ? ' aria-current="page"' : '';
+            $desktopLinks .= '<a class="homestead-appbar__link' . $activeClass . '" href="' . $safeHref . '"' . $current . '>' . $safeLabel . '</a>';
+            $mobileLinks .= '<a class="homestead-mobile-menu__link' . $activeClass . '" href="' . $safeHref . '"' . $current . '>' . $safeLabel . '</a>';
+        }
+
+        $displayName = trim((string)($user['display_name'] ?? 'Household member'));
+        $safeDisplayName = htmlspecialchars($displayName, ENT_QUOTES, 'UTF-8');
+        $initial = function_exists('mb_substr') ? mb_substr($displayName, 0, 1) : substr($displayName, 0, 1);
+        $safeInitial = htmlspecialchars(strtoupper((string)$initial), ENT_QUOTES, 'UTF-8');
+
+        $navigation = '<header class="homestead-appbar">'
+            . '<div class="homestead-appbar__inner">'
+            . '<a class="homestead-appbar__brand" href="/dashboard.php" aria-label="Homestead dashboard">'
+            . '<span class="homestead-appbar__mark" aria-hidden="true">H</span>'
+            . '<span class="homestead-appbar__brand-copy"><strong>Homestead</strong><small>Household food system</small></span>'
+            . '</a>'
+            . '<nav class="homestead-appbar__links" aria-label="Homestead sections">' . $desktopLinks . '</nav>'
+            . '<div class="homestead-appbar__member">'
+            . '<a class="homestead-appbar__avatar" href="/account.php" aria-label="Open account for ' . $safeDisplayName . '">' . $safeInitial . '</a>'
+            . '<a class="homestead-appbar__signout" href="/logout.php">Sign out</a>'
+            . '</div>'
+            . '<details class="homestead-mobile-menu">'
+            . '<summary><span aria-hidden="true"></span>Menu</summary>'
+            . '<div class="homestead-mobile-menu__panel">'
+            . '<div class="homestead-mobile-menu__member"><span class="homestead-appbar__avatar">' . $safeInitial . '</span><div><strong>' . $safeDisplayName . '</strong><small>Household workspace</small></div></div>'
+            . '<nav aria-label="Mobile Homestead sections">' . $mobileLinks . '</nav>'
+            . '<a class="homestead-mobile-menu__signout" href="/logout.php">Sign out</a>'
+            . '</div>'
+            . '</details>'
+            . '</div>'
+            . '</header>';
+
+        return (string)preg_replace_callback(
+            '/<body\b[^>]*>/i',
+            static fn(array $matches): string => $matches[0] . $navigation,
             $html,
             1
         );
