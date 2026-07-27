@@ -1,0 +1,415 @@
+@media (max-width: 1120px) {
+    .site-header {
+        grid-template-columns: auto 1fr auto;
+        gap: 18px;
+        padding: 0 24px;
+    }
+
+    .site-navigation {
+        gap: 22px;
+    }
+
+    .landing-hero {
+        grid-template-columns: 1fr;
+        padding-bottom: 60px;
+    }
+
+    .hero-copy {
+        max-width: 760px;
+    }
+
+    .device-stage {
+        width: min(760px, 100%);
+        margin: 0 auto;
+    }
+
+    .feature-card-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .feature-card:nth-child(4),
+    .feature-card:nth-child(5) {
+        grid-column: span 1;
+    }
+}
+
+@media (max-width: 860px) {
+    .public-frame {
+        width: min(100% - 18px, 1450px);
+        margin: 9px auto;
+    }
+
+    .site-header {
+        grid-template-columns: auto auto 1fr;
+        min-height: 72px;
+    }
+
+    .nav-toggle {
+        display: block;
+        justify-self: end;
+        grid-column: 2;
+    }
+
+    .site-navigation {
+        display: none;
+        position: absolute;
+        left: 18px;
+        right: 18px;
+        top: 80px;
+        z-index: 20;
+        padding: 12px;
+        border: 1px solid var(--line-strong);
+        border-radius: 12px;
+        background: rgba(10, 9, 7, .98);
+        box-shadow: var(--shadow-soft);
+    }
+
+    .site-navigation.is-open {
+        display: grid;
+        gap: 4px;
+    }
+
+    .site-navigation a {
+        padding: 11px;
+        border-radius: 7px;
+    }
+
+    .site-navigation a:hover {
+        background: rgba(201, 150, 73, .08);
+    }
+
+    .header-actions {
+        justify-self: end;
+        gap: 12px;
+    }
+
+    .header-actions .text-link {
+        display: none;
+    }
+
+    .brand-word {
+        font-size: 23px;
+    }
+
+    .feature-card-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .feature-card:last-child {
+        grid-column: span 2;
+    }
+
+    .system-showcase {
+        grid-template-columns: 1fr;
+    }
+
+    .showcase-card {
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+    }
+
+    .showcase-card:last-child {
+        border-bottom: 0;
+    }
+
+    .final-cta {
+        grid-template-columns: 1fr;
+    }
+
+    .cta-photo {
+        min-height: 220px;
+    }
+
+    .site-footer {
+        grid-template-columns: 1fr;
+        justify-items: center;
+        text-align: center;
+    }
+
+    .site-footer p {
+        justify-self: center;
+    }
+
+    .access-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .access-story {
+        min-height: 440px;
+    }
+
+    .activation-hero {
+        grid-template-columns: 1fr;
+    }
+
+    .activation-art {
+        display: none;
+    }
+}
+
+@media (max-width: 640px) {
+    .public-frame {
+        width: 100%;
+        margin: 0;
+        border-left: 0;
+        border-right: 0;
+        border-radius: 0;
+    }
+
+    .site-header {
+        padding: 0 14px;
+    }
+
+    .brand-seal {
+        width: 34px;
+        height: 34px;
+    }
+
+    .brand-word {
+        font-size: 20px;
+    }
+
+    .header-actions .gold-button {
+        min-height: 38px;
+        padding: 8px 11px;
+        font-size: 11px;
+    }
+
+    .landing-hero {
+        min-height: auto;
+        padding: 48px 22px 44px;
+    }
+
+    .hero-copy h1 {
+        font-size: clamp(52px, 17vw, 72px);
+    }
+
+    .hero-description {
+        font-size: 16px;
+    }
+
+    .hero-actions {
+        flex-direction: column;
+    }
+
+    .hero-actions .gold-button,
+    .hero-actions .outline-button {
+        width: 100%;
+    }
+
+    .device-stage {
+        min-height: 430px;
+        margin-top: 18px;
+    }
+
+    .desktop-device {
+        inset: 16px 0 74px;
+    }
+
+    .device-bezel {
+        inset: 11px;
+    }
+
+    .preview-app {
+        grid-template-columns: 72px 1fr;
+    }
+
+    .preview-sidebar {
+        padding: 16px 7px;
+    }
+
+    .preview-sidebar > strong {
+        font-size: 10px;
+    }
+
+    .preview-sidebar span {
+        overflow: hidden;
+        padding: 6px 3px;
+        font-size: 0;
+    }
+
+    .preview-sidebar span::first-letter {
+        font-size: 9px;
+    }
+
+    .preview-canvas {
+        padding: 14px 9px;
+    }
+
+    .preview-title {
+        font-size: 10px;
+    }
+
+    .preview-metrics {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .preview-middle {
+        grid-template-columns: 1fr;
+    }
+
+    .schedule-card {
+        display: none;
+    }
+
+    .garden-health {
+        min-height: 108px;
+        grid-template-columns: 1fr 80px;
+    }
+
+    .preview-bottom {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .preview-bottom article:nth-child(n+3) {
+        display: none;
+    }
+
+    .phone-device {
+        width: 145px;
+        height: 305px;
+        right: -6px;
+    }
+
+    .phone-screen article:nth-of-type(3) {
+        display: none;
+    }
+
+    .still-life {
+        display: none;
+    }
+
+    .section-block {
+        padding: 50px 18px;
+    }
+
+    .feature-card-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .feature-card:last-child {
+        grid-column: auto;
+    }
+
+    .lifecycle-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .lifecycle-grid article {
+        min-height: 190px;
+    }
+
+    .lifecycle-grid article:not(:last-child)::after {
+        width: 1px;
+        height: 38px;
+        top: auto;
+        bottom: -18px;
+        right: 50%;
+        border-top: 0;
+        border-left: 1px dashed rgba(201, 150, 73, .4);
+    }
+
+    .showcase-card {
+        grid-template-rows: 220px 1fr;
+    }
+
+    .showcase-card > div:last-child {
+        padding: 25px 22px 32px;
+    }
+
+    .final-cta {
+        margin: 26px 14px;
+    }
+
+    .cta-copy {
+        padding: 28px 22px;
+    }
+
+    .site-footer nav {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 18px;
+    }
+
+    .access-page,
+    .activation-page {
+        padding: 0;
+    }
+
+    .access-layout,
+    .activation-frame {
+        min-height: 100vh;
+        border: 0;
+        border-radius: 0;
+    }
+
+    .access-story {
+        min-height: 390px;
+        padding: 30px 22px;
+    }
+
+    .access-story h1 {
+        font-size: 48px;
+    }
+
+    .access-points {
+        display: none;
+    }
+
+    .access-form-panel {
+        min-height: 470px;
+        padding: 34px 22px;
+    }
+
+    .form-brand {
+        display: inline-flex;
+    }
+
+    .form-heading h2 {
+        font-size: 40px;
+    }
+
+    .activation-header {
+        padding: 0 18px;
+    }
+
+    .activation-account {
+        display: none;
+    }
+
+    .activation-hero {
+        padding: 38px 22px;
+    }
+
+    .activation-hero h1 {
+        font-size: 46px;
+    }
+
+    .activation-panel {
+        margin: 20px 12px 34px;
+        padding: 18px 14px;
+    }
+
+    .panel-heading {
+        flex-direction: column;
+    }
+
+    .activation-submit .gold-button {
+        width: 100%;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html {
+        scroll-behavior: auto;
+    }
+
+    *,
+    *::before,
+    *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
+        scroll-behavior: auto !important;
+    }
+}

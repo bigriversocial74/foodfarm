@@ -109,5 +109,75 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_array($invitation)) {
         $error = user_error_message($exception, 'The invitation could not be accepted. Try again.');
     }
 }
-?><!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Accept invitation · Homestead</title><link rel="stylesheet" href="/assets/css/app.css"></head><body><a class="skip-link" href="#main-content">Skip to invitation</a><main id="main-content" class="page-container" style="max-width:680px;padding-top:8vh"><section class="panel"><p class="eyebrow">Family invitation</p><h1>Join Homestead</h1>
-<?php if ($error): ?><div class="status status-warning" role="alert" style="display:block;margin:20px 0"><?= e($error) ?></div><?php elseif (is_array($invitation)): ?><p class="page-description">Create an account for <strong><?= e((string)$invitation['email']) ?></strong> as <?= e(str_replace('_', ' ', (string)$invitation['role'])) ?>.</p><form method="post" class="form-grid"><input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>"><input type="hidden" name="token" value="<?= e($token) ?>"><label>Password<input class="search-field" type="password" name="password" minlength="12" maxlength="4096" autocomplete="new-password" required></label><label>Confirm password<input class="search-field" type="password" name="password_confirmation" minlength="12" maxlength="4096" autocomplete="new-password" required></label><button class="button primary" type="submit">Create account</button></form><?php endif; ?></section></main></body></html>
+?><!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="theme-color" content="#090806">
+    <title>Accept invitation · Homestead</title>
+    <link rel="icon" href="assets/icons/homestead-icon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="assets/css/homestead-public.css?v=20260727-1">
+</head>
+<body class="access-page">
+<a class="skip-link" href="#main-content">Skip to invitation</a>
+<main id="main-content" class="access-layout">
+    <section class="access-story invite-story">
+        <a class="site-brand light-brand" href="./" aria-label="Return to Homestead home">
+            <span class="brand-seal"><svg viewBox="0 0 48 48" aria-hidden="true">
+<circle cx="24" cy="24" r="22" fill="none" stroke="currentColor" stroke-width="1.5"/>
+<path d="M24 10v27M24 15c-5-1-8-4-9-8M24 20c5-1 8-4 9-8M24 25c-5-1-8-4-9-8M24 30c5-1 8-4 9-8M18 37h12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+</svg></span>
+            <span class="brand-word">Homestead</span>
+        </a>
+        <div class="access-story-copy">
+            <p class="gold-kicker">Family invitation</p>
+            <h1>Bring your part of the household into view.</h1>
+            <p>Join the shared food system with access appropriate to your household role and responsibilities.</p>
+        </div>
+        <div class="access-points">
+            <span>Private, role-aware access</span>
+            <span>Shared tasks, meals, shopping, and calendars</span>
+            <span>Connected pantry, garden, and preservation records</span>
+        </div>
+    </section>
+
+    <section class="access-form-panel">
+        <a class="site-brand form-brand" href="./" aria-label="Return to Homestead home">
+            <span class="brand-seal"><svg viewBox="0 0 48 48" aria-hidden="true">
+<circle cx="24" cy="24" r="22" fill="none" stroke="currentColor" stroke-width="1.5"/>
+<path d="M24 10v27M24 15c-5-1-8-4-9-8M24 20c5-1 8-4 9-8M24 25c-5-1-8-4-9-8M24 30c5-1 8-4 9-8M18 37h12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+</svg></span>
+            <span class="brand-word">Homestead</span>
+        </a>
+        <div class="form-heading">
+            <p class="gold-kicker">Household onboarding</p>
+            <h2>Join Homestead</h2>
+            <?php if (is_array($invitation)): ?>
+                <p>Create an account for <strong><?= e((string)$invitation['email']) ?></strong> as <?= e(str_replace('_', ' ', (string)$invitation['role'])) ?>.</p>
+            <?php else: ?>
+                <p>Invitation access could not be verified.</p>
+            <?php endif; ?>
+        </div>
+
+        <?php if ($error): ?>
+            <div class="alert alert-warning" role="alert"><?= e($error) ?></div>
+        <?php elseif (is_array($invitation)): ?>
+            <form method="post" class="public-form">
+                <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                <input type="hidden" name="token" value="<?= e($token) ?>">
+                <label>
+                    <span>Password</span>
+                    <input type="password" name="password" minlength="12" maxlength="4096" autocomplete="new-password" required>
+                </label>
+                <label>
+                    <span>Confirm password</span>
+                    <input type="password" name="password_confirmation" minlength="12" maxlength="4096" autocomplete="new-password" required>
+                </label>
+                <button class="gold-button full-width" type="submit">Create account</button>
+            </form>
+        <?php endif; ?>
+    </section>
+</main>
+</body>
+</html>
