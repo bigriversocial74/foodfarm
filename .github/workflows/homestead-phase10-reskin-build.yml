@@ -1,0 +1,84 @@
+name: Homestead Phase 10 Reskin Build
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/homestead-phase10-reskin-build.yml'
+      - '.reskin/phase10/**'
+
+permissions:
+  contents: write
+
+jobs:
+  build-phase10:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out nutrition branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Reconstruct Phase 10 package
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .reskin/phase10/chunk-* > /tmp/phase10.b64
+          test "$(wc -c < /tmp/phase10.b64)" = "13276"
+          echo "e94bb31f7d8a168f5e667d0e1411fccc45041cd2615e4a62261b1b80802b86da  /tmp/phase10.b64" | sha256sum -c -
+          base64 -d /tmp/phase10.b64 > /tmp/phase10.tar.gz
+          echo "d67fb8f6a45aea36675fa766c508cc5e0d7f5e9d7758663f420156561c85c8c0  /tmp/phase10.tar.gz" | sha256sum -c -
+          rm -rf /tmp/phase10-build
+          mkdir -p /tmp/phase10-build
+          tar -xzf /tmp/phase10.tar.gz -C /tmp/phase10-build
+
+      - name: Validate Phase 10 rebuild
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -l /tmp/phase10-build/phase10.php
+          node --check /tmp/phase10-build/assets/js/homestead-nutrition.js
+          for action in save_settings save_member_profile save_member_allergen save_inventory_nutrition save_inventory_allergen calculate_recipe_nutrition run_meal_assessment accept_recommendation dismiss_recommendation complete_recommendation; do
+            grep -q "'$action'" /tmp/phase10-build/phase10.php
+          done
+          grep -Fq 'Nutrition, Dietary Planning & Wellness' /tmp/phase10-build/phase10.php
+          grep -Fq 'not diagnosis, treatment, or medical advice' /tmp/phase10-build/phase10.php
+          grep -Fq 'Planning support, not clinical guidance' /tmp/phase10-build/phase10.php
+          grep -Fq 'Latest household plan' /tmp/phase10-build/phase10.php
+          grep -Fq 'Nutrition recommendations' /tmp/phase10-build/phase10.php
+          grep -Fq 'Recipe intelligence' /tmp/phase10-build/phase10.php
+          ! grep -Eiq '\b(CREATE|ALTER|DROP)[[:space:]]+TABLE\b' /tmp/phase10-build/phase10.php
+          ! grep -E 'href="/|src="/' /tmp/phase10-build/phase10.php
+
+      - name: Commit Phase 10 rebuild
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp /tmp/phase10-build/phase10.php phase10.php
+          cp /tmp/phase10-build/assets/css/homestead-nutrition.css assets/css/homestead-nutrition.css
+          cp /tmp/phase10-build/assets/js/homestead-nutrition.js assets/js/homestead-nutrition.js
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('app/bootstrap.php')
+          source = path.read_text()
+          old = "'phase10.php' => ['class' => 'ui-nutrition', 'stylesheet' => 'intelligence-pages.css'],"
+          new = "'phase10.php' => ['class' => 'ui-nutrition', 'stylesheet' => 'homestead-nutrition.css'],"
+          if old not in source:
+              raise SystemExit('Expected Phase 10 route mapping not found')
+          path.write_text(source.replace(old, new, 1))
+          PY
+          php -l app/bootstrap.php
+          php tests/phase10_static_audit.php
+          grep -q "phase10.php'.*homestead-nutrition.css" app/bootstrap.php
+          rm -f .github/workflows/homestead-phase10-reskin-build.yml
+          rm -rf .reskin/phase10
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          changed="$(git diff --cached --name-only)"
+          echo "$changed"
+          ! echo "$changed" | grep -E '^(database/|app/(NutritionService|Auth|Database|.*Service)\.php)'
+          git commit -m "Reskin Homestead nutrition and dietary planning"
+          git push origin HEAD:${{ github.head_ref }}
