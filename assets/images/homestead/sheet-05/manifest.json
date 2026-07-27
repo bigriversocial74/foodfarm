@@ -1,0 +1,173 @@
+{
+  "sheet": 5,
+  "source_file": "homestead_5.png",
+  "source_dimensions": [
+    1122,
+    1402
+  ],
+  "source_format": "PNG",
+  "source_sha256": "13477baf5ae5516cb6b64e25d21c50a5de557d4f94036e50ebab23e1c138628f",
+  "panel_count": 10,
+  "assets": [
+    {
+      "filename": "preservation-jars-wide.png",
+      "crop_box": [
+        18,
+        218,
+        1104,
+        691
+      ],
+      "dimensions": [
+        1086,
+        473
+      ],
+      "intended_use": "Landing or preservation page wide scene of canned and fermented foods.",
+      "format": "PNG",
+      "sha256": "784315bebe46fa4cdcc9cac56210fea6df34ee448514c4c790cd25ff559c3d93"
+    },
+    {
+      "filename": "dehydrated-food-jars.png",
+      "crop_box": [
+        18,
+        708,
+        374,
+        1126
+      ],
+      "dimensions": [
+        356,
+        418
+      ],
+      "intended_use": "Preservation detail card for dehydration and dried-food storage.",
+      "format": "PNG",
+      "sha256": "ba5fe3fd6d8373ab2a0e86fdcd353facd653e662d000e586483b20d0926a4c7a"
+    },
+    {
+      "filename": "fermentation-crock.png",
+      "crop_box": [
+        389,
+        708,
+        733,
+        1126
+      ],
+      "dimensions": [
+        344,
+        418
+      ],
+      "intended_use": "Preservation detail card for fermentation crocks, pickles, and sauerkraut.",
+      "format": "PNG",
+      "sha256": "e0cf1bfc5828e3655da2c7fecf62d33c73c94c34eb17d645508d84246148d8d7"
+    },
+    {
+      "filename": "labeled-pickle-jar.png",
+      "crop_box": [
+        748,
+        708,
+        1104,
+        1126
+      ],
+      "dimensions": [
+        356,
+        418
+      ],
+      "intended_use": "Preservation tracking card for dated labels, batches, and written records.",
+      "format": "PNG",
+      "sha256": "86b0ba0a880900654a856320505653e8727014cf352ebb8e2ffa4349491c69e5"
+    },
+    {
+      "filename": "canning-jar-icon.png",
+      "crop_box": [
+        18,
+        1143,
+        211,
+        1350
+      ],
+      "dimensions": [
+        193,
+        207
+      ],
+      "intended_use": "Canning and jar-storage feature card.",
+      "format": "PNG",
+      "sha256": "60ffa443845cb431081d50d30bbe407c6bec08da3251dc5f7a52859fd7988a90"
+    },
+    {
+      "filename": "dehydrator-icon.png",
+      "crop_box": [
+        220,
+        1143,
+        390,
+        1350
+      ],
+      "dimensions": [
+        170,
+        207
+      ],
+      "intended_use": "Dehydration feature card.",
+      "format": "PNG",
+      "sha256": "fd4d067a0c4c21827db8579821b0755f317c2f59418c809acf88a2df9d79f358"
+    },
+    {
+      "filename": "fermentation-crock-icon.png",
+      "crop_box": [
+        400,
+        1143,
+        567,
+        1350
+      ],
+      "dimensions": [
+        167,
+        207
+      ],
+      "intended_use": "Fermentation vessel feature card.",
+      "format": "PNG",
+      "sha256": "8ed49075244c4fc463ddc2615341fc59ce79cac1d293fee3678319ff619d9952"
+    },
+    {
+      "filename": "preservation-label-icon.png",
+      "crop_box": [
+        576,
+        1143,
+        742,
+        1350
+      ],
+      "dimensions": [
+        166,
+        207
+      ],
+      "intended_use": "Batch labeling and traceability feature card.",
+      "format": "PNG",
+      "sha256": "b27860b636fb773763fe81d54a84a3471f0655a6610a2d162e15a5ecf720b680"
+    },
+    {
+      "filename": "preservation-time-icon.png",
+      "crop_box": [
+        752,
+        1143,
+        918,
+        1350
+      ],
+      "dimensions": [
+        166,
+        207
+      ],
+      "intended_use": "Processing time and shelf-life feature card.",
+      "format": "PNG",
+      "sha256": "6b162e937102a9ed84f9ee84e8d94793f0136f602fe3b531bc0ee046157a6eaa"
+    },
+    {
+      "filename": "preservation-shelf-icon.png",
+      "crop_box": [
+        928,
+        1143,
+        1104,
+        1350
+      ],
+      "dimensions": [
+        176,
+        207
+      ],
+      "intended_use": "Preserved-food shelf inventory feature card.",
+      "format": "PNG",
+      "sha256": "838c273e1e59868339121f7b3c2e26c8674940754f4421705beec132ab64520e"
+    }
+  ]
+}
