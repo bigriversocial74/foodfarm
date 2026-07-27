@@ -7,9 +7,16 @@ declare(strict_types=1);
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="theme-color" content="#1f4b36">
+    <meta name="application-name" content="Homestead">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="description" content="Homestead is a household food system for growing, storing, cooking, preserving, planning, and coordinating real food.">
     <title>Homestead · Your Household Food System</title>
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="icon" href="/assets/icons/homestead-icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/assets/icons/homestead-icon.svg">
     <link rel="stylesheet" href="/assets/css/app.css">
+    <script src="/assets/js/pwa.js?v=20260727" defer></script>
 </head>
 <body>
 <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -36,6 +43,7 @@ declare(strict_types=1);
                 <div class="hero-actions">
                     <a class="button primary" href="/login.php">Open Homestead</a>
                     <a class="button secondary" href="#system">Explore the system</a>
+                    <button class="button secondary" type="button" data-homestead-install hidden>Install Homestead</button>
                 </div>
                 <div class="hero-proof" aria-label="Homestead benefits">
                     <span>Built for households</span>
