@@ -48,9 +48,9 @@ jobs:
           cp /tmp/login-session-fix/tests/session_cookie_policy_test.php tests/session_cookie_policy_test.php
           cp /tmp/login-session-fix/.github/workflows/login-session-hardening.yml .github/workflows/login-session-hardening.yml
           php tests/session_cookie_policy_test.php
-          grep -Fq "'path' => $basePath !== '' ? $basePath . '/' : '/'" app/bootstrap.php
-          grep -Fq "'secure' => $requestUsesHttps" app/bootstrap.php
-          grep -Fq "csrf_is_valid" login.php
+          grep -Fq "'path' => \$basePath !== '' ? \$basePath . '/' : '/'" app/bootstrap.php
+          grep -Fq "'secure' => \$requestUsesHttps" app/bootstrap.php
+          grep -Fq 'csrf_is_valid' login.php
           grep -Fq '$auth->attempt($email, $password)' login.php
           grep -Fq 'session_regenerate_id' app/Auth.php
 
