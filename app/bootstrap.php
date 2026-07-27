@@ -76,7 +76,7 @@ $routeName = basename($requestPath);
 $uiRoutes = [
     'dashboard.php' => ['class' => 'ui-dashboard', 'stylesheet' => 'homestead-dashboard.css'],
     'phase2.php' => ['class' => 'ui-household', 'stylesheet' => 'homestead-pantry.css'],
-    'phase4.php' => ['class' => 'ui-recipes', 'stylesheet' => 'core-pages.css'],
+    'phase4.php' => ['class' => 'ui-recipes', 'stylesheet' => 'homestead-recipes.css'],
     'phase6.php' => ['class' => 'ui-grow', 'stylesheet' => 'core-pages.css'],
     'prepared-food.php' => ['class' => 'ui-preserve', 'stylesheet' => 'core-pages.css'],
     'phase3.php' => ['class' => 'ui-access', 'stylesheet' => 'intelligence-pages.css'],
