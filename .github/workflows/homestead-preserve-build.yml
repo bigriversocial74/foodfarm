@@ -58,7 +58,7 @@ jobs:
 
           grep -q 'homestead-preserve.css' app/bootstrap.php
           grep -q 'Preservation Tracking' phase6.php
-          grep -q 'Preservation Timeline' phase6.php
+          grep -q 'Batch timeline' phase6.php
           grep -q 'data-preserve-search' phase6.php
           grep -q 'data-preserve-method' phase6.php
           grep -q 'name="action" value="create_zone"' phase6.php
@@ -86,3 +86,5 @@ jobs:
           git add -u .github/workflows .homestead-build
           git commit -m "Build Homestead preservation tracking experience"
           git push origin HEAD:${{ github.event.pull_request.head.ref }}
+
+# corrected timeline assertion
