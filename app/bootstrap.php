@@ -88,6 +88,9 @@ $uiRoutes = [
     'phase10.php' => ['class' => 'ui-nutrition', 'stylesheet' => 'intelligence-pages.css'],
     'phase11.php' => ['class' => 'ui-alerts', 'stylesheet' => 'intelligence-pages.css'],
     'account.php' => ['class' => 'ui-account', 'stylesheet' => 'intelligence-pages.css'],
+    'login.php' => ['class' => 'ui-auth-flow ui-login', 'stylesheet' => 'access-flow.css'],
+    'accept-invite.php' => ['class' => 'ui-auth-flow ui-invite', 'stylesheet' => 'access-flow.css'],
+    'activate-kit.php' => ['class' => 'ui-auth-flow ui-kit-activation', 'stylesheet' => 'access-flow.css'],
 ];
 $uiRoute = $uiRoutes[$routeName] ?? null;
 if (is_array($uiRoute)) {
