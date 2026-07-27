@@ -71,6 +71,12 @@ function redirect(string $url): never
     if (!str_starts_with($url, '/') || str_starts_with($url, '//') || preg_match('/[\x00-\x1F\x7F]/', $url)) {
         throw new RuntimeException('Unsafe redirect target.');
     }
+
+    $basePath = defined('HOMESTEAD_BASE_PATH') ? (string)constant('HOMESTEAD_BASE_PATH') : '';
+    if ($basePath !== '' && $url !== $basePath && !str_starts_with($url, $basePath . '/')) {
+        $url = $basePath . $url;
+    }
+
     header('Location: ' . $url, true, 303);
     exit;
 }
@@ -138,15 +144,19 @@ function health_error(Throwable $exception, array $config): never
 {
     $isDebug = !empty($config['app']['debug']) && (($config['app']['environment'] ?? 'production') !== 'production');
     if (!$isDebug) {
-        error_log(sprintf('Homestead health error [%s]: %s', $exception::class, $exception->getMessage()));
+        error_log(sprintf(
+            'Homestead health error [%s]: %s in %s:%d',
+            $exception::class,
+            $exception->getMessage(),
+            $exception->getFile(),
+            $exception->getLine()
+        ));
     }
+
     http_response_code(500);
-    header('Content-Type: application/json; charset=utf-8');
     echo json_encode([
         'ok' => false,
-        'connected' => false,
         'error' => $isDebug ? $exception->getMessage() : 'Health check failed.',
-        'timestamp' => gmdate(DATE_ATOM),
-    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    ], JSON_UNESCAPED_SLASHES);
     exit;
 }
