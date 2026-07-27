@@ -1,10 +1,10 @@
 {
-  "id": "/",
+  "id": "./",
   "name": "Homestead Household Food System",
   "short_name": "Homestead",
   "description": "A household food system for growing, storing, cooking, preserving, planning, and coordinating real food.",
-  "start_url": "/dashboard.php?source=pwa",
-  "scope": "/",
+  "start_url": "dashboard.php?source=pwa",
+  "scope": "./",
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
   "orientation": "any",
@@ -13,19 +13,19 @@
   "categories": ["food", "lifestyle", "productivity"],
   "icons": [
     {
-      "src": "/assets/icons/homestead-icon.svg",
+      "src": "assets/icons/homestead-icon.svg",
       "sizes": "192x192",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "/assets/icons/homestead-icon.svg",
+      "src": "assets/icons/homestead-icon.svg",
       "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "/assets/icons/homestead-icon.svg",
+      "src": "assets/icons/homestead-icon.svg",
       "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "maskable"
@@ -36,19 +36,19 @@
       "name": "Pantry inventory",
       "short_name": "Pantry",
       "description": "Open household inventory and storage records.",
-      "url": "/phase2.php?section=inventory&source=pwa-shortcut"
+      "url": "phase2.php?section=inventory&source=pwa-shortcut"
     },
     {
       "name": "Today’s planning",
       "short_name": "Planning",
       "description": "Open household tasks, assignments, and shopping suggestions.",
-      "url": "/phase7.php?source=pwa-shortcut"
+      "url": "phase7.php?source=pwa-shortcut"
     },
     {
       "name": "Household alerts",
       "short_name": "Alerts",
       "description": "Open notifications, calendar items, and household alerts.",
-      "url": "/phase11.php?source=pwa-shortcut"
+      "url": "phase11.php?source=pwa-shortcut"
     }
   ]
 }
