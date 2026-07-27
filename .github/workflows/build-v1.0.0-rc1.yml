@@ -1,0 +1,108 @@
+name: Build Homestead v1.0.0-rc1
+
+on:
+  push:
+    branches:
+      - release/v1.0.0-rc1
+    paths:
+      - '.github/workflows/build-v1.0.0-rc1.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-release-candidate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out certified source
+        uses: actions/checkout@v4
+        with:
+          ref: b3bbec8cfee398d33563ce1c6d6532b8e88d68b7
+          fetch-depth: 1
+
+      - name: Validate certified source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "b3bbec8cfee398d33563ce1c6d6532b8e88d68b7"
+          php -l index.php
+          php -l login.php
+          php -l dashboard.php
+          php -l phase7.php
+          php -l phase8.php
+          php -l phase9.php
+          php -l phase10.php
+          php -l phase11.php
+          php -l account.php
+          test -f assets/css/homestead-account.css
+          test -f assets/css/homestead-alerts.css
+          test -f assets/css/homestead-nutrition.css
+          test -f assets/css/homestead-finance.css
+          test -f assets/css/homestead-forecast.css
+          test -f assets/css/homestead-planning.css
+
+      - name: Assemble production-safe package
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_name='Homestead-v1.0.0-rc1'
+          mkdir -p "/tmp/${release_name}"
+          rsync -a ./ "/tmp/${release_name}/" \
+            --exclude='.git/' \
+            --exclude='.github/' \
+            --exclude='.reskin/' \
+            --exclude='config.php' \
+            --exclude='.env' \
+            --exclude='.env.*' \
+            --exclude='storage/' \
+            --exclude='tests/' \
+            --exclude='test-results/' \
+            --exclude='coverage/' \
+            --exclude='*.log' \
+            --exclude='*.zip'
+
+          cat > "/tmp/${release_name}/RELEASE-CANDIDATE.txt" <<'EOF'
+          Homestead v1.0.0-rc1
+          Source commit: b3bbec8cfee398d33563ce1c6d6532b8e88d68b7
+          Built: 2026-07-27
+
+          Deployment safeguards:
+          - Preserve the live config.php file.
+          - Preserve the complete live storage/ directory.
+          - Do not re-import SQL solely for the ten-page reskin sequence.
+          - Confirm the existing database includes migrations through phase11_alerts_calendar_notifications.sql.
+          - Confirm app.base_url matches the deployed domain or subfolder.
+          - Confirm debug=false and security.health_key is a long random production value.
+          - Hard-refresh browsers and refresh/reinstall the PWA after upload.
+          EOF
+
+          cd /tmp
+          zip -X -r "${GITHUB_WORKSPACE}/${release_name}.zip" "${release_name}"
+          cd "${GITHUB_WORKSPACE}"
+          sha256sum "${release_name}.zip" > "${release_name}.zip.sha256"
+
+      - name: Verify package exclusions
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_name='Homestead-v1.0.0-rc1'
+          unzip -l "${release_name}.zip" > /tmp/package-list.txt
+          ! grep -E '/config\.php$' /tmp/package-list.txt
+          ! grep -E '/storage/' /tmp/package-list.txt
+          ! grep -E '/\.github/' /tmp/package-list.txt
+          ! grep -E '/tests/' /tmp/package-list.txt
+          grep -F "${release_name}/config-example.php" /tmp/package-list.txt
+          grep -F "${release_name}/account.php" /tmp/package-list.txt
+          grep -F "${release_name}/phase11.php" /tmp/package-list.txt
+          grep -F "${release_name}/assets/css/homestead-account.css" /tmp/package-list.txt
+          grep -F "${release_name}/RELEASE-CANDIDATE.txt" /tmp/package-list.txt
+
+      - name: Upload release candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: Homestead-v1.0.0-rc1
+          retention-days: 30
+          if-no-files-found: error
+          path: |
+            Homestead-v1.0.0-rc1.zip
+            Homestead-v1.0.0-rc1.zip.sha256
