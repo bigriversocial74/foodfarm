@@ -7,6 +7,7 @@ require __DIR__ . '/app/bootstrap.php';
 use function Homestead\csrf_is_valid;
 use function Homestead\csrf_token;
 use function Homestead\e;
+use function Homestead\redirect;
 use function Homestead\user_error_message;
 
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
@@ -14,7 +15,10 @@ header('Pragma: no-cache');
 
 $user = $auth->user();
 $error = null;
-$success = null;
+$success = isset($_SESSION['login_success_message'])
+    ? (string)$_SESSION['login_success_message']
+    : null;
+unset($_SESSION['login_success_message']);
 
 if ($user === null && $_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
@@ -84,7 +88,8 @@ if ($user === null && $_SERVER['REQUEST_METHOD'] === 'POST') {
             error_log('Homestead login audit failed: ' . $auditException->getMessage());
         }
 
-        $success = 'You are signed in. Choose where to continue.';
+        $_SESSION['login_success_message'] = 'You are signed in. Choose where to continue.';
+        redirect('/login.php');
     } catch (Throwable $exception) {
         $error = user_error_message($exception, 'Sign-in could not be completed. Try again.');
     }
