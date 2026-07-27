@@ -1,4 +1,4 @@
-name: Homestead Sheet 5 Preview
+name: Homestead Sheet 5 Asset Build
 
 on:
   pull_request:
@@ -8,10 +8,10 @@ on:
       - .github/workflows/homestead-sheet-05-preview.yml
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  preview-sheet-05:
+  build-sheet-05-assets:
     runs-on: ubuntu-latest
     steps:
       - name: Check out rebuild branch
@@ -22,36 +22,146 @@ jobs:
       - name: Install Pillow
         run: python -m pip install --disable-pip-version-check Pillow
 
-      - name: Build Sheet 5 preview artifact
+      - name: Extract and validate Sheet 5 panels
         shell: bash
         run: |
-          mkdir -p .homestead-preview
           python - <<'PY'
+          from __future__ import annotations
+
+          import hashlib
+          import json
           from pathlib import Path
           from PIL import Image
 
-          source = Image.open('homestead_5.png')
+          source_path = Path('homestead_5.png')
+          output_dir = Path('assets/images/homestead/sheet-05')
+          output_dir.mkdir(parents=True, exist_ok=True)
+
+          assets = [
+              {
+                  'filename': 'preservation-jars-wide.png',
+                  'crop_box': [18, 218, 1104, 691],
+                  'dimensions': [1086, 473],
+                  'intended_use': 'Landing or preservation page wide scene of canned and fermented foods.',
+              },
+              {
+                  'filename': 'dehydrated-food-jars.png',
+                  'crop_box': [18, 708, 374, 1126],
+                  'dimensions': [356, 418],
+                  'intended_use': 'Preservation detail card for dehydration and dried-food storage.',
+              },
+              {
+                  'filename': 'fermentation-crock.png',
+                  'crop_box': [389, 708, 733, 1126],
+                  'dimensions': [344, 418],
+                  'intended_use': 'Preservation detail card for fermentation crocks, pickles, and sauerkraut.',
+              },
+              {
+                  'filename': 'labeled-pickle-jar.png',
+                  'crop_box': [748, 708, 1104, 1126],
+                  'dimensions': [356, 418],
+                  'intended_use': 'Preservation tracking card for dated labels, batches, and written records.',
+              },
+              {
+                  'filename': 'canning-jar-icon.png',
+                  'crop_box': [18, 1143, 211, 1350],
+                  'dimensions': [193, 207],
+                  'intended_use': 'Canning and jar-storage feature card.',
+              },
+              {
+                  'filename': 'dehydrator-icon.png',
+                  'crop_box': [220, 1143, 390, 1350],
+                  'dimensions': [170, 207],
+                  'intended_use': 'Dehydration feature card.',
+              },
+              {
+                  'filename': 'fermentation-crock-icon.png',
+                  'crop_box': [400, 1143, 567, 1350],
+                  'dimensions': [167, 207],
+                  'intended_use': 'Fermentation vessel feature card.',
+              },
+              {
+                  'filename': 'preservation-label-icon.png',
+                  'crop_box': [576, 1143, 742, 1350],
+                  'dimensions': [166, 207],
+                  'intended_use': 'Batch labeling and traceability feature card.',
+              },
+              {
+                  'filename': 'preservation-time-icon.png',
+                  'crop_box': [752, 1143, 918, 1350],
+                  'dimensions': [166, 207],
+                  'intended_use': 'Processing time and shelf-life feature card.',
+              },
+              {
+                  'filename': 'preservation-shelf-icon.png',
+                  'crop_box': [928, 1143, 1104, 1350],
+                  'dimensions': [176, 207],
+                  'intended_use': 'Preserved-food shelf inventory feature card.',
+              },
+          ]
+
+          source = Image.open(source_path)
           source.load()
-          preview = source.convert('RGB')
-          preview.thumbnail((1600, 1600), Image.Resampling.LANCZOS)
-          preview.save('.homestead-preview/sheet-05-preview.jpg', format='JPEG', quality=88, optimize=True)
-          Path('.homestead-preview/sheet-05-metadata.txt').write_text(
-              f'source={source.width}x{source.height}\n'
-              f'mode={source.mode}\n'
-              f'format={source.format}\n'
-              f'preview={preview.width}x{preview.height}\n',
-              encoding='utf-8'
+          if source.size != (1122, 1402):
+              raise SystemExit(f'Unexpected Sheet 5 source dimensions: {source.size}')
+          if source.format != 'PNG':
+              raise SystemExit(f'Unexpected Sheet 5 source format: {source.format}')
+
+          for asset in assets:
+              output_path = output_dir / asset['filename']
+              crop = source.crop(tuple(asset['crop_box'])).convert('RGB')
+              expected_size = tuple(asset['dimensions'])
+              if crop.size != expected_size:
+                  raise SystemExit(
+                      f"{asset['filename']} dimensions {crop.size} do not match {expected_size}"
+                  )
+              crop.save(output_path, format='PNG', optimize=True)
+              verify = Image.open(output_path)
+              verify.load()
+              if verify.size != expected_size or verify.format != 'PNG':
+                  raise SystemExit(f"Failed output validation for {asset['filename']}")
+              asset['format'] = 'PNG'
+              asset['sha256'] = hashlib.sha256(output_path.read_bytes()).hexdigest()
+
+          manifest = {
+              'sheet': 5,
+              'source_file': source_path.name,
+              'source_dimensions': list(source.size),
+              'source_format': source.format,
+              'source_sha256': hashlib.sha256(source_path.read_bytes()).hexdigest(),
+              'panel_count': len(assets),
+              'assets': assets,
+          }
+          (output_dir / 'manifest.json').write_text(
+              json.dumps(manifest, indent=2) + '\n',
+              encoding='utf-8',
           )
-          print(Path('.homestead-preview/sheet-05-metadata.txt').read_text(encoding='utf-8'))
+
+          print(f"Created and validated {len(assets)} Sheet 5 panel assets.")
+          for asset in assets:
+              print(
+                  f"{asset['filename']}: "
+                  f"{asset['dimensions'][0]}x{asset['dimensions'][1]} PNG"
+              )
           PY
 
-      - name: Upload Sheet 5 source and preview
+      - name: Commit completed Sheet 5 asset batch
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/images/homestead/sheet-05
+          if git diff --cached --quiet; then
+            echo "Sheet 5 assets are unchanged."
+            exit 0
+          fi
+          git commit -m "Add Homestead Sheet 5 preservation tracking assets"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
+
+      - name: Upload completed Sheet 5 asset batch
         uses: actions/upload-artifact@v4
         with:
-          name: homestead-sheet-05-source-preview
-          path: |
-            homestead_5.png
-            .homestead-preview/sheet-05-preview.jpg
-            .homestead-preview/sheet-05-metadata.txt
+          name: homestead-sheet-05-assets
+          path: assets/images/homestead/sheet-05
           if-no-files-found: error
           retention-days: 7
