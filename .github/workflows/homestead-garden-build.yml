@@ -23,7 +23,31 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cat .homestead-build/garden-build.part-* > /tmp/garden-build.b64
+          cat \
+            .homestead-build/garden-build.part-00 \
+            .homestead-build/garden-build.part-01 \
+            .homestead-build/garden-build.mini-00 \
+            .homestead-build/garden-build.mini-01 \
+            .homestead-build/garden-build.mini-02 \
+            .homestead-build/garden-build.mini-03 \
+            .homestead-build/garden-build.mini-04 \
+            .homestead-build/garden-build.mini-05 \
+            .homestead-build/garden-build.mini-06 \
+            .homestead-build/garden-build.mini-07 \
+            .homestead-build/garden-build.mini-08 \
+            .homestead-build/garden-build.mini-09 \
+            .homestead-build/garden-build.mini-10 \
+            .homestead-build/garden-build.mini-11 \
+            .homestead-build/garden-build.mini-12 \
+            .homestead-build/garden-build.mini-13 \
+            .homestead-build/garden-build.mini-14 \
+            .homestead-build/garden-build.mini-15 \
+            .homestead-build/garden-build.part-03 \
+            .homestead-build/garden-build.part-04 \
+            .homestead-build/garden-build.part-05 \
+            > /tmp/garden-build.b64
+          test "$(wc -c < /tmp/garden-build.b64)" -eq 23276
+          echo "5f718367cf58c05e79d7875803ba7c4dce4560651ad9490dd5b4a04ba15fff6e  /tmp/garden-build.b64" | sha256sum --check --strict
           base64 --decode /tmp/garden-build.b64 > /tmp/garden-build.tar.gz
           echo "e6378d10f523ac0907fb5a3ba6a89a36982403715a3498f72d1d4acdffea74f1  /tmp/garden-build.tar.gz" | sha256sum --check --strict
           tar -xzf /tmp/garden-build.tar.gz
@@ -74,4 +98,4 @@ jobs:
           git commit -m "Build Homestead garden monitoring experience"
           git push origin HEAD:${{ github.event.pull_request.head.ref }}
 
-# package reconstruction retry 2
+# verified micro-segment reconstruction
