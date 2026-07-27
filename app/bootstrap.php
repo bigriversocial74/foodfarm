@@ -74,7 +74,7 @@ $requestPath = (string)(parse_url((string)($_SERVER['REQUEST_URI'] ?? ''), PHP_U
 $routeName = basename($requestPath);
 
 $uiRoutes = [
-    'dashboard.php' => ['class' => 'ui-dashboard', 'stylesheet' => 'core-pages.css'],
+    'dashboard.php' => ['class' => 'ui-dashboard', 'stylesheet' => 'homestead-dashboard.css'],
     'phase2.php' => ['class' => 'ui-household', 'stylesheet' => 'core-pages.css'],
     'phase4.php' => ['class' => 'ui-recipes', 'stylesheet' => 'core-pages.css'],
     'phase6.php' => ['class' => 'ui-grow', 'stylesheet' => 'core-pages.css'],
@@ -105,7 +105,11 @@ if (is_array($uiRoute)) {
     $sectionClass = '';
     $activeShellKey = match ($routeName) {
         'dashboard.php' => 'home',
-        'phase2.php' => (string)($_GET['section'] ?? 'family') === 'family' ? 'household' : 'pantry',
+        'phase2.php' => match ((string)($_GET['section'] ?? 'family')) {
+            'family' => 'household',
+            'storage' => 'storage',
+            default => 'pantry',
+        },
         'phase3.php' => 'access',
         'phase4.php' => 'recipes',
         'phase5.php', 'starter-kit-lifecycle.php' => 'kits',
@@ -153,7 +157,7 @@ if (is_array($uiRoute)) {
                 $safeStylesheet = htmlspecialchars($stylesheetPath, ENT_QUOTES, 'UTF-8');
                 $html = str_ireplace(
                     '</head>',
-                    '<link rel="stylesheet" href="' . $safeStylesheet . '?v=20260727-2"></head>',
+                    '<link rel="stylesheet" href="' . $safeStylesheet . '?v=20260727-3"></head>',
                     $html
                 );
             }
@@ -194,75 +198,123 @@ if (is_array($uiRoute)) {
             }
             return false;
         };
-        $navigationItems = [
-            ['key' => 'home', 'label' => 'Home', 'href' => '/dashboard.php', 'visible' => true],
-            ['key' => 'household', 'label' => 'Household', 'href' => '/phase2.php?section=family', 'visible' => true],
-            ['key' => 'pantry', 'label' => 'Pantry', 'href' => '/phase2.php?section=inventory', 'visible' => $canAny(['storage.view', 'storage.manage', 'inventory.view', 'inventory.manage'])],
-            ['key' => 'recipes', 'label' => 'Recipes', 'href' => '/phase4.php', 'visible' => $canAny(['recipes.view', 'recipes.manage', 'recipes.complete', 'meals.manage'])],
-            ['key' => 'garden', 'label' => 'Garden', 'href' => '/phase6.php?section=garden', 'visible' => $canAny(['garden.view', 'garden.manage', 'harvest.record'])],
-            ['key' => 'preserve', 'label' => 'Preserve', 'href' => '/phase6.php?section=preservation', 'visible' => $canAny(['preservation.view', 'preservation.manage'])],
-            ['key' => 'planning', 'label' => 'Planning', 'href' => '/phase7.php', 'visible' => $canAny(['tasks.manage', 'tasks.complete'])],
-            ['key' => 'forecast', 'label' => 'Forecast', 'href' => '/phase8.php', 'visible' => $canAny([
-                'inventory.view', 'inventory.manage', 'garden.view', 'garden.manage',
-                'harvest.record', 'preservation.view', 'preservation.manage',
-                'tasks.manage', 'tasks.complete',
-            ])],
-            ['key' => 'finance', 'label' => 'Finance', 'href' => '/phase9.php', 'visible' => $canAny(['finance.view', 'finance.manage'])],
-            ['key' => 'nutrition', 'label' => 'Nutrition', 'href' => '/phase10.php', 'visible' => $canAny(['nutrition.view', 'nutrition.manage'])],
-            ['key' => 'alerts', 'label' => 'Alerts', 'href' => '/phase11.php', 'visible' => $canAny(['notifications.view', 'notifications.manage'])],
-            ['key' => 'access', 'label' => 'Access', 'href' => '/phase3.php', 'visible' => $canAny(['members.manage', 'members.invite', 'permissions.manage'])],
-            ['key' => 'kits', 'label' => 'Starter Kits', 'href' => '/phase5.php', 'visible' => !empty($user['is_platform_admin'])],
-            ['key' => 'account', 'label' => 'Account', 'href' => '/account.php', 'visible' => true],
+
+        $navigationGroups = [
+            'Main' => [
+                ['key' => 'home', 'label' => 'Dashboard', 'href' => 'dashboard.php', 'icon' => '⌂', 'visible' => true],
+                ['key' => 'pantry', 'label' => 'Pantry Inventory', 'href' => 'phase2.php?section=inventory', 'icon' => '▦', 'visible' => $canAny(['storage.view', 'storage.manage', 'inventory.view', 'inventory.manage'])],
+                ['key' => 'recipes', 'label' => 'Recipes & Meal Planning', 'href' => 'phase4.php', 'icon' => '✣', 'visible' => $canAny(['recipes.view', 'recipes.manage', 'recipes.complete', 'meals.manage'])],
+                ['key' => 'garden', 'label' => 'Garden', 'href' => 'phase6.php?section=garden', 'icon' => '♧', 'visible' => $canAny(['garden.view', 'garden.manage', 'harvest.record'])],
+                ['key' => 'preserve', 'label' => 'Preservation', 'href' => 'phase6.php?section=preservation', 'icon' => '▣', 'visible' => $canAny(['preservation.view', 'preservation.manage'])],
+                ['key' => 'planning', 'label' => 'Planning & Tasks', 'href' => 'phase7.php', 'icon' => '✓', 'visible' => $canAny(['tasks.manage', 'tasks.complete'])],
+                ['key' => 'forecast', 'label' => 'Forecast & Seasons', 'href' => 'phase8.php', 'icon' => '⌁', 'visible' => $canAny([
+                    'inventory.view', 'inventory.manage', 'garden.view', 'garden.manage',
+                    'harvest.record', 'preservation.view', 'preservation.manage',
+                    'tasks.manage', 'tasks.complete',
+                ])],
+            ],
+            'Manage' => [
+                ['key' => 'household', 'label' => 'Family & Household', 'href' => 'phase2.php?section=family', 'icon' => '♙', 'visible' => true],
+                ['key' => 'storage', 'label' => 'Storage Locations', 'href' => 'phase2.php?section=storage', 'icon' => '▤', 'visible' => $canAny(['storage.view', 'storage.manage'])],
+                ['key' => 'finance', 'label' => 'Costs & Reports', 'href' => 'phase9.php', 'icon' => '▥', 'visible' => $canAny(['finance.view', 'finance.manage'])],
+                ['key' => 'nutrition', 'label' => 'Nutrition', 'href' => 'phase10.php', 'icon' => '◎', 'visible' => $canAny(['nutrition.view', 'nutrition.manage'])],
+                ['key' => 'alerts', 'label' => 'Alerts & Calendar', 'href' => 'phase11.php', 'icon' => '!', 'visible' => $canAny(['notifications.view', 'notifications.manage'])],
+            ],
+            'Settings' => [
+                ['key' => 'access', 'label' => 'Family Access', 'href' => 'phase3.php', 'icon' => '⚿', 'visible' => $canAny(['members.manage', 'members.invite', 'permissions.manage'])],
+                ['key' => 'kits', 'label' => 'Starter Kits', 'href' => 'phase5.php', 'icon' => '◆', 'visible' => !empty($user['is_platform_admin'])],
+                ['key' => 'account', 'label' => 'Profile & Settings', 'href' => 'account.php', 'icon' => '⚙', 'visible' => true],
+            ],
         ];
 
-        $desktopLinks = '';
-        $mobileLinks = '';
-        foreach ($navigationItems as $item) {
-            if (!$item['visible']) {
+        $sidebarNavigation = '';
+        $mobileNavigation = '';
+        $alertsVisible = false;
+        foreach ($navigationGroups as $groupLabel => $items) {
+            $groupLinks = '';
+            $mobileGroupLinks = '';
+            foreach ($items as $item) {
+                if (!$item['visible']) {
+                    continue;
+                }
+                if ($item['key'] === 'alerts') {
+                    $alertsVisible = true;
+                }
+                $isActive = $item['key'] === $activeShellKey;
+                $safeHref = htmlspecialchars((string)$item['href'], ENT_QUOTES, 'UTF-8');
+                $safeLabel = htmlspecialchars((string)$item['label'], ENT_QUOTES, 'UTF-8');
+                $safeIcon = htmlspecialchars((string)$item['icon'], ENT_QUOTES, 'UTF-8');
+                $activeClass = $isActive ? ' is-active' : '';
+                $current = $isActive ? ' aria-current="page"' : '';
+                $groupLinks .= '<a class="homestead-nav__link' . $activeClass . '" href="' . $safeHref . '"' . $current . '>'
+                    . '<span class="homestead-nav__icon" aria-hidden="true">' . $safeIcon . '</span>'
+                    . '<span>' . $safeLabel . '</span></a>';
+                $mobileGroupLinks .= '<a class="homestead-mobile-nav__link' . $activeClass . '" href="' . $safeHref . '"' . $current . '>'
+                    . '<span class="homestead-nav__icon" aria-hidden="true">' . $safeIcon . '</span>'
+                    . '<span>' . $safeLabel . '</span></a>';
+            }
+            if ($groupLinks === '') {
                 continue;
             }
-            $isActive = $item['key'] === $activeShellKey;
-            $safeHref = htmlspecialchars((string)$item['href'], ENT_QUOTES, 'UTF-8');
-            $safeLabel = htmlspecialchars((string)$item['label'], ENT_QUOTES, 'UTF-8');
-            $activeClass = $isActive ? ' is-active' : '';
-            $current = $isActive ? ' aria-current="page"' : '';
-            $desktopLinks .= '<a class="homestead-appbar__link' . $activeClass . '" href="' . $safeHref . '"' . $current . '>' . $safeLabel . '</a>';
-            $mobileLinks .= '<a class="homestead-mobile-menu__link' . $activeClass . '" href="' . $safeHref . '"' . $current . '>' . $safeLabel . '</a>';
+            $safeGroup = htmlspecialchars($groupLabel, ENT_QUOTES, 'UTF-8');
+            $sidebarNavigation .= '<section class="homestead-nav__group"><p class="homestead-nav__heading">' . $safeGroup . '</p><nav aria-label="' . $safeGroup . '">' . $groupLinks . '</nav></section>';
+            $mobileNavigation .= '<section class="homestead-mobile-nav__group"><p>' . $safeGroup . '</p><nav aria-label="Mobile ' . $safeGroup . '">' . $mobileGroupLinks . '</nav></section>';
         }
 
         $displayName = trim((string)($user['display_name'] ?? 'Household member'));
         $safeDisplayName = htmlspecialchars($displayName, ENT_QUOTES, 'UTF-8');
         $initial = function_exists('mb_substr') ? mb_substr($displayName, 0, 1) : substr($displayName, 0, 1);
         $safeInitial = htmlspecialchars(strtoupper((string)$initial), ENT_QUOTES, 'UTF-8');
+        $safeRole = htmlspecialchars(ucwords(str_replace('_', ' ', (string)($user['role'] ?? 'member'))), ENT_QUOTES, 'UTF-8');
 
-        $navigation = '<header class="homestead-appbar">'
-            . '<div class="homestead-appbar__inner">'
-            . '<a class="homestead-appbar__brand" href="/dashboard.php" aria-label="Homestead dashboard">'
-            . '<span class="homestead-appbar__mark" aria-hidden="true">H</span>'
-            . '<span class="homestead-appbar__brand-copy"><strong>Homestead</strong><small>Household food system</small></span>'
-            . '</a>'
-            . '<nav class="homestead-appbar__links" aria-label="Homestead sections">' . $desktopLinks . '</nav>'
-            . '<div class="homestead-appbar__member">'
-            . '<a class="homestead-appbar__avatar" href="/account.php" aria-label="Open account for ' . $safeDisplayName . '">' . $safeInitial . '</a>'
-            . '<a class="homestead-appbar__signout" href="/logout.php">Sign out</a>'
+        $alertLink = $alertsVisible
+            ? '<a class="homestead-topbar__icon-link" href="phase11.php" aria-label="Open alerts"><span aria-hidden="true">♢</span></a>'
+            : '';
+
+        $shellOpen = '<div class="homestead-shell">'
+            . '<aside class="homestead-sidebar" id="homestead-sidebar" aria-label="Homestead navigation">'
+            . '<div class="homestead-sidebar__brand-row">'
+            . '<a class="homestead-sidebar__brand" href="dashboard.php" aria-label="Homestead dashboard">'
+            . '<span class="homestead-sidebar__mark" aria-hidden="true">H</span><strong>Homestead</strong></a>'
+            . '<button class="homestead-sidebar__close" type="button" data-shell-menu-close aria-label="Close navigation">×</button>'
             . '</div>'
-            . '<details class="homestead-mobile-menu">'
-            . '<summary><span aria-hidden="true"></span>Menu</summary>'
-            . '<div class="homestead-mobile-menu__panel">'
-            . '<div class="homestead-mobile-menu__member"><span class="homestead-appbar__avatar">' . $safeInitial . '</span><div><strong>' . $safeDisplayName . '</strong><small>Household workspace</small></div></div>'
-            . '<nav aria-label="Mobile Homestead sections">' . $mobileLinks . '</nav>'
-            . '<a class="homestead-mobile-menu__signout" href="/logout.php">Sign out</a>'
+            . '<div class="homestead-sidebar__navigation">' . $sidebarNavigation . '</div>'
+            . '<div class="homestead-sidebar__footer">'
+            . '<p>Household system</p><span>All core workflows connected.</span>'
+            . '<a href="phase8.php">View resilience →</a>'
             . '</div>'
-            . '</details>'
+            . '</aside>'
+            . '<div class="homestead-workspace">'
+            . '<header class="homestead-topbar">'
+            . '<button class="homestead-topbar__menu" type="button" data-shell-menu-toggle aria-controls="homestead-sidebar" aria-expanded="false"><span aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button>'
+            . '<a class="homestead-topbar__search" href="phase2.php?section=inventory" aria-label="Open pantry inventory"><span aria-hidden="true">⌕</span><span>Search household records</span></a>'
+            . '<div class="homestead-topbar__actions">' . $alertLink
+            . '<a class="homestead-topbar__profile" href="account.php" aria-label="Open account for ' . $safeDisplayName . '">'
+            . '<span class="homestead-topbar__avatar">' . $safeInitial . '</span>'
+            . '<span class="homestead-topbar__profile-copy"><strong>' . $safeDisplayName . '</strong><small>' . $safeRole . '</small></span>'
+            . '<span class="homestead-topbar__chevron" aria-hidden="true">⌄</span></a>'
             . '</div>'
+            . '<details class="homestead-mobile-nav">'
+            . '<summary aria-label="Open mobile navigation"><span aria-hidden="true">☰</span></summary>'
+            . '<div class="homestead-mobile-nav__panel">'
+            . '<div class="homestead-mobile-nav__member"><span class="homestead-topbar__avatar">' . $safeInitial . '</span><div><strong>' . $safeDisplayName . '</strong><small>' . $safeRole . '</small></div></div>'
+            . $mobileNavigation
+            . '<a class="homestead-mobile-nav__signout" href="logout.php">Sign out</a>'
+            . '</div></details>'
             . '</header>';
 
-        return (string)preg_replace_callback(
+        $shellClose = '</div></div>'
+            . '<button class="homestead-shell__backdrop" type="button" data-shell-menu-close aria-label="Close navigation"></button>'
+            . '<script src="assets/js/homestead-app-shell.js?v=20260727-3" defer></script>';
+
+        $html = (string)preg_replace_callback(
             '/<body\b[^>]*>/i',
-            static fn(array $matches): string => $matches[0] . $navigation,
+            static fn(array $matches): string => $matches[0] . $shellOpen,
             $html,
             1
         );
+
+        return str_ireplace('</body>', $shellClose . '</body>', $html);
     });
 }
 

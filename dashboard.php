@@ -276,61 +276,431 @@ if ($canViewInventory) {
     $ledgerStatement->execute([$householdId]);
     $ledger = $ledgerStatement->fetchAll();
 }
+
+
+$metricByLabel = [];
+foreach ($metrics as $metric) {
+    $metricByLabel[(string)$metric['label']] = $metric;
+}
+$metricValue = static function (string $label, int $default = 0) use ($metricByLabel): int {
+    return isset($metricByLabel[$label]) ? (int)$metricByLabel[$label]['value'] : $default;
+};
+$formatCurrency = static fn(float $value): string => '$' . number_format($value, 0);
+$formatDate = static function (?string $value, string $fallback = 'Not scheduled'): string {
+    if ($value === null || trim($value) === '') {
+        return $fallback;
+    }
+    $timestamp = strtotime($value);
+    return $timestamp === false ? $fallback : date('M j, g:i A', $timestamp);
+};
+
+$inventoryCount = $metricValue('Active inventory');
+$belowReorder = $metricValue('Below reorder');
+$activeRecipes = $metricValue('Active recipes');
+$activePlantings = $metricValue('Active plantings');
+$harvestReady = $metricValue('Harvest ready');
+$preservationQueue = $metricValue('Preservation queue');
+$activeTasks = $metricValue('Active tasks');
+$overdueTasks = $metricValue('Overdue tasks');
+$unreadAlerts = $metricValue('Unread alerts');
+$urgentAlerts = $metricValue('Urgent alerts');
+
+$inventoryValue = 0.0;
+$expiringSoon = 0;
+$categoryCount = 0;
+if ($canViewInventory) {
+    $inventorySummary = $pdo->prepare(
+        "SELECT
+            COALESCE(SUM(current_quantity * COALESCE(purchase_cost, 0)), 0) AS inventory_value,
+            SUM(best_use_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)) AS expiring_soon,
+            COUNT(DISTINCT category_id) AS category_count
+         FROM inventory_items
+         WHERE household_id = ? AND status = 'active'"
+    );
+    $inventorySummary->execute([$householdId]);
+    $inventorySummaryRow = $inventorySummary->fetch();
+    if (is_array($inventorySummaryRow)) {
+        $inventoryValue = (float)$inventorySummaryRow['inventory_value'];
+        $expiringSoon = (int)$inventorySummaryRow['expiring_soon'];
+        $categoryCount = (int)$inventorySummaryRow['category_count'];
+    }
+}
+$stockedPercent = $inventoryCount > 0
+    ? max(0, min(100, (int)round((($inventoryCount - $belowReorder) / $inventoryCount) * 100)))
+    : 100;
+
+$activeZones = 0;
+$thrivingPlantings = 0;
+$nextHarvest = null;
+if ($canViewGarden) {
+    $activeZones = $scalar($pdo, 'SELECT COUNT(*) FROM garden_zones WHERE household_id = ? AND active = 1', [$householdId]);
+    $thrivingPlantings = $scalar(
+        $pdo,
+        "SELECT COUNT(*) FROM plantings p
+         JOIN garden_zones z ON z.id = p.garden_zone_id
+         WHERE z.household_id = ?
+           AND p.growth_stage IN ('seedling','vegetative','flowering','fruiting','harvest_ready')",
+        [$householdId]
+    );
+    $nextHarvestStatement = $pdo->prepare(
+        "SELECT p.crop_name, p.variety, p.expected_harvest_start
+         FROM plantings p
+         JOIN garden_zones z ON z.id = p.garden_zone_id
+         WHERE z.household_id = ?
+           AND p.growth_stage NOT IN ('completed','failed')
+           AND p.expected_harvest_start IS NOT NULL
+         ORDER BY p.expected_harvest_start ASC, p.id ASC LIMIT 1"
+    );
+    $nextHarvestStatement->execute([$householdId]);
+    $nextHarvest = $nextHarvestStatement->fetch() ?: null;
+}
+
+$preservationActive = 0;
+$preservationStored = 0;
+$preservationExpiring = 0;
+$preservationMethod = null;
+if ($canViewPreservation) {
+    $preservationSummary = $pdo->prepare(
+        "SELECT
+            SUM(status IN ('planned','prepared','processed','cooling','labeled')) AS active_count,
+            SUM(status = 'stored') AS stored_count,
+            SUM(best_use_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)) AS expiring_count
+         FROM preservation_batches WHERE household_id = ?"
+    );
+    $preservationSummary->execute([$householdId]);
+    $preservationSummaryRow = $preservationSummary->fetch();
+    if (is_array($preservationSummaryRow)) {
+        $preservationActive = (int)$preservationSummaryRow['active_count'];
+        $preservationStored = (int)$preservationSummaryRow['stored_count'];
+        $preservationExpiring = (int)$preservationSummaryRow['expiring_count'];
+    }
+    $methodStatement = $pdo->prepare(
+        "SELECT method, COUNT(*) AS method_count
+         FROM preservation_batches
+         WHERE household_id = ? AND status NOT IN ('finished','discarded')
+         GROUP BY method ORDER BY method_count DESC, method LIMIT 1"
+    );
+    $methodStatement->execute([$householdId]);
+    $methodRow = $methodStatement->fetch();
+    $preservationMethod = is_array($methodRow) ? (string)$methodRow['method'] : null;
+}
+
+$mealPlanCount = 0;
+if ($canViewRecipes) {
+    $mealPlanCount = $scalar($pdo, "SELECT COUNT(*) FROM meal_plans WHERE household_id = ? AND status = 'active'", [$householdId]);
+}
+
+$dashboardAlerts = [];
+if ($phase11Available) {
+    $alertStatement = $pdo->prepare(
+        "SELECT title, body, category, priority, status, COALESCE(due_at, occurs_at, created_at) AS attention_at
+         FROM household_notifications
+         WHERE household_id = ?
+           AND status IN ('unread','acknowledged')
+           AND (
+               visibility = 'household'
+               OR (visibility = 'adults_only' AND ? = 1)
+               OR (visibility = 'private' AND recipient_member_id = ?)
+           )
+         ORDER BY CASE priority WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END,
+                  COALESCE(due_at, occurs_at, created_at), id DESC
+         LIMIT 4"
+    );
+    $alertStatement->execute([$householdId, $adultAccess, (int)$user['member_id']]);
+    $dashboardAlerts = $alertStatement->fetchAll();
+}
+
+$dashboardTasks = [];
+$completedThisWeek = 0;
+if ($canViewPlanning) {
+    $manageTasks = $auth->can($user, 'tasks.manage');
+    $taskVisibility = $manageTasks ? '' : ' AND (t.assigned_member_id IS NULL OR t.assigned_member_id = ?)';
+    $taskQueryParams = $manageTasks ? [$householdId] : [$householdId, (int)$user['member_id']];
+    $taskStatement = $pdo->prepare(
+        "SELECT t.title, t.due_at, t.priority, t.status, hm.display_name
+         FROM household_tasks t
+         LEFT JOIN household_members hm ON hm.id = t.assigned_member_id AND hm.household_id = t.household_id
+         WHERE t.household_id = ? AND t.status IN ('planned','ready','in_progress')" . $taskVisibility . "
+         ORDER BY t.due_at IS NULL, t.due_at ASC, t.id ASC LIMIT 7"
+    );
+    $taskStatement->execute($taskQueryParams);
+    $dashboardTasks = $taskStatement->fetchAll();
+
+    $completedParams = $manageTasks ? [$householdId] : [$householdId, (int)$user['member_id']];
+    $completedScope = $manageTasks ? '' : ' AND (assigned_member_id IS NULL OR assigned_member_id = ?)';
+    $completedThisWeek = $scalar(
+        $pdo,
+        "SELECT COUNT(*) FROM household_tasks
+         WHERE household_id = ? AND status = 'completed'
+           AND completed_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 7 DAY)" . $completedScope,
+        $completedParams
+    );
+}
+
+$overviewCards = [];
+if ($canViewInventory) {
+    $overviewCards[] = [
+        'title' => 'Pantry',
+        'image' => 'assets/images/homestead/sheet-05/preservation-jars-wide.png',
+        'value' => $inventoryCount,
+        'unit' => 'items',
+        'status' => $stockedPercent . '% well stocked',
+        'rows' => [
+            ['Low stock alerts', $belowReorder],
+            ['Categories stocked', $categoryCount],
+            ['Inventory value', $formatCurrency($inventoryValue)],
+        ],
+        'href' => 'phase2.php?section=inventory',
+    ];
+}
+if ($canViewGarden) {
+    $overviewCards[] = [
+        'title' => 'Garden',
+        'image' => 'assets/images/homestead/sheet-04/garden-monitoring-wide.png',
+        'value' => $activePlantings,
+        'unit' => 'growing',
+        'status' => $thrivingPlantings . ' thriving',
+        'rows' => [
+            ['Active zones', $activeZones],
+            ['Harvest ready', $harvestReady],
+            ['Next harvest', is_array($nextHarvest) ? (string)$nextHarvest['crop_name'] : 'Not scheduled'],
+        ],
+        'href' => 'phase6.php?section=garden',
+    ];
+}
+if ($canViewPreservation) {
+    $overviewCards[] = [
+        'title' => 'Preservation',
+        'image' => 'assets/images/homestead/sheet-05/dehydrated-food-jars.png',
+        'value' => $preservationActive,
+        'unit' => 'batches',
+        'status' => $preservationQueue . ' in progress',
+        'rows' => [
+            ['Stored batches', $preservationStored],
+            ['Expiring soon', $preservationExpiring],
+            ['Method in focus', $preservationMethod ? ucwords(str_replace('_', ' ', $preservationMethod)) : 'Not set'],
+        ],
+        'href' => 'phase6.php?section=preservation',
+    ];
+}
+
+$metricCards = [];
+if ($canViewInventory) {
+    $metricCards[] = ['label' => 'Pantry Inventory', 'value' => $inventoryCount, 'unit' => 'items', 'detail' => $formatCurrency($inventoryValue) . ' tracked value', 'note' => $belowReorder . ' below reorder', 'href' => 'phase2.php?section=inventory', 'icon' => '▦', 'tone' => 'gold'];
+}
+if ($canViewGarden) {
+    $metricCards[] = ['label' => 'Upcoming Harvests', 'value' => $harvestReady, 'unit' => 'ready', 'detail' => is_array($nextHarvest) ? (string)$nextHarvest['crop_name'] : 'No harvest date', 'note' => $activePlantings . ' active plantings', 'href' => 'phase6.php?section=harvests', 'icon' => '♧', 'tone' => 'green'];
+}
+if ($canViewInventory || $canViewPreservation) {
+    $metricCards[] = ['label' => 'Expiring Soon', 'value' => $expiringSoon + $preservationExpiring, 'unit' => 'items', 'detail' => 'Within 30 days', 'note' => 'Review dates', 'href' => $canViewInventory ? 'phase2.php?section=inventory' : 'phase6.php?section=preservation', 'icon' => '△', 'tone' => 'amber'];
+}
+if ($canViewRecipes) {
+    $metricCards[] = ['label' => 'Active Recipes', 'value' => $activeRecipes, 'unit' => 'available', 'detail' => $mealPlanCount . ' active meal plans', 'note' => 'View plans', 'href' => 'phase4.php', 'icon' => '✣', 'tone' => 'gold'];
+}
+if ($canViewPreservation) {
+    $metricCards[] = ['label' => 'Preservation Batches', 'value' => $preservationActive, 'unit' => 'active', 'detail' => $preservationExpiring . ' expiring soon', 'note' => 'View batches', 'href' => 'phase6.php?section=preservation', 'icon' => '▣', 'tone' => 'gold'];
+}
+$metricCards[] = ['label' => 'System Health', 'value' => 'Good', 'unit' => '', 'detail' => 'Core workflows available', 'note' => ($activeTasks + $unreadAlerts) . ' active signals', 'href' => $phase11Available ? 'phase11.php' : 'account.php', 'icon' => '⌁', 'tone' => 'green'];
+
+$quickActions = [];
+if ($canViewInventory) {
+    $quickActions[] = ['label' => 'Add inventory item', 'href' => 'phase2.php?section=inventory', 'icon' => '▦'];
+}
+if ($canViewGarden) {
+    $quickActions[] = ['label' => 'Log harvest', 'href' => 'phase6.php?section=harvests', 'icon' => '♧'];
+}
+if ($canViewRecipes) {
+    $quickActions[] = ['label' => 'Create recipe', 'href' => 'phase4.php', 'icon' => '✣'];
+}
+if ($canViewPreservation) {
+    $quickActions[] = ['label' => 'Start preservation batch', 'href' => 'phase6.php?section=preservation', 'icon' => '▣'];
+}
+if ($canViewPlanning) {
+    $quickActions[] = ['label' => 'Add household task', 'href' => 'phase7.php', 'icon' => '✓'];
+}
+$quickActions[] = ['label' => 'Open household settings', 'href' => 'account.php', 'icon' => '⚙'];
+
+$highlights = [];
+if ($canViewGarden) {
+    $highlights[] = ['label' => 'Harvest', 'value' => $harvestReady, 'detail' => $activePlantings . ' plantings', 'icon' => '♧', 'href' => 'phase6.php?section=harvests'];
+}
+if ($canViewPreservation) {
+    $highlights[] = ['label' => 'Preserve', 'value' => $preservationActive, 'detail' => $preservationStored . ' stored', 'icon' => '▣', 'href' => 'phase6.php?section=preservation'];
+}
+if ($canViewRecipes) {
+    $highlights[] = ['label' => 'Cook', 'value' => $activeRecipes, 'detail' => $mealPlanCount . ' meal plans', 'icon' => '✣', 'href' => 'phase4.php'];
+}
+if ($canViewInventory) {
+    $highlights[] = ['label' => 'Stock Up', 'value' => $belowReorder, 'detail' => 'low stock items', 'icon' => '▦', 'href' => 'phase2.php?section=inventory'];
+}
+
+$glanceRows = [];
+if ($canViewInventory) {
+    $glanceRows[] = ['Total inventory value', $formatCurrency($inventoryValue)];
+}
+if ($canViewGarden) {
+    $glanceRows[] = ['Plants growing', $activePlantings];
+}
+if ($canViewPreservation) {
+    $glanceRows[] = ['Stored preservation batches', $preservationStored];
+}
+if ($canViewPlanning) {
+    $glanceRows[] = ['Active tasks', $activeTasks];
+    $glanceRows[] = ['Overdue tasks', $overdueTasks];
+    $glanceRows[] = ['Completed this week', $completedThisWeek];
+}
+if ($phase11Available) {
+    $glanceRows[] = ['Unread alerts', $unreadAlerts];
+}
 ?><!doctype html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="theme-color" content="#090806">
     <title>Household Dashboard · Homestead</title>
-    <link rel="stylesheet" href="/assets/css/app.css">
+    <link rel="icon" href="assets/icons/homestead-icon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="assets/css/homestead-dashboard.css?v=20260727-3">
 </head>
 <body>
 <a class="skip-link" href="#main-content">Skip to household dashboard</a>
-<main id="main-content" class="page-container">
-<header class="page-header">
-    <div>
-        <p class="eyebrow">Household food operating system</p>
-        <h1>Welcome, <?= e((string)$user['display_name']) ?></h1>
-        <p class="page-description">Detect, notify, assign, stock, grow, cook, preserve, balance household nutrition, measure cost and waste, and improve the next food cycle.</p>
+<main id="main-content" class="dashboard-page">
+    <header class="dashboard-hero">
+        <div class="dashboard-hero__copy">
+            <p class="dashboard-kicker">Household food operating system</p>
+            <h1>Dashboard <span aria-hidden="true">⌁</span></h1>
+            <p>Your homestead at a glance.</p>
+        </div>
+    </header>
+
+    <section class="dashboard-metrics" aria-label="Household overview metrics">
+        <?php foreach ($metricCards as $card): ?>
+            <a class="dashboard-metric dashboard-metric--<?= e((string)$card['tone']) ?>" href="<?= e((string)$card['href']) ?>">
+                <div class="dashboard-metric__label"><span aria-hidden="true"><?= e((string)$card['icon']) ?></span><?= e((string)$card['label']) ?></div>
+                <div class="dashboard-metric__value"><strong><?= is_int($card['value']) ? (int)$card['value'] : e((string)$card['value']) ?></strong><?php if ($card['unit'] !== ''): ?><span><?= e((string)$card['unit']) ?></span><?php endif; ?></div>
+                <p><?= e((string)$card['detail']) ?></p>
+                <span class="dashboard-metric__link"><?= e((string)$card['note']) ?> →</span>
+            </a>
+        <?php endforeach; ?>
+    </section>
+
+    <div class="dashboard-columns">
+        <div class="dashboard-primary">
+            <section class="dashboard-panel dashboard-overview">
+                <div class="dashboard-panel__heading">
+                    <div><p class="dashboard-kicker">Connected household record</p><h2>Homestead Overview</h2></div>
+                    <span class="dashboard-live"><i></i>Live</span>
+                </div>
+                <div class="dashboard-overview__grid">
+                    <?php foreach ($overviewCards as $card): ?>
+                        <a class="overview-card" href="<?= e((string)$card['href']) ?>">
+                            <h3><?= e((string)$card['title']) ?></h3>
+                            <div class="overview-card__summary">
+                                <img src="<?= e((string)$card['image']) ?>" alt="">
+                                <div><strong><?= (int)$card['value'] ?></strong><span><?= e((string)$card['unit']) ?></span><p><i></i><?= e((string)$card['status']) ?></p></div>
+                            </div>
+                            <div class="overview-card__progress"><span style="width:<?= $card['title'] === 'Pantry' ? $stockedPercent : max(14, min(100, (int)$card['value'] * 6)) ?>%"></span></div>
+                            <dl>
+                                <?php foreach ($card['rows'] as [$label, $value]): ?><div><dt><?= e((string)$label) ?></dt><dd><?= e((string)$value) ?></dd></div><?php endforeach; ?>
+                            </dl>
+                        </a>
+                    <?php endforeach; ?>
+                </div>
+                <div class="dashboard-status">
+                    <span class="dashboard-status__leaf" aria-hidden="true">♧</span>
+                    <div><h3>Overall Status</h3><p>Your household system is active. Pantry, growing, planning, and preservation records are connected.</p></div>
+                    <a href="phase8.php">View reports →</a>
+                </div>
+            </section>
+
+            <div class="dashboard-dual">
+                <section class="dashboard-panel dashboard-highlights">
+                    <div class="dashboard-panel__heading"><div><p class="dashboard-kicker">Current week</p><h2>This Week’s Highlights</h2></div><a href="phase7.php">View all</a></div>
+                    <div class="highlight-grid">
+                        <?php foreach ($highlights as $highlight): ?>
+                            <a class="highlight-card" href="<?= e((string)$highlight['href']) ?>">
+                                <span class="highlight-card__icon" aria-hidden="true"><?= e((string)$highlight['icon']) ?></span>
+                                <h3><?= e((string)$highlight['label']) ?></h3>
+                                <strong><?= (int)$highlight['value'] ?></strong>
+                                <p><?= e((string)$highlight['detail']) ?></p>
+                            </a>
+                        <?php endforeach; ?>
+                    </div>
+                </section>
+
+                <section class="dashboard-panel dashboard-tasks">
+                    <div class="dashboard-panel__heading"><div><p class="dashboard-kicker">Today and ahead</p><h2>Upcoming Tasks</h2></div><a href="phase7.php">Calendar →</a></div>
+                    <div class="task-date-strip"><span>Today</span><strong><?= e(date('D, M j')) ?></strong></div>
+                    <div class="dashboard-task-list">
+                        <?php if ($dashboardTasks === []): ?><p class="dashboard-empty">No active tasks. Your household plan is clear.</p><?php endif; ?>
+                        <?php foreach ($dashboardTasks as $task): ?>
+                            <a class="dashboard-task" href="phase7.php">
+                                <span class="dashboard-task__check" aria-hidden="true"></span>
+                                <span><strong><?= e((string)$task['title']) ?></strong><small><?= e((string)($task['display_name'] ?? 'Household')) ?></small></span>
+                                <time><?= e($formatDate($task['due_at'] ?? null)) ?></time>
+                            </a>
+                        <?php endforeach; ?>
+                    </div>
+                </section>
+            </div>
+
+            <section class="dashboard-panel dashboard-activity">
+                <div class="dashboard-panel__heading"><div><p class="dashboard-kicker">Recorded household history</p><h2>Recent Activity</h2></div><a href="phase2.php?section=ledger">View all</a></div>
+                <div class="activity-list">
+                    <?php if ($activities === []): ?><p class="dashboard-empty">No household activity has been recorded yet.</p><?php endif; ?>
+                    <?php foreach (array_slice($activities, 0, 7) as $activity): ?>
+                        <div class="activity-row">
+                            <span class="activity-row__icon" aria-hidden="true">◇</span>
+                            <div><strong><?= e((string)$activity['summary']) ?></strong><small><?= e(str_replace('_', ' ', (string)$activity['event_key'])) ?> · <?= e((string)($activity['display_name'] ?? 'Household')) ?></small></div>
+                            <time><?= e($formatDate((string)$activity['occurred_at'])) ?></time>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+                <?php if ($ledger !== []): ?>
+                    <div class="ledger-strip">
+                        <?php foreach (array_slice($ledger, 0, 3) as $event): ?>
+                            <a href="phase2.php?section=ledger"><strong><?= e((string)($event['item_name'] ?? 'Household food')) ?></strong><span><?= e(str_replace('_', ' ', (string)$event['event_type'])) ?> · <?= e((string)$event['quantity']) ?> <?= e((string)$event['unit']) ?></span></a>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+            </section>
+
+            <section class="dashboard-tip">
+                <span class="dashboard-tip__icon" aria-hidden="true">♧</span>
+                <div><h2>Pro Tip</h2><p>Use recurring tasks and alerts to keep pantry checks, garden readings, and preservation rotations visible.</p><a href="phase7.php">Go to planning →</a></div>
+            </section>
+        </div>
+
+        <aside class="dashboard-secondary" aria-label="Dashboard attention and actions">
+            <section class="dashboard-panel dashboard-alerts">
+                <div class="dashboard-panel__heading"><div><p class="dashboard-kicker">Attention</p><h2>Alerts</h2></div><?php if ($phase11Available): ?><a href="phase11.php">View all</a><?php endif; ?></div>
+                <div class="alert-list">
+                    <?php if ($dashboardAlerts === []): ?><div class="dashboard-empty-card"><span aria-hidden="true">✓</span><p>No current alerts.</p></div><?php endif; ?>
+                    <?php foreach ($dashboardAlerts as $alert): ?>
+                        <a class="dashboard-alert dashboard-alert--<?= e((string)$alert['priority']) ?>" href="phase11.php">
+                            <span class="dashboard-alert__icon" aria-hidden="true"><?= in_array((string)$alert['priority'], ['critical','high'], true) ? '△' : '◇' ?></span>
+                            <span><strong><?= e((string)$alert['title']) ?></strong><small><?= e($formatDate($alert['attention_at'] ?? null, 'Current')) ?></small><em>View alert →</em></span>
+                        </a>
+                    <?php endforeach; ?>
+                </div>
+            </section>
+
+            <section class="dashboard-panel dashboard-quick-actions">
+                <div class="dashboard-panel__heading"><div><p class="dashboard-kicker">Common workflows</p><h2>Quick Actions</h2></div></div>
+                <nav aria-label="Quick actions">
+                    <?php foreach ($quickActions as $action): ?><a href="<?= e((string)$action['href']) ?>"><span aria-hidden="true"><?= e((string)$action['icon']) ?></span><?= e((string)$action['label']) ?><i aria-hidden="true">→</i></a><?php endforeach; ?>
+                </nav>
+            </section>
+
+            <section class="dashboard-panel dashboard-glance">
+                <div class="dashboard-panel__heading"><div><p class="dashboard-kicker">Household totals</p><h2>At a Glance</h2></div></div>
+                <dl>
+                    <?php foreach ($glanceRows as [$label, $value]): ?><div><dt><?= e((string)$label) ?></dt><dd><?= e((string)$value) ?></dd></div><?php endforeach; ?>
+                </dl>
+                <p>Keep up the great work! <span aria-hidden="true">♧</span></p>
+            </section>
+        </aside>
     </div>
-    <div class="toolbar">
-        <a class="button secondary" href="/account.php">Account</a>
-        <a class="button secondary" href="/logout.php">Sign out</a>
-    </div>
-</header>
-
-<?php if ($metrics !== []): ?><section class="metrics-grid compact" aria-label="Household food metrics">
-<?php foreach ($metrics as $metric): ?><a class="metric-card" href="<?= e((string)$metric['href']) ?>"><div><p><?= e((string)$metric['label']) ?></p><strong><?= e((string)($metric['prefix'] ?? '')) ?><?= (int)$metric['value'] ?><?= e((string)($metric['suffix'] ?? '')) ?></strong></div></a><?php endforeach; ?>
-</section><?php endif; ?>
-
-<section class="content-grid">
-    <?php if ($phase11Available): ?><a class="panel" href="/phase11.php"><p class="eyebrow">Notify</p><h2>Alerts & shared calendar</h2><p class="page-description" style="margin-top:12px">One permission-aware inbox for tasks, shortages, meals, harvest windows, use-by dates, finance reviews, nutrition follow-up, digests, and ICS calendar export.</p></a><?php endif; ?>
-    <?php if ($phase10Available): ?><a class="panel" href="/phase10.php"><p class="eyebrow">Balance</p><h2>Nutrition & dietary planning</h2><p class="page-description" style="margin-top:12px">Ingredient label data, optional family targets, dietary patterns, allergen controls, recipe nutrition, meal-plan assessments, and task-ready recommendations.</p></a><?php endif; ?>
-    <?php if ($phase9Available): ?><a class="panel" href="/phase9.php"><p class="eyebrow">Measure</p><h2>Cost, waste & savings</h2><p class="page-description" style="margin-top:12px">Purchase prices, weighted unit costs, recipe cost per serving, budgets, waste value, supplier comparisons, household-production value, and savings recommendations.</p></a><?php endif; ?>
-    <?php if ($phase8Available): ?><a class="panel" href="/phase8.php"><p class="eyebrow">Forecast</p><h2>Seasons & self-sufficiency</h2><p class="page-description" style="margin-top:12px">Pantry coverage, planned demand, days on hand, expected harvests, preservation output, seasonal plans, and evidence-linked recommendations.</p></a><?php endif; ?>
-    <?php if ($canViewPlanning): ?><a class="panel" href="/phase7.php"><p class="eyebrow">Coordinate</p><h2>Daily planning & tasks</h2><p class="page-description" style="margin-top:12px">Assignments, recurring duties, meal preparation, harvest windows, preservation follow-up, and shopping suggestions.</p></a><?php endif; ?>
-    <?php if ($canViewInventory): ?><a class="panel" href="/phase2.php?section=inventory"><p class="eyebrow">Stock</p><h2>Household & inventory</h2><p class="page-description" style="margin-top:12px">Family profiles, storage locations, pantry quantities, reorder levels, and the food ledger.</p></a><?php endif; ?>
-    <?php if ($canViewRecipes): ?><a class="panel" href="/phase4.php"><p class="eyebrow">Cook</p><h2>Recipes & meal planning</h2><p class="page-description" style="margin-top:12px">Connected recipes, ingredient deductions, family servings, meal plans, and prepared food.</p></a><?php endif; ?>
-    <?php if ($canViewGarden): ?><a class="panel" href="/phase6.php"><p class="eyebrow">Grow</p><h2>Garden & harvest</h2><p class="page-description" style="margin-top:12px">Zones, crop stages, environmental readings, harvest destinations, and field-to-pantry provenance.</p></a><?php endif; ?>
-    <?php if ($canViewPreservation): ?><a class="panel" href="/phase6.php?section=preservation"><p class="eyebrow">Preserve</p><h2>Preservation batches</h2><p class="page-description" style="margin-top:12px">Guarded input deductions, preserved-food outputs, storage, dates, and process references.</p></a><?php endif; ?>
-    <?php if ($canManageAccess): ?><a class="panel" href="/phase3.php"><p class="eyebrow">Administer</p><h2>Family access</h2><p class="page-description" style="margin-top:12px">Invitations, roles, permission overrides, and authentication history.</p></a><?php endif; ?>
-    <?php if ($isPlatformAdmin): ?><a class="panel" href="/phase5.php"><p class="eyebrow">Platform</p><h2>Starter Kits</h2><p class="page-description" style="margin-top:12px">Build, publish, order, and activate guided household food systems.</p></a><?php endif; ?>
-</section>
-
-<section class="content-grid">
-    <article class="panel span-2">
-        <h2>Recent household activity</h2>
-        <div class="table-wrap" tabindex="0"><table><thead><tr><th scope="col">Time</th><th scope="col">Activity</th><th scope="col">Member</th></tr></thead><tbody>
-        <?php if ($activities === []): ?><tr><td colspan="3">No household activity yet.</td></tr><?php endif; ?>
-        <?php foreach ($activities as $activity): ?><tr><td><?= e((string)$activity['occurred_at']) ?></td><td><strong><?= e((string)$activity['summary']) ?></strong><br><span class="page-description"><?= e(str_replace('_', ' ', (string)$activity['event_key'])) ?></span></td><td><?= e((string)($activity['display_name'] ?? 'Household')) ?></td></tr><?php endforeach; ?>
-        </tbody></table></div>
-    </article>
-    <?php if ($canViewInventory): ?><article class="panel">
-        <h2>Latest food-ledger events</h2>
-        <?php if ($ledger === []): ?><p class="page-description">No food-ledger activity yet.</p><?php endif; ?>
-        <?php foreach ($ledger as $event): ?><div class="member-card" style="margin-bottom:10px"><strong><?= e((string)($event['item_name'] ?? 'Household food')) ?></strong><br><span class="page-description"><?= e(str_replace('_', ' ', (string)$event['event_type'])) ?> · <?= e((string)$event['quantity']) ?> <?= e((string)$event['unit']) ?> · <?= e((string)$event['occurred_at']) ?></span></div><?php endforeach; ?>
-    </article><?php endif; ?>
-</section>
 </main>
 </body>
 </html>
