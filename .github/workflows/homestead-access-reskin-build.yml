@@ -1,0 +1,74 @@
+name: Homestead Family Access Reskin Build
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/homestead-access-reskin-build.yml'
+      - '.reskin/access/**'
+
+permissions:
+  contents: write
+
+jobs:
+  build-access:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out access branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Reconstruct Family Access package
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .reskin/access/chunk-* > /tmp/access.b64
+          test "$(wc -c < /tmp/access.b64)" = "20936"
+          echo "1458b9a4e86ee1b77aaf0f1ad0a2f9ab3cc1516b1100a14eb3cb41237e1e9a61  /tmp/access.b64" | sha256sum -c -
+          base64 -d /tmp/access.b64 > /tmp/access.tar.gz
+          echo "025330f323857a8789cfde20477850c69438ef65418a1166bc9c35220f71221a  /tmp/access.tar.gz" | sha256sum -c -
+          rm -rf /tmp/access-build
+          mkdir -p /tmp/access-build
+          tar -xzf /tmp/access.tar.gz -C /tmp/access-build
+
+      - name: Validate Family Access rebuild
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -l /tmp/access-build/phase3.php
+          php -l /tmp/access-build/app/bootstrap.php
+          node --check /tmp/access-build/assets/js/homestead-access.js
+          for action in invite revoke_invite update_permissions; do
+            grep -q "'$action'" /tmp/access-build/phase3.php
+          done
+          for permission in members.manage members.invite permissions.manage storage.view storage.manage inventory.view inventory.manage recipes.view recipes.manage recipes.complete meals.manage garden.view garden.manage harvest.record preservation.view preservation.manage tasks.manage tasks.complete finance.view finance.manage nutrition.view nutrition.manage notifications.view notifications.manage; do
+            grep -q "'$permission'" /tmp/access-build/phase3.php
+          done
+          grep -q 'Family Access' /tmp/access-build/phase3.php
+          grep -q 'Members & role access' /tmp/access-build/phase3.php
+          grep -q 'Household access' /tmp/access-build/phase3.php
+          grep -q "phase3.php'.*homestead-access-admin.css" /tmp/access-build/app/bootstrap.php
+          ! grep -Eiq '\b(CREATE|ALTER|DROP)[[:space:]]+TABLE\b' /tmp/access-build/phase3.php
+          ! grep -E 'href="/|src="/' /tmp/access-build/phase3.php
+
+      - name: Commit Family Access rebuild
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp /tmp/access-build/phase3.php phase3.php
+          cp /tmp/access-build/app/bootstrap.php app/bootstrap.php
+          cp /tmp/access-build/assets/css/homestead-access-admin.css assets/css/homestead-access-admin.css
+          cp /tmp/access-build/assets/js/homestead-access.js assets/js/homestead-access.js
+          rm -f .github/workflows/homestead-access-reskin-build.yml
+          rm -rf .reskin/access
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          changed="$(git diff --cached --name-only)"
+          echo "$changed"
+          ! echo "$changed" | grep -E '^(database/|app/(Auth|Database|.*Service)\.php)'
+          git commit -m "Reskin Homestead family access"
+          git push origin HEAD:${{ github.head_ref }}
