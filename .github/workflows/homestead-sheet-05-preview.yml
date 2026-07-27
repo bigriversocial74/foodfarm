@@ -1,0 +1,57 @@
+name: Homestead Sheet 5 Preview
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/homestead-sheet-05-preview.yml
+
+permissions:
+  contents: read
+
+jobs:
+  preview-sheet-05:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out rebuild branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      - name: Install Pillow
+        run: python -m pip install --disable-pip-version-check Pillow
+
+      - name: Build Sheet 5 preview artifact
+        shell: bash
+        run: |
+          mkdir -p .homestead-preview
+          python - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+
+          source = Image.open('homestead_5.png')
+          source.load()
+          preview = source.convert('RGB')
+          preview.thumbnail((1600, 1600), Image.Resampling.LANCZOS)
+          preview.save('.homestead-preview/sheet-05-preview.jpg', format='JPEG', quality=88, optimize=True)
+          Path('.homestead-preview/sheet-05-metadata.txt').write_text(
+              f'source={source.width}x{source.height}\n'
+              f'mode={source.mode}\n'
+              f'format={source.format}\n'
+              f'preview={preview.width}x{preview.height}\n',
+              encoding='utf-8'
+          )
+          print(Path('.homestead-preview/sheet-05-metadata.txt').read_text(encoding='utf-8'))
+          PY
+
+      - name: Upload Sheet 5 source and preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: homestead-sheet-05-source-preview
+          path: |
+            homestead_5.png
+            .homestead-preview/sheet-05-preview.jpg
+            .homestead-preview/sheet-05-metadata.txt
+          if-no-files-found: error
+          retention-days: 7
