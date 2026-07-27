@@ -1,0 +1,34 @@
+# Include this snippet inside the Homestead HTTPS server block.
+# Keep the host-specific root, TLS, PHP-FPM socket, logging, and rate limits in
+# the primary server configuration.
+
+location ~ (^|/)\.(?!well-known/) {
+    deny all;
+}
+
+location ~ ^/(?:app|bin|database|docs|storage|tests)(?:/|$) {
+    deny all;
+}
+
+location ~* ^/(?:config(?:-example)?\.php|README(?:\.md)?|.*\.(?:sql|log|ini|env|yml|yaml))$ {
+    deny all;
+}
+
+location = /manifest.webmanifest {
+    default_type application/manifest+json;
+    add_header Cache-Control "no-cache, max-age=0" always;
+    try_files $uri =404;
+}
+
+location = /service-worker.js {
+    default_type application/javascript;
+    add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+    add_header Service-Worker-Allowed "/" always;
+    try_files $uri =404;
+}
+
+location ~* \.(?:css|js|svg|png|jpg|jpeg|webp|gif|ico|woff|woff2)$ {
+    expires 7d;
+    add_header Cache-Control "public, max-age=604800, immutable" always;
+    try_files $uri =404;
+}
