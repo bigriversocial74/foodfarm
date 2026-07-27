@@ -1,0 +1,71 @@
+name: Homestead Pantry Build
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/homestead-pantry-build.yml
+
+permissions:
+  contents: write
+
+jobs:
+  build-pantry:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out rebuild branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      - name: Reconstruct pantry build
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .homestead-build/pantry-build.part-* > /tmp/pantry-build.b64
+          base64 --decode /tmp/pantry-build.b64 > /tmp/pantry-build.tar.gz
+          echo "a379ba8b5ff959773d6a29776caab490bd8cd2815347880e31e3235906b8bcad  /tmp/pantry-build.tar.gz" | sha256sum --check --strict
+          tar -xzf /tmp/pantry-build.tar.gz
+
+      - name: Validate pantry build
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -l phase2.php
+          php -l app/bootstrap.php
+          node --check assets/js/homestead-pantry.js
+
+          if grep -nE '(href|src)="/(assets|dashboard\.php|phase[0-9]+\.php|account\.php|logout\.php)' phase2.php app/bootstrap.php assets/css/homestead-pantry.css assets/js/homestead-pantry.js; then
+            echo "Root-only route or asset path detected."
+            exit 1
+          fi
+
+          if grep -nE '\b(ALTER|CREATE TABLE|DROP TABLE)\b' phase2.php; then
+            echo "Unexpected schema SQL found in phase2.php."
+            exit 1
+          fi
+
+          grep -q 'homestead-pantry.css' app/bootstrap.php
+          grep -q 'data-pantry-search' phase2.php
+          grep -q 'data-pantry-filter' phase2.php
+          grep -q 'name="action" value="add_inventory"' phase2.php
+          grep -q 'name="action" value="adjust_inventory"' phase2.php
+          grep -q 'name="action" value="add_location"' phase2.php
+          grep -q 'name="action" value="add_member"' phase2.php
+          test -f assets/images/homestead/sheet-05/preservation-jars-wide.png
+          echo "Pantry build validation passed."
+
+      - name: Commit pantry build
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .homestead-build
+          rm -f .github/workflows/homestead-pantry-source.yml
+          rm -f .github/workflows/homestead-pantry-build.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add phase2.php app/bootstrap.php assets/css/homestead-pantry.css assets/js/homestead-pantry.js
+          git add -u .github/workflows .homestead-build
+          git commit -m "Build Homestead pantry inventory experience"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
