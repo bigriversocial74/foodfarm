@@ -93,8 +93,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="theme-color" content="#1f4b36">
+    <meta name="application-name" content="Homestead">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <title>Sign in · Homestead</title>
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="icon" href="/assets/icons/homestead-icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/assets/icons/homestead-icon.svg">
     <link rel="stylesheet" href="/assets/css/app.css">
+    <script src="/assets/js/pwa.js?v=20260727" defer></script>
 </head>
 <body>
 <a class="skip-link" href="#main-content">Skip to sign-in</a>
