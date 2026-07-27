@@ -1,0 +1,84 @@
+name: Homestead Phase 11 Reskin Build
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/homestead-phase11-reskin-build.yml'
+      - '.reskin/phase11/**'
+
+permissions:
+  contents: write
+
+jobs:
+  build-phase11:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out alerts branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Reconstruct Phase 11 package
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .reskin/phase11/chunk-* > /tmp/phase11.b64
+          test "$(wc -c < /tmp/phase11.b64)" = "12836"
+          echo "f1ddf14622bb736672eba1b98c052b17253cec7640bd22c163a9e70e6b418e4e  /tmp/phase11.b64" | sha256sum -c -
+          base64 -d /tmp/phase11.b64 > /tmp/phase11.tar.gz
+          echo "fc929d9a5404dc4efe338f835c0937054eb3c8a7b8e0ac26dd085a9a7554cfb8  /tmp/phase11.tar.gz" | sha256sum -c -
+          rm -rf /tmp/phase11-build
+          mkdir -p /tmp/phase11-build
+          tar -xzf /tmp/phase11.tar.gz -C /tmp/phase11-build
+
+      - name: Validate Phase 11 rebuild
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -l /tmp/phase11-build/phase11.php
+          node --check /tmp/phase11-build/assets/js/homestead-alerts.js
+          for action in save_settings save_member_preferences run_sync acknowledge_notification complete_notification dismiss_notification create_task generate_digest; do
+            grep -q "'$action'" /tmp/phase11-build/phase11.php
+          done
+          grep -Fq 'Alerts, Notifications &amp; Shared Calendar' /tmp/phase11-build/phase11.php
+          grep -Fq 'In-app first, adapter-ready outside the app' /tmp/phase11-build/phase11.php
+          grep -Fq 'Household notifications' /tmp/phase11-build/phase11.php
+          grep -Fq 'Upcoming household events' /tmp/phase11-build/phase11.php
+          grep -Fq 'phase11_action_key' /tmp/phase11-build/phase11.php
+          grep -Fq 'hash_equals' /tmp/phase11-build/phase11.php
+          ! grep -Eiq '\b(CREATE|ALTER|DROP)[[:space:]]+TABLE\b' /tmp/phase11-build/phase11.php
+          ! grep -E 'href="/|src="/' /tmp/phase11-build/phase11.php
+
+      - name: Commit Phase 11 rebuild
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp /tmp/phase11-build/phase11.php phase11.php
+          cp /tmp/phase11-build/assets/css/homestead-alerts.css assets/css/homestead-alerts.css
+          cp /tmp/phase11-build/assets/js/homestead-alerts.js assets/js/homestead-alerts.js
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('app/bootstrap.php')
+          source = path.read_text()
+          old = "'phase11.php' => ['class' => 'ui-alerts', 'stylesheet' => 'intelligence-pages.css'],"
+          new = "'phase11.php' => ['class' => 'ui-alerts', 'stylesheet' => 'homestead-alerts.css'],"
+          if old not in source:
+              raise SystemExit('Expected Phase 11 route mapping not found')
+          path.write_text(source.replace(old, new, 1))
+          PY
+          php -l app/bootstrap.php
+          php tests/phase11_static_audit.php
+          grep -q "phase11.php'.*homestead-alerts.css" app/bootstrap.php
+          rm -f .github/workflows/homestead-phase11-reskin-build.yml
+          rm -rf .reskin/phase11
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          changed="$(git diff --cached --name-only)"
+          echo "$changed"
+          ! echo "$changed" | grep -E '^(database/|app/(NotificationService|Auth|Database|.*Service)\.php)'
+          git commit -m "Reskin Homestead alerts and shared calendar"
+          git push origin HEAD:${{ github.head_ref }}
