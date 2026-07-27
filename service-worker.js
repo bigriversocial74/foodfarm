@@ -61,7 +61,7 @@ const staticAsset = async (request) => {
     return response;
   });
 
-  if (cached !== undefined) {
+  if (cached !== null) {
     void network.catch(() => undefined);
     return cached;
   }
