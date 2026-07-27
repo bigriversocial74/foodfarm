@@ -14,6 +14,49 @@ function e(string $value): string
     return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
 
+
+function normalize_app_base_path(string $path): string
+{
+    $normalized = '/' . trim(str_replace('\\', '/', $path), '/');
+    return $normalized === '/' ? '' : $normalized;
+}
+
+function resolve_app_base_path(array $config, array $server, string $appRoot): string
+{
+    $normalizedRoot = rtrim(str_replace('\\', '/', (string)(realpath($appRoot) ?: $appRoot)), '/');
+    $scriptFilenameRaw = (string)($server['SCRIPT_FILENAME'] ?? '');
+    $scriptFilename = str_replace('\\', '/', (string)(realpath($scriptFilenameRaw) ?: $scriptFilenameRaw));
+    $scriptName = str_replace('\\', '/', (string)($server['SCRIPT_NAME'] ?? ''));
+
+    if ($normalizedRoot !== '' && $scriptFilename !== '' && str_starts_with($scriptFilename, $normalizedRoot)) {
+        $relativeScript = substr($scriptFilename, strlen($normalizedRoot));
+        if ($relativeScript !== '' && str_ends_with($scriptName, $relativeScript)) {
+            return normalize_app_base_path(substr($scriptName, 0, -strlen($relativeScript)));
+        }
+    }
+
+    $configuredPath = parse_url((string)($config['app']['base_url'] ?? ''), PHP_URL_PATH);
+    return normalize_app_base_path(is_string($configuredPath) ? $configuredPath : '');
+}
+
+function request_uses_https(array $config, array $server): bool
+{
+    $https = strtolower(trim((string)($server['HTTPS'] ?? '')));
+    if ($https !== '' && $https !== 'off' && $https !== '0') {
+        return true;
+    }
+    if ((int)($server['SERVER_PORT'] ?? 0) === 443) {
+        return true;
+    }
+
+    $forwardedProto = strtolower(trim(explode(',', (string)($server['HTTP_X_FORWARDED_PROTO'] ?? ''))[0]));
+    if ($forwardedProto === 'https') {
+        return true;
+    }
+
+    return strtolower((string)parse_url((string)($config['app']['base_url'] ?? ''), PHP_URL_SCHEME)) === 'https';
+}
+
 function apply_security_headers(bool $isProduction): void
 {
     if (headers_sent()) {
@@ -45,9 +88,14 @@ function csrf_token(): string
     return (string)$_SESSION['csrf_token'];
 }
 
+function csrf_is_valid(?string $token): bool
+{
+    return is_string($token) && hash_equals(csrf_token(), $token);
+}
+
 function verify_csrf(?string $token): void
 {
-    if (!is_string($token) || !hash_equals(csrf_token(), $token)) {
+    if (!csrf_is_valid($token)) {
         http_response_code(419);
         exit('The form session expired. Return to the previous page and try again.');
     }
