@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+// Compatibility identifier: Forecasting, Seasons & Self-Sufficiency
+
 require __DIR__ . '/app/bootstrap.php';
 require_once __DIR__ . '/app/ForecastingService.php';
 
