@@ -45,7 +45,12 @@ if ($environment === 'production') {
 }
 
 require_once __DIR__ . '/Support.php';
-Homestead\apply_security_headers($environment === 'production');
+$basePath = Homestead\resolve_app_base_path($config, $_SERVER, dirname(__DIR__));
+if (!defined('HOMESTEAD_BASE_PATH')) {
+    define('HOMESTEAD_BASE_PATH', $basePath);
+}
+$requestUsesHttps = Homestead\request_uses_https($config, $_SERVER);
+Homestead\apply_security_headers($environment === 'production' && $requestUsesHttps);
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
     ini_set('session.use_strict_mode', '1');
@@ -63,11 +68,14 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
     session_set_cookie_params([
         'lifetime' => 0,
         'httponly' => true,
-        'secure' => $environment === 'production' || (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
+        'secure' => $requestUsesHttps,
         'samesite' => 'Lax',
-        'path' => '/',
+        'path' => $basePath !== '' ? $basePath . '/' : '/',
     ]);
-    session_start();
+    if (!session_start()) {
+        http_response_code(503);
+        exit('Homestead could not start a secure form session. Check the PHP session storage configuration.');
+    }
 }
 
 $requestPath = (string)(parse_url((string)($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH) ?? '');

@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 require __DIR__ . '/app/bootstrap.php';
 
+use function Homestead\csrf_is_valid;
 use function Homestead\csrf_token;
 use function Homestead\e;
 use function Homestead\flash;
 use function Homestead\redirect;
 use function Homestead\user_error_message;
-use function Homestead\verify_csrf;
 
 if ($auth->user() !== null) {
     redirect('/phase3.php');
@@ -18,7 +18,10 @@ if ($auth->user() !== null) {
 $error = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
-        verify_csrf($_POST['csrf_token'] ?? null);
+        if (!csrf_is_valid($_POST['csrf_token'] ?? null)) {
+            http_response_code(419);
+            throw new RuntimeException('The form session expired. Reload this page and try again.');
+        }
 
         $now = time();
         $attempts = array_values(array_filter(
