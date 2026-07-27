@@ -3,24 +3,28 @@
  */
 'use strict';
 
-const CACHE_PREFIX = 'homestead-static-';
-const CACHE_NAME = `${CACHE_PREFIX}20260727-1`;
-const OFFLINE_URL = '/offline.html';
-const STATIC_ASSETS = Object.freeze([
-  "/offline.html",
-  "/manifest.webmanifest",
-  "/assets/css/app.css",
-  "/assets/css/app-shell.css",
-  "/assets/css/app-shell-base.css",
-  "/assets/css/workflow-polish.css",
-  "/assets/css/operations-polish.css",
-  "/assets/css/mobile-workflows.css",
-  "/assets/css/core-pages.css",
-  "/assets/css/intelligence-pages.css",
-  "/assets/css/access-flow.css",
-  "/assets/js/pwa.js",
-  "/assets/icons/homestead-icon.svg"
+const SCOPE_PATH = new URL(self.registration.scope).pathname.replace(/\/$/, '');
+const SCOPE_KEY = SCOPE_PATH.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '') || 'root';
+const CACHE_PREFIX = `homestead-static-${SCOPE_KEY}-`;
+const CACHE_NAME = `${CACHE_PREFIX}20260727-2`;
+const scopedPath = (path) => `${SCOPE_PATH}/${path.replace(/^\//, '')}`;
+const OFFLINE_URL = scopedPath('offline.html');
+const STATIC_ASSET_PATHS = Object.freeze([
+  "offline.html",
+  "manifest.webmanifest",
+  "assets/css/app.css",
+  "assets/css/app-shell.css",
+  "assets/css/app-shell-base.css",
+  "assets/css/workflow-polish.css",
+  "assets/css/operations-polish.css",
+  "assets/css/mobile-workflows.css",
+  "assets/css/core-pages.css",
+  "assets/css/intelligence-pages.css",
+  "assets/css/access-flow.css",
+  "assets/js/pwa.js",
+  "assets/icons/homestead-icon.svg"
 ]);
+const STATIC_ASSETS = Object.freeze(STATIC_ASSET_PATHS.map(scopedPath));
 
 const STATIC_EXTENSION = /\.(?:css|js|svg|png|jpg|jpeg|webp|gif|ico|woff2?|webmanifest)$/i;
 const SENSITIVE_PATH = /(?:^|\/)(?:api|bin|database|docs|tests)(?:\/|$)|\.php$/i;
@@ -40,7 +44,7 @@ const mustUseNetworkOnly = (request, url) => {
     return true;
   }
 
-  return url.pathname === '/service-worker.js';
+  return url.pathname === scopedPath('service-worker.js');
 };
 
 const networkOnly = async (request) => {

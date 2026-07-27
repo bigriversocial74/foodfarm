@@ -144,16 +144,16 @@ if (is_array($uiRoute)) {
             return $html;
         }
 
-        $stylesheets = ['/assets/css/' . $uiStylesheet];
+        $stylesheets = ['assets/css/' . $uiStylesheet];
         if ($injectShell) {
-            $stylesheets[] = '/assets/css/app-shell.css';
+            $stylesheets[] = 'assets/css/app-shell.css';
         }
         foreach ($stylesheets as $stylesheetPath) {
             if (!str_contains($html, $stylesheetPath)) {
                 $safeStylesheet = htmlspecialchars($stylesheetPath, ENT_QUOTES, 'UTF-8');
                 $html = str_ireplace(
                     '</head>',
-                    '<link rel="stylesheet" href="' . $safeStylesheet . '?v=20260727"></head>',
+                    '<link rel="stylesheet" href="' . $safeStylesheet . '?v=20260727-2"></head>',
                     $html
                 );
             }

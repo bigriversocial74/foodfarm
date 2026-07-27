@@ -46,9 +46,19 @@
     return;
   }
 
+  const scriptElement = document.currentScript
+    ?? Array.from(document.scripts).find((script) => script.src.includes('/assets/js/pwa.js'));
+  if (!(scriptElement instanceof HTMLScriptElement) || scriptElement.src === '') {
+    return;
+  }
+
+  const scriptUrl = new URL(scriptElement.src, document.baseURI);
+  const appBaseUrl = new URL('../../', scriptUrl);
+  const serviceWorkerUrl = new URL('service-worker.js', appBaseUrl);
+
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/service-worker.js', {
-      scope: '/',
+    navigator.serviceWorker.register(serviceWorkerUrl.pathname, {
+      scope: appBaseUrl.pathname,
       updateViaCache: 'none'
     }).then((registration) => {
       void registration.update();
