@@ -1,0 +1,960 @@
+@import url("homestead-access.css?v=20260727-1");
+@import url("homestead-responsive.css?v=20260727-1");
+
+:root {
+    --page: #080705;
+    --page-soft: #0c0a07;
+    --surface: #11100d;
+    --surface-2: #17130e;
+    --surface-3: #1d1710;
+    --surface-4: #241b11;
+    --text: #f4ead8;
+    --text-soft: #d7c9b4;
+    --muted: #a99a86;
+    --gold: #c99649;
+    --gold-bright: #e0ad61;
+    --gold-dark: #8a5f25;
+    --cream: #ead3ad;
+    --line: rgba(202, 151, 73, .24);
+    --line-strong: rgba(220, 170, 91, .48);
+    --shadow: 0 24px 70px rgba(0, 0, 0, .48);
+    --shadow-soft: 0 12px 38px rgba(0, 0, 0, .34);
+    --radius-sm: 10px;
+    --radius: 18px;
+    --radius-lg: 28px;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+[hidden] {
+    display: none !important;
+}
+
+html {
+    scroll-behavior: smooth;
+    color-scheme: dark;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    background:
+        radial-gradient(circle at 10% -5%, rgba(169, 116, 44, .11), transparent 30rem),
+        radial-gradient(circle at 92% 18%, rgba(118, 76, 26, .09), transparent 34rem),
+        linear-gradient(180deg, #070604, var(--page));
+    color: var(--text);
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+}
+
+body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -2;
+    pointer-events: none;
+    opacity: .7;
+    background:
+        repeating-linear-gradient(0deg, rgba(255, 255, 255, .012) 0 1px, transparent 1px 4px),
+        repeating-linear-gradient(90deg, transparent 0 94px, rgba(198, 147, 68, .018) 95px 96px);
+}
+
+body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: radial-gradient(circle at center, transparent 45%, rgba(0, 0, 0, .42) 100%);
+}
+
+a {
+    color: inherit;
+}
+
+button,
+input,
+select,
+textarea {
+    font: inherit;
+}
+
+button {
+    cursor: pointer;
+}
+
+img,
+svg {
+    display: block;
+    max-width: 100%;
+}
+
+::selection {
+    background: rgba(201, 150, 73, .35);
+    color: #fff8ea;
+}
+
+:focus {
+    outline: 0;
+}
+
+:focus-visible {
+    outline: 2px solid var(--gold-bright);
+    outline-offset: 3px;
+}
+
+.visually-hidden {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+}
+
+.skip-link {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: 1000;
+    transform: translateY(-160%);
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: var(--gold-bright);
+    color: #130d06;
+    font-weight: 800;
+    text-decoration: none;
+}
+
+.skip-link:focus {
+    transform: translateY(0);
+}
+
+.public-frame {
+    width: min(1450px, calc(100% - 36px));
+    margin: 18px auto;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background:
+        linear-gradient(rgba(10, 8, 5, .88), rgba(10, 8, 5, .96)),
+        repeating-linear-gradient(0deg, #2b1a0d 0 3px, #1b1008 3px 8px, #311f10 8px 10px);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, .45), var(--shadow);
+}
+
+.site-header {
+    min-height: 82px;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 32px;
+    padding: 0 38px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(9, 8, 6, .94);
+    backdrop-filter: blur(18px);
+}
+
+.site-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--cream);
+    text-decoration: none;
+}
+
+.brand-seal {
+    width: 42px;
+    height: 42px;
+    color: var(--gold);
+}
+
+.brand-word {
+    color: var(--cream);
+    font: 700 28px Georgia, "Times New Roman", serif;
+    letter-spacing: -.02em;
+}
+
+.site-navigation {
+    justify-self: center;
+    display: flex;
+    align-items: center;
+    gap: clamp(24px, 4vw, 52px);
+}
+
+.site-navigation a,
+.text-link,
+.site-footer nav a {
+    color: var(--text-soft);
+    font-size: 13px;
+    text-decoration: none;
+    transition: color .18s ease;
+}
+
+.site-navigation a:hover,
+.text-link:hover,
+.site-footer nav a:hover {
+    color: var(--gold-bright);
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+}
+
+.nav-toggle {
+    display: none;
+    width: 42px;
+    height: 42px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface);
+    padding: 9px;
+}
+
+.nav-toggle span:not(.visually-hidden) {
+    display: block;
+    width: 100%;
+    height: 2px;
+    margin: 4px 0;
+    background: var(--gold);
+}
+
+.gold-button,
+.outline-button {
+    min-height: 46px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    padding: 12px 24px;
+    border-radius: 6px;
+    font-weight: 750;
+    font-size: 14px;
+    text-decoration: none;
+    transition: transform .18s ease, border-color .18s ease, filter .18s ease, background .18s ease;
+}
+
+.gold-button {
+    border: 1px solid #edbd73;
+    background: linear-gradient(180deg, #e3af62, #bd7d2f);
+    color: #171006;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, .38),
+        0 8px 24px rgba(155, 93, 24, .25);
+}
+
+.gold-button:hover {
+    color: #100b05;
+    filter: brightness(1.08);
+    transform: translateY(-1px);
+}
+
+.gold-button.compact {
+    min-height: 40px;
+    padding: 9px 18px;
+    font-size: 13px;
+}
+
+.outline-button {
+    border: 1px solid var(--line-strong);
+    background: rgba(13, 11, 8, .7);
+    color: var(--text);
+}
+
+.outline-button:hover {
+    border-color: var(--gold-bright);
+    background: rgba(201, 150, 73, .08);
+    transform: translateY(-1px);
+}
+
+.full-width {
+    width: 100%;
+}
+
+.landing-hero {
+    min-height: 735px;
+    display: grid;
+    grid-template-columns: minmax(370px, .82fr) minmax(570px, 1.18fr);
+    align-items: center;
+    gap: clamp(34px, 5vw, 76px);
+    padding: clamp(56px, 7vw, 92px) clamp(42px, 6vw, 82px);
+    position: relative;
+    overflow: hidden;
+    border-bottom: 1px solid var(--line);
+    background:
+        linear-gradient(90deg, rgba(15, 10, 6, .94) 0%, rgba(18, 11, 6, .86) 43%, rgba(10, 8, 6, .78) 100%),
+        repeating-linear-gradient(0deg, #26170c 0 4px, #1b1008 4px 10px, #301d0e 10px 13px);
+}
+
+.landing-hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+        radial-gradient(circle at 72% 42%, rgba(210, 153, 68, .11), transparent 26rem),
+        linear-gradient(90deg, transparent 0 70%, rgba(0, 0, 0, .34) 100%);
+}
+
+.hero-copy {
+    position: relative;
+    z-index: 3;
+}
+
+.gold-kicker {
+    margin: 0 0 12px;
+    color: var(--gold);
+    font-size: 11px;
+    font-weight: 850;
+    letter-spacing: .19em;
+    text-transform: uppercase;
+}
+
+.hero-copy h1,
+.access-story h1,
+.activation-hero h1 {
+    margin: 0;
+    color: var(--cream);
+    font: 700 clamp(58px, 6.4vw, 94px)/1.02 Georgia, "Times New Roman", serif;
+    letter-spacing: -.035em;
+    text-shadow: 0 2px 28px rgba(0, 0, 0, .4);
+}
+
+.leaf-mark {
+    display: inline-block;
+    margin-left: 10px;
+    color: var(--gold);
+    font-size: .52em;
+    transform: rotate(-18deg);
+}
+
+.hero-description {
+    max-width: 560px;
+    margin: 22px 0 0;
+    color: var(--text-soft);
+    font-size: clamp(16px, 1.45vw, 20px);
+    line-height: 1.65;
+}
+
+.hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 28px;
+}
+
+.trust-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    margin-top: 28px;
+    color: var(--muted);
+    font-size: 11px;
+}
+
+.trust-row span {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.trust-row span::before {
+    content: "⊙";
+    color: var(--gold);
+    font-size: 16px;
+}
+
+.device-stage {
+    min-height: 570px;
+    position: relative;
+    z-index: 2;
+}
+
+.still-life {
+    position: absolute;
+    width: 260px;
+    height: 460px;
+    right: -80px;
+    top: 64px;
+    opacity: .66;
+    filter: saturate(.78) brightness(.72) sepia(.16);
+    background:
+        linear-gradient(90deg, transparent, rgba(8, 7, 5, .08)),
+        url("../images/homestead/sheet-05/preservation-jars-wide.png") 72% center / auto 100% no-repeat;
+    mask-image: linear-gradient(90deg, transparent 0, #000 30%, #000 82%, transparent 100%);
+}
+
+.desktop-device {
+    position: absolute;
+    inset: 28px 18px 42px 0;
+    border-radius: 28px;
+    background: linear-gradient(160deg, #3b3b39, #0d0e0d 25%, #171918 78%, #080908);
+    box-shadow:
+        inset 0 0 0 2px rgba(255, 255, 255, .12),
+        inset 0 0 0 7px #090a09,
+        0 30px 60px rgba(0, 0, 0, .65);
+    transform: perspective(1200px) rotateY(-2deg);
+}
+
+.desktop-device::before {
+    content: "";
+    position: absolute;
+    width: 7px;
+    height: 7px;
+    top: 10px;
+    left: 50%;
+    border-radius: 50%;
+    background: #222;
+    box-shadow: inset 0 0 0 1px #333;
+}
+
+.device-bezel {
+    position: absolute;
+    inset: 18px;
+    overflow: hidden;
+    border-radius: 18px;
+    background: #0b0c0b;
+}
+
+.preview-app {
+    height: 100%;
+    display: grid;
+    grid-template-columns: 118px 1fr;
+    background: #0d0d0b;
+    font-size: 10px;
+}
+
+.preview-sidebar {
+    padding: 22px 13px;
+    border-right: 1px solid rgba(201, 150, 73, .14);
+    background: #0a0a09;
+}
+
+.preview-sidebar > strong {
+    display: block;
+    margin: 0 6px 18px;
+    color: var(--cream);
+    font: 700 15px Georgia, serif;
+}
+
+.preview-sidebar nav {
+    display: grid;
+    gap: 5px;
+}
+
+.preview-sidebar span {
+    padding: 8px 7px;
+    border-radius: 6px;
+    color: #b8af9f;
+    white-space: nowrap;
+}
+
+.preview-sidebar span.active {
+    background: rgba(201, 150, 73, .13);
+    color: var(--gold-bright);
+}
+
+.preview-sidebar b {
+    font-weight: 700;
+}
+
+.preview-canvas {
+    min-width: 0;
+    padding: 20px 17px;
+}
+
+.preview-title {
+    display: flex;
+    justify-content: space-between;
+    color: #eee5d8;
+    font-size: 14px;
+}
+
+.preview-metrics,
+.preview-bottom {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 15px;
+}
+
+.preview-metrics article,
+.preview-bottom article,
+.schedule-card {
+    min-width: 0;
+    padding: 12px;
+    border: 1px solid rgba(201, 150, 73, .15);
+    border-radius: 8px;
+    background: linear-gradient(145deg, #15140f, #10100d);
+}
+
+.preview-app small,
+.preview-app b,
+.preview-app em {
+    display: block;
+    min-width: 0;
+}
+
+.preview-app small {
+    color: #c6baa8;
+    font-size: 8px;
+}
+
+.preview-app b {
+    margin-top: 10px;
+    color: #eee4d4;
+    font-size: 12px;
+}
+
+.preview-app em {
+    margin-top: 3px;
+    color: #8f8576;
+    font-size: 7px;
+    font-style: normal;
+}
+
+.preview-middle {
+    display: grid;
+    grid-template-columns: 1.55fr .9fr;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.garden-health {
+    min-height: 142px;
+    display: grid;
+    grid-template-columns: 1fr 125px;
+    gap: 10px;
+    overflow: hidden;
+    padding: 14px;
+    border: 1px solid rgba(201, 150, 73, .15);
+    border-radius: 8px;
+    background: #11110e;
+}
+
+.garden-image,
+.phone-garden-image {
+    background:
+        linear-gradient(rgba(9, 11, 8, .06), rgba(6, 7, 5, .32)),
+        url("../images/homestead/sheet-04/garden-monitoring-wide.png") center / cover no-repeat;
+}
+
+.garden-image {
+    margin: -14px -14px -14px 0;
+}
+
+.health-bar {
+    display: block;
+    height: 5px;
+    margin-top: 16px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #29291e;
+}
+
+.health-bar i {
+    display: block;
+    width: 76%;
+    height: 100%;
+    background: #7ca263;
+}
+
+.schedule-card b {
+    margin-top: 14px;
+}
+
+.phone-device {
+    position: absolute;
+    width: 190px;
+    height: 395px;
+    right: -18px;
+    bottom: 0;
+    padding: 9px;
+    border-radius: 30px;
+    z-index: 5;
+    background: linear-gradient(160deg, #3a3b39, #0a0b0a 28%, #191a19);
+    box-shadow:
+        inset 0 0 0 2px rgba(255, 255, 255, .16),
+        0 30px 55px rgba(0, 0, 0, .72);
+}
+
+.phone-device::before {
+    content: "";
+    position: absolute;
+    width: 62px;
+    height: 17px;
+    left: 50%;
+    top: 8px;
+    z-index: 4;
+    transform: translateX(-50%);
+    border-radius: 0 0 12px 12px;
+    background: #050505;
+}
+
+.phone-screen {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    overflow: hidden;
+    padding: 18px 10px 8px;
+    border-radius: 22px;
+    background: #0d0e0c;
+    font-size: 8px;
+}
+
+.phone-status,
+.phone-head {
+    display: flex;
+    justify-content: space-between;
+    color: #eee4d5;
+}
+
+.phone-head {
+    margin: 8px 0 2px;
+    color: var(--cream);
+    font-size: 11px;
+}
+
+.phone-screen > small {
+    color: #9b907e;
+}
+
+.phone-screen article {
+    padding: 9px;
+    border: 1px solid rgba(201, 150, 73, .15);
+    border-radius: 7px;
+    background: #15140f;
+}
+
+.phone-screen article b,
+.phone-screen article span {
+    display: block;
+}
+
+.phone-screen article b {
+    color: #eee4d5;
+}
+
+.phone-screen article span {
+    margin-top: 3px;
+    color: #8e8475;
+    font-size: 7px;
+}
+
+.phone-garden {
+    display: grid;
+    grid-template-columns: 1fr 50px;
+    min-height: 74px;
+}
+
+.phone-garden-image {
+    border-radius: 5px;
+}
+
+.phone-screen nav {
+    margin-top: auto;
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 5px 2px;
+    border-top: 1px solid rgba(201, 150, 73, .14);
+    color: #a89578;
+}
+
+.section-block {
+    padding: clamp(54px, 7vw, 88px) clamp(32px, 5vw, 68px);
+    border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, rgba(11, 10, 8, .98), rgba(9, 8, 6, .98));
+}
+
+.section-heading {
+    max-width: 760px;
+    margin: 0 auto 34px;
+    text-align: center;
+}
+
+.section-heading h2,
+.showcase-card h2,
+.final-cta h2,
+.form-heading h2,
+.activation-panel h2 {
+    margin: 0;
+    color: var(--cream);
+    font: 700 clamp(30px, 3vw, 45px) Georgia, "Times New Roman", serif;
+    letter-spacing: -.02em;
+}
+
+.ornament {
+    display: block;
+    width: 86px;
+    height: 12px;
+    margin: 16px auto 0;
+    position: relative;
+}
+
+.ornament::before,
+.ornament::after {
+    content: "";
+    position: absolute;
+    top: 5px;
+    width: 34px;
+    height: 1px;
+    background: var(--line-strong);
+}
+
+.ornament::before {
+    left: 0;
+}
+
+.ornament::after {
+    right: 0;
+}
+
+.ornament {
+    background: radial-gradient(circle at center, var(--gold) 0 3px, transparent 4px);
+}
+
+.feature-card-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.feature-card {
+    min-height: 255px;
+    padding: 24px 20px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    text-align: center;
+    background:
+        linear-gradient(145deg, rgba(31, 25, 17, .42), rgba(13, 12, 9, .96)),
+        radial-gradient(circle at top, rgba(201, 150, 73, .08), transparent 58%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .025);
+}
+
+.line-icon {
+    width: 66px;
+    height: 66px;
+    margin: 0 auto 18px;
+    color: var(--gold);
+}
+
+.line-icon svg {
+    width: 100%;
+    height: 100%;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.feature-card h3,
+.lifecycle-grid h3 {
+    margin: 0;
+    color: var(--cream);
+    font: 700 18px Georgia, serif;
+}
+
+.feature-card p,
+.lifecycle-grid p,
+.showcase-card p,
+.final-cta p,
+.form-heading p,
+.access-story p,
+.activation-hero p {
+    color: var(--muted);
+}
+
+.feature-card p {
+    margin: 10px 0 0;
+    font-size: 12px;
+    line-height: 1.65;
+}
+
+.lifecycle-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0;
+    max-width: 1050px;
+    margin: 0 auto;
+}
+
+.lifecycle-grid article {
+    min-height: 220px;
+    padding: 18px 34px;
+    position: relative;
+    text-align: center;
+}
+
+.lifecycle-grid article:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    top: 56px;
+    right: -26%;
+    width: 52%;
+    border-top: 1px dashed rgba(201, 150, 73, .4);
+}
+
+.step-number {
+    position: absolute;
+    top: 12px;
+    left: 24px;
+    width: 30px;
+    height: 30px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    color: #151006;
+    background: linear-gradient(180deg, #d7a85e, #8e5e24);
+    font: 700 14px Georgia, serif;
+}
+
+.step-icon {
+    height: 70px;
+    display: grid;
+    place-items: center;
+    color: var(--gold);
+    font-size: 54px;
+}
+
+.lifecycle-grid p {
+    margin: 9px auto 0;
+    max-width: 190px;
+    font-size: 12px;
+}
+
+.system-showcase {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-bottom: 1px solid var(--line);
+}
+
+.showcase-card {
+    min-height: 520px;
+    display: grid;
+    grid-template-rows: 270px 1fr;
+    border-right: 1px solid var(--line);
+    background: #0a0907;
+}
+
+.showcase-card:last-child {
+    border-right: 0;
+}
+
+.showcase-photo {
+    background-position: center;
+    background-size: cover;
+    filter: saturate(.84) sepia(.08);
+}
+
+.garden-showcase .showcase-photo {
+    background-image:
+        linear-gradient(180deg, transparent 42%, rgba(9, 8, 6, .92) 100%),
+        url("../images/homestead/sheet-04/garden-monitoring-wide.png");
+}
+
+.preservation-showcase .showcase-photo {
+    background-image:
+        linear-gradient(180deg, transparent 42%, rgba(9, 8, 6, .92) 100%),
+        url("../images/homestead/sheet-05/preservation-jars-wide.png");
+}
+
+.showcase-card > div:last-child {
+    padding: 28px 38px 38px;
+}
+
+.showcase-card p:not(.gold-kicker) {
+    max-width: 600px;
+    margin: 13px 0 18px;
+    font-size: 13px;
+}
+
+.inline-link {
+    color: var(--gold-bright);
+    font-size: 13px;
+    font-weight: 750;
+    text-decoration: none;
+}
+
+.inline-link span {
+    display: inline-block;
+    transition: transform .18s ease;
+}
+
+.inline-link:hover span {
+    transform: translateX(4px);
+}
+
+.final-cta {
+    min-height: 250px;
+    display: grid;
+    grid-template-columns: .72fr 1.28fr;
+    margin: 44px clamp(28px, 5vw, 64px);
+    overflow: hidden;
+    border: 1px solid var(--line-strong);
+    border-radius: 14px;
+    background: #0c0b08;
+}
+
+.cta-photo {
+    min-height: 250px;
+    background:
+        linear-gradient(90deg, rgba(8, 7, 5, .06), rgba(8, 7, 5, .74)),
+        url("../images/homestead/sheet-05/preservation-jars-wide.png") center / cover no-repeat;
+}
+
+.cta-copy {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 34px clamp(28px, 5vw, 64px);
+}
+
+.cta-copy p:not(.gold-kicker) {
+    margin: 10px 0 20px;
+}
+
+.compact-trust {
+    margin-top: 16px;
+}
+
+.site-footer {
+    min-height: 80px;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 24px;
+    padding: 18px 38px;
+    border-top: 1px solid var(--line);
+    background: rgba(7, 7, 5, .96);
+}
+
+.footer-brand .brand-seal {
+    width: 34px;
+    height: 34px;
+}
+
+.footer-brand .brand-word {
+    font-size: 23px;
+}
+
+.site-footer nav {
+    display: flex;
+    gap: 30px;
+}
+
+.site-footer p {
+    justify-self: end;
+    margin: 0;
+    color: var(--muted);
+    font-size: 11px;
+}

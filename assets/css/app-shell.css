@@ -1,4 +1,551 @@
-@import url("app-shell-base.css?v=20260727-2");
-@import url("workflow-polish.css?v=20260727-2");
-@import url("operations-polish.css?v=20260727-2");
-@import url("mobile-workflows.css?v=20260727-2");
+:root {
+    --hs-bg: #080705;
+    --hs-panel: #100f0c;
+    --hs-panel-soft: #15120e;
+    --hs-panel-warm: #1b150e;
+    --hs-border: rgba(186, 135, 61, .18);
+    --hs-border-strong: rgba(202, 151, 73, .34);
+    --hs-gold: #b7833d;
+    --hs-gold-bright: #d2a45f;
+    --hs-gold-soft: #e3c38f;
+    --hs-text: #eee4d3;
+    --hs-text-soft: #c8baa7;
+    --hs-muted: #8f877c;
+    --hs-green: #6f9d48;
+    --hs-blue: #5b8db0;
+    --hs-danger: #c57a45;
+    --hs-sidebar: 248px;
+    --hs-topbar: 64px;
+    --hs-shadow: 0 24px 70px rgba(0, 0, 0, .32);
+}
+
+body.has-homestead-shell {
+    min-height: 100vh;
+    margin: 0;
+    background:
+        radial-gradient(circle at 70% -10%, rgba(126, 84, 30, .12), transparent 34rem),
+        linear-gradient(135deg, #070604, #0b0907 58%, #070604);
+    color: var(--hs-text);
+}
+
+body.has-homestead-shell::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    opacity: .2;
+    background-image:
+        linear-gradient(rgba(211, 164, 95, .025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(211, 164, 95, .018) 1px, transparent 1px);
+    background-size: 34px 34px;
+}
+
+body.has-homestead-shell a { color: inherit; }
+body.has-homestead-shell img { max-width: 100%; }
+body.has-homestead-shell button,
+body.has-homestead-shell input,
+body.has-homestead-shell select,
+body.has-homestead-shell textarea { font: inherit; }
+
+.homestead-shell {
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: var(--hs-sidebar) minmax(0, 1fr);
+}
+
+.homestead-sidebar {
+    position: sticky;
+    top: 0;
+    z-index: 80;
+    height: 100vh;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-right: 1px solid var(--hs-border);
+    background:
+        linear-gradient(180deg, rgba(18, 17, 14, .98), rgba(9, 9, 7, .99)),
+        #0b0a08;
+    box-shadow: 18px 0 50px rgba(0, 0, 0, .16);
+}
+
+.homestead-sidebar::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    opacity: .13;
+    background:
+        repeating-linear-gradient(0deg, transparent 0 23px, rgba(190, 143, 70, .035) 24px 25px),
+        radial-gradient(circle at 0 100%, rgba(183, 131, 61, .2), transparent 17rem);
+}
+
+.homestead-sidebar__brand-row {
+    min-height: var(--hs-topbar);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 0 18px;
+    border-bottom: 1px solid var(--hs-border);
+}
+
+.homestead-sidebar__brand {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--hs-gold-bright) !important;
+    text-decoration: none;
+}
+
+.homestead-sidebar__brand strong {
+    overflow: hidden;
+    font: 600 24px/1 Georgia, "Times New Roman", serif;
+    letter-spacing: -.025em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.homestead-sidebar__mark {
+    width: 38px;
+    height: 38px;
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(203, 150, 69, .6);
+    border-radius: 50%;
+    color: var(--hs-gold-bright);
+    background: radial-gradient(circle, rgba(183, 131, 61, .12), transparent 70%);
+    box-shadow: inset 0 0 0 3px rgba(183, 131, 61, .04);
+    font: 600 18px/1 Georgia, serif;
+}
+
+.homestead-sidebar__close {
+    display: none;
+    width: 34px;
+    height: 34px;
+    place-items: center;
+    border: 1px solid var(--hs-border);
+    border-radius: 10px;
+    color: var(--hs-text-soft);
+    background: rgba(255, 255, 255, .025);
+    cursor: pointer;
+}
+
+.homestead-sidebar__navigation {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 18px 10px 24px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(183, 131, 61, .22) transparent;
+}
+
+.homestead-nav__group + .homestead-nav__group { margin-top: 22px; }
+.homestead-nav__heading {
+    margin: 0 10px 8px;
+    color: #746f67;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: .19em;
+    text-transform: uppercase;
+}
+.homestead-nav__group nav { display: grid; gap: 3px; }
+
+.homestead-nav__link {
+    min-height: 38px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 11px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    color: #aaa297 !important;
+    text-decoration: none;
+    font-size: 12px;
+    line-height: 1.25;
+    transition: color .16s ease, background .16s ease, border-color .16s ease, transform .16s ease;
+}
+
+.homestead-nav__link:hover {
+    color: var(--hs-text) !important;
+    border-color: rgba(183, 131, 61, .12);
+    background: rgba(183, 131, 61, .07);
+    transform: translateX(2px);
+}
+
+.homestead-nav__link.is-active {
+    color: #ead8bc !important;
+    border-color: rgba(183, 131, 61, .08);
+    background: linear-gradient(90deg, rgba(183, 131, 61, .19), rgba(183, 131, 61, .07));
+    box-shadow: inset 2px 0 0 var(--hs-gold);
+}
+
+.homestead-nav__icon {
+    width: 20px;
+    flex: 0 0 20px;
+    display: grid;
+    place-items: center;
+    color: var(--hs-gold);
+    font-size: 16px;
+    line-height: 1;
+}
+
+.homestead-sidebar__footer {
+    margin: 0 12px 14px;
+    padding: 15px;
+    border: 1px solid var(--hs-border);
+    border-radius: 10px;
+    background:
+        linear-gradient(145deg, rgba(183, 131, 61, .09), rgba(255, 255, 255, .015)),
+        #0d0c09;
+}
+.homestead-sidebar__footer p {
+    margin: 0 0 5px;
+    color: var(--hs-gold-soft);
+    font: 600 15px/1.2 Georgia, serif;
+}
+.homestead-sidebar__footer span {
+    display: block;
+    color: var(--hs-muted);
+    font-size: 10px;
+    line-height: 1.5;
+}
+.homestead-sidebar__footer a {
+    display: inline-block;
+    margin-top: 11px;
+    color: var(--hs-gold-bright) !important;
+    text-decoration: none;
+    font-size: 10px;
+    font-weight: 750;
+}
+
+.homestead-workspace {
+    min-width: 0;
+    min-height: 100vh;
+    background: rgba(5, 5, 4, .15);
+}
+
+.homestead-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 70;
+    min-height: var(--hs-topbar);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 0 18px 0 22px;
+    border-bottom: 1px solid var(--hs-border);
+    background: rgba(9, 9, 7, .91);
+    box-shadow: 0 12px 35px rgba(0, 0, 0, .14);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+}
+
+.homestead-topbar__menu {
+    width: 38px;
+    height: 38px;
+    display: none;
+    place-items: center;
+    border: 1px solid var(--hs-border);
+    border-radius: 9px;
+    color: var(--hs-gold-bright);
+    background: rgba(255, 255, 255, .025);
+    cursor: pointer;
+}
+.homestead-topbar__menu > span:first-child,
+.homestead-topbar__menu > span:first-child::before,
+.homestead-topbar__menu > span:first-child::after {
+    width: 16px;
+    height: 1px;
+    display: block;
+    border-radius: 99px;
+    background: currentColor;
+}
+.homestead-topbar__menu > span:first-child { position: relative; }
+.homestead-topbar__menu > span:first-child::before,
+.homestead-topbar__menu > span:first-child::after {
+    content: "";
+    position: absolute;
+    left: 0;
+}
+.homestead-topbar__menu > span:first-child::before { top: -5px; }
+.homestead-topbar__menu > span:first-child::after { top: 5px; }
+
+.homestead-topbar__search {
+    min-width: 0;
+    min-height: 36px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 11px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    color: var(--hs-muted) !important;
+    text-decoration: none;
+    font-size: 11px;
+}
+.homestead-topbar__search:hover {
+    color: var(--hs-text-soft) !important;
+    border-color: var(--hs-border);
+    background: rgba(255, 255, 255, .02);
+}
+.homestead-topbar__search > span:first-child {
+    color: var(--hs-gold);
+    font-size: 21px;
+    line-height: 1;
+}
+
+.homestead-topbar__actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+.homestead-topbar__icon-link {
+    width: 36px;
+    height: 36px;
+    display: grid;
+    place-items: center;
+    border: 1px solid transparent;
+    border-radius: 50%;
+    color: var(--hs-text-soft) !important;
+    text-decoration: none;
+    font-size: 21px;
+}
+.homestead-topbar__icon-link:hover {
+    border-color: var(--hs-border);
+    color: var(--hs-gold-bright) !important;
+    background: rgba(183, 131, 61, .07);
+}
+
+.homestead-topbar__profile {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 4px 7px 4px 4px;
+    border: 1px solid transparent;
+    border-radius: 22px;
+    color: var(--hs-text-soft) !important;
+    text-decoration: none;
+}
+.homestead-topbar__profile:hover {
+    border-color: var(--hs-border);
+    background: rgba(255, 255, 255, .02);
+}
+.homestead-topbar__avatar {
+    width: 34px;
+    height: 34px;
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--hs-border-strong);
+    border-radius: 50%;
+    color: var(--hs-gold-soft);
+    background: #14110d;
+    font-size: 11px;
+    font-weight: 800;
+}
+.homestead-topbar__profile-copy {
+    min-width: 0;
+    display: grid;
+    gap: 1px;
+}
+.homestead-topbar__profile-copy strong,
+.homestead-topbar__profile-copy small {
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.homestead-topbar__profile-copy strong { color: var(--hs-text); font-size: 11px; }
+.homestead-topbar__profile-copy small { color: var(--hs-muted); font-size: 8px; text-transform: uppercase; letter-spacing: .09em; }
+.homestead-topbar__chevron { color: #6f685f; font-size: 12px; }
+
+.homestead-mobile-nav { display: none; position: relative; margin-left: auto; }
+.homestead-mobile-nav summary {
+    width: 38px;
+    height: 38px;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--hs-border);
+    border-radius: 9px;
+    color: var(--hs-gold-bright);
+    background: rgba(255, 255, 255, .025);
+    cursor: pointer;
+    list-style: none;
+}
+.homestead-mobile-nav summary::-webkit-details-marker { display: none; }
+.homestead-mobile-nav__panel {
+    position: absolute;
+    top: calc(100% + 11px);
+    right: 0;
+    width: min(390px, calc(100vw - 24px));
+    max-height: calc(100vh - 84px);
+    overflow-y: auto;
+    padding: 14px;
+    border: 1px solid var(--hs-border-strong);
+    border-radius: 13px;
+    background: rgba(13, 12, 9, .99);
+    box-shadow: var(--hs-shadow);
+}
+.homestead-mobile-nav__member {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 4px 13px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--hs-border);
+}
+.homestead-mobile-nav__member div { min-width: 0; display: grid; gap: 2px; }
+.homestead-mobile-nav__member strong { color: var(--hs-text); font-size: 12px; }
+.homestead-mobile-nav__member small { color: var(--hs-muted); font-size: 9px; text-transform: uppercase; letter-spacing: .09em; }
+.homestead-mobile-nav__group + .homestead-mobile-nav__group { margin-top: 14px; }
+.homestead-mobile-nav__group > p {
+    margin: 0 6px 6px;
+    color: #6f685f;
+    font-size: 8px;
+    font-weight: 800;
+    letter-spacing: .17em;
+    text-transform: uppercase;
+}
+.homestead-mobile-nav__group nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
+.homestead-mobile-nav__link {
+    min-height: 41px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 9px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    color: var(--hs-text-soft) !important;
+    text-decoration: none;
+    font-size: 10px;
+}
+.homestead-mobile-nav__link:hover,
+.homestead-mobile-nav__link.is-active {
+    border-color: var(--hs-border);
+    background: rgba(183, 131, 61, .1);
+}
+.homestead-mobile-nav__signout {
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 13px;
+    border: 1px solid rgba(197, 122, 69, .25);
+    border-radius: 8px;
+    color: #d39a72 !important;
+    background: rgba(197, 122, 69, .06);
+    text-decoration: none;
+    font-size: 10px;
+    font-weight: 800;
+}
+
+.homestead-shell__backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 75;
+    display: none;
+    border: 0;
+    background: rgba(0, 0, 0, .66);
+    backdrop-filter: blur(3px);
+}
+
+body.has-homestead-shell .skip-link {
+    position: fixed;
+    left: 12px;
+    top: 10px;
+    z-index: 150;
+    transform: translateY(-160%);
+    padding: 9px 12px;
+    border-radius: 7px;
+    color: #080705 !important;
+    background: var(--hs-gold-bright);
+    font-size: 11px;
+    font-weight: 800;
+}
+body.has-homestead-shell .skip-link:focus { transform: translateY(0); }
+body.has-homestead-shell .visually-hidden {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+}
+
+body.has-homestead-shell .page-container {
+    width: min(1580px, 100%);
+    margin: 0 auto;
+    padding: clamp(20px, 3vw, 34px);
+    scroll-margin-top: calc(var(--hs-topbar) + 12px);
+}
+
+@media (max-width: 1180px) {
+    :root { --hs-sidebar: 228px; }
+    .homestead-sidebar__brand strong { font-size: 21px; }
+    .homestead-nav__link { font-size: 11px; }
+}
+
+@media (max-width: 960px) {
+    .homestead-shell { display: block; }
+    .homestead-sidebar {
+        position: fixed;
+        left: 0;
+        top: 0;
+        width: min(286px, 86vw);
+        transform: translateX(-103%);
+        transition: transform .22s ease;
+        box-shadow: 25px 0 70px rgba(0, 0, 0, .5);
+    }
+    body.shell-menu-open { overflow: hidden; }
+    body.shell-menu-open .homestead-sidebar { transform: translateX(0); }
+    body.shell-menu-open .homestead-shell__backdrop { display: block; }
+    .homestead-sidebar__close { display: grid; }
+    .homestead-topbar__menu { display: grid; }
+    .homestead-topbar__search { display: none; }
+}
+
+@media (max-width: 640px) {
+    :root { --hs-topbar: 58px; }
+    .homestead-topbar { min-height: var(--hs-topbar); padding: 0 10px; }
+    .homestead-topbar__profile-copy,
+    .homestead-topbar__chevron { display: none; }
+    .homestead-topbar__profile { padding-right: 4px; }
+    .homestead-mobile-nav { display: block; }
+    .homestead-topbar__actions { gap: 4px; }
+    .homestead-mobile-nav__panel {
+        position: fixed;
+        top: 66px;
+        right: 8px;
+        left: 8px;
+        width: auto;
+        max-height: calc(100vh - 74px);
+    }
+    body.has-homestead-shell .page-container { padding: 14px 10px 28px; }
+}
+
+@media (max-width: 390px) {
+    .homestead-mobile-nav__group nav { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .homestead-sidebar,
+    .homestead-nav__link { transition: none; }
+}
+
+@media (forced-colors: active) {
+    .homestead-sidebar,
+    .homestead-topbar,
+    .homestead-nav__link,
+    .homestead-mobile-nav__panel,
+    .homestead-topbar__profile { border: 1px solid CanvasText; }
+}

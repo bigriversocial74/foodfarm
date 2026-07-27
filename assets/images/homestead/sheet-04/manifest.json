@@ -1,0 +1,173 @@
+{
+  "sheet": 4,
+  "source_file": "homestead_4.png",
+  "source_dimensions": [
+    1122,
+    1402
+  ],
+  "source_format": "PNG",
+  "source_sha256": "88f68f8453b689a94f179794f6b97d442b5b4e0b9d0b5bb334b33dfc509b1de2",
+  "panel_count": 10,
+  "assets": [
+    {
+      "filename": "garden-monitoring-wide.png",
+      "crop_box": [
+        44,
+        231,
+        1077,
+        645
+      ],
+      "dimensions": [
+        1033,
+        414
+      ],
+      "intended_use": "Landing or garden page wide monitoring scene with grow racks and wall sensor.",
+      "format": "PNG",
+      "sha256": "c24f6925c3b7266e0ce64b8301a285165cba2eb7927ac6faa3c8f8d5d602493f"
+    },
+    {
+      "filename": "basil-grow-light-closeup.png",
+      "crop_box": [
+        44,
+        672,
+        348,
+        1074
+      ],
+      "dimensions": [
+        304,
+        402
+      ],
+      "intended_use": "Garden detail card for grow lights, herbs, and indoor planting.",
+      "format": "PNG",
+      "sha256": "97c060a04498db349c8c2fd089c8b2b74336f37dffad5d31cb3bee44795fef18"
+    },
+    {
+      "filename": "soil-sensor-closeup.png",
+      "crop_box": [
+        367,
+        672,
+        733,
+        1074
+      ],
+      "dimensions": [
+        366,
+        402
+      ],
+      "intended_use": "Garden monitoring card for temperature, humidity, and soil readings.",
+      "format": "PNG",
+      "sha256": "28ecdc2d7d1caac3226564c0119a809d0ebd341ee23e0471781afed019a7576b"
+    },
+    {
+      "filename": "indoor-grow-racks.png",
+      "crop_box": [
+        752,
+        672,
+        1077,
+        1074
+      ],
+      "dimensions": [
+        325,
+        402
+      ],
+      "intended_use": "Garden overview card for indoor grow racks and seedling inventory.",
+      "format": "PNG",
+      "sha256": "9c19566a9a1ce4c93ff609e2b7e1b34f934807cabebfe2a1b265b58e47f454b6"
+    },
+    {
+      "filename": "temperature-monitoring-icon.png",
+      "crop_box": [
+        46,
+        1113,
+        213,
+        1328
+      ],
+      "dimensions": [
+        167,
+        215
+      ],
+      "intended_use": "Temperature monitoring feature card.",
+      "format": "PNG",
+      "sha256": "5e01532d277ceb3724abe10c01c68022bc2606936402ce4f62dc761976cf2d72"
+    },
+    {
+      "filename": "humidity-monitoring-icon.png",
+      "crop_box": [
+        228,
+        1113,
+        390,
+        1328
+      ],
+      "dimensions": [
+        162,
+        215
+      ],
+      "intended_use": "Humidity monitoring feature card.",
+      "format": "PNG",
+      "sha256": "d0204bc40a5d19aaa4144bbbf163588cc4967900dd7a4eec900ac1449b6f8c6c"
+    },
+    {
+      "filename": "plant-growth-icon.png",
+      "crop_box": [
+        406,
+        1113,
+        559,
+        1328
+      ],
+      "dimensions": [
+        153,
+        215
+      ],
+      "intended_use": "Plant growth and seedling feature card.",
+      "format": "PNG",
+      "sha256": "43a71628a626fe617fefa76428d0fc981a4998eccc704095db022e862ec21e1d"
+    },
+    {
+      "filename": "soil-moisture-icon.png",
+      "crop_box": [
+        575,
+        1113,
+        729,
+        1328
+      ],
+      "dimensions": [
+        154,
+        215
+      ],
+      "intended_use": "Soil moisture monitoring feature card.",
+      "format": "PNG",
+      "sha256": "d98d847c7156487942b59bab2afbb28d77a0fbdbef4c78d863378376c74b86be"
+    },
+    {
+      "filename": "airflow-icon.png",
+      "crop_box": [
+        745,
+        1113,
+        900,
+        1328
+      ],
+      "dimensions": [
+        155,
+        215
+      ],
+      "intended_use": "Airflow and ventilation monitoring feature card.",
+      "format": "PNG",
+      "sha256": "9de9e239e39f123fe286ebf8506f6cd77ed614988a48e2e031633a95d65481e8"
+    },
+    {
+      "filename": "garden-camera-icon.png",
+      "crop_box": [
+        915,
+        1113,
+        1076,
+        1328
+      ],
+      "dimensions": [
+        161,
+        215
+      ],
+      "intended_use": "Garden camera and visual inspection feature card.",
+      "format": "PNG",
+      "sha256": "57bace0661140279fb06ae8e7d272d8495887816cc67148203bf89f365d760f1"
+    }
+  ]
+}

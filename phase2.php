@@ -27,6 +27,7 @@ $canManageStorage = $auth->can($user, 'storage.manage');
 $canViewStorage = $canManageStorage || $auth->can($user, 'storage.view');
 $canManageInventory = $auth->can($user, 'inventory.manage');
 $canViewInventory = $canManageInventory || $auth->can($user, 'inventory.view');
+$canViewPlanning = $auth->can($user, 'tasks.manage') || $auth->can($user, 'tasks.complete');
 if (($section === 'storage' && !$canViewStorage) || (in_array($section, ['inventory', 'ledger'], true) && !$canViewInventory)) {
     http_response_code(403);
     exit('You do not have permission to view this household area.');
@@ -313,15 +314,334 @@ $ledgerStatement = $pdo->prepare(
 );
 $ledgerStatement->execute([$householdId]);
 $ledger = $ledgerStatement->fetchAll();
+$activeInventory = array_values(array_filter(
+    $inventory,
+    static fn(array $item): bool => (string)($item['status'] ?? '') === 'active'
+));
+$inventoryCount = count($activeInventory);
+$inventoryValue = 0.0;
+$lowStockItems = [];
+$expiringSoonItems = [];
+$recentInventory = $activeInventory;
+$categoryUsage = [];
+$today = new DateTimeImmutable('today');
+$expiryCutoff = $today->modify('+30 days');
+
+foreach ($activeInventory as $item) {
+    $quantity = (float)($item['current_quantity'] ?? 0);
+    $purchaseCost = $item['purchase_cost'] === null ? 0.0 : (float)$item['purchase_cost'];
+    $inventoryValue += max(0.0, $quantity) * max(0.0, $purchaseCost);
+
+    if ($item['reorder_level'] !== null && $quantity <= (float)$item['reorder_level']) {
+        $lowStockItems[] = $item;
+    }
+
+    $bestUse = trim((string)($item['best_use_date'] ?? ''));
+    if ($bestUse !== '') {
+        $bestUseDate = DateTimeImmutable::createFromFormat('!Y-m-d', $bestUse);
+        if ($bestUseDate && $bestUseDate >= $today && $bestUseDate <= $expiryCutoff) {
+            $expiringSoonItems[] = $item;
+        }
+    }
+
+    $categoryName = trim((string)($item['category_name'] ?? 'Uncategorized')) ?: 'Uncategorized';
+    $categoryUsage[$categoryName] = ($categoryUsage[$categoryName] ?? 0) + 1;
+}
+
+usort(
+    $recentInventory,
+    static fn(array $left, array $right): int => strcmp((string)($right['created_at'] ?? ''), (string)($left['created_at'] ?? ''))
+);
+$recentInventory = array_slice($recentInventory, 0, 8);
+arsort($categoryUsage);
+$categoryUsage = array_slice($categoryUsage, 0, 6, true);
+$locationCards = array_slice($locations, 0, 6);
+$shoppingSuggestions = array_slice($lowStockItems, 0, 6);
+$inventoryRows = $section === 'inventory' ? $inventory : [];
+$sectionMeta = [
+    'family' => ['eyebrow' => 'Household profiles', 'title' => 'Family & Household', 'description' => 'Keep household roles, serving plans, activity context, and privacy controls organized.'],
+    'storage' => ['eyebrow' => 'Pantry organization', 'title' => 'Storage Locations', 'description' => 'Manage shelves, rooms, containers, capacity, and target storage conditions.'],
+    'inventory' => ['eyebrow' => 'Digital pantry', 'title' => 'Pantry Inventory', 'description' => "Track what you have, where it's stored, and when it needs attention."],
+    'ledger' => ['eyebrow' => 'Food provenance', 'title' => 'Food Lifecycle Ledger', 'description' => 'Review the immutable household record of purchases, harvests, moves, use, preservation, and waste.'],
+];
+$currentMeta = $sectionMeta[$section];
 $flashes = consume_flashes();
 $token = csrf_token();
 ?><!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Household Operations · Homestead</title><link rel="stylesheet" href="/assets/css/app.css"></head>
-<body><a class="skip-link" href="#main-content">Skip to household operations</a><main id="main-content" class="page-container"><header class="page-header"><div><p class="eyebrow">Authenticated household workspace</p><h1>Household Operations</h1><p class="page-description">Family, storage, inventory, and immutable food-ledger workflows.</p></div><div><strong><?= e((string)$user['display_name']) ?></strong><br><a href="/logout.php">Sign out</a></div></header>
-<?php foreach ($flashes as $message): ?><div role="status" class="status status-<?= $message['type'] === 'error' ? 'warning' : 'good' ?>" style="display:block;margin-bottom:12px"><?= e((string)$message['message']) ?></div><?php endforeach; ?>
-<nav class="toolbar" aria-label="Household sections"><a class="button secondary" href="?section=family">Family</a><?php if ($canViewStorage): ?><a class="button secondary" href="?section=storage">Storage</a><?php endif; ?><?php if ($canViewInventory): ?><a class="button secondary" href="?section=inventory">Inventory</a><a class="button secondary" href="?section=ledger">Food ledger</a><?php endif; ?></nav>
-<?php if ($section === 'family'): ?><section class="content-grid"><article class="panel span-2"><h2>Family members</h2><div class="table-wrap" tabindex="0"><table><thead><tr><th scope="col">Name</th><th scope="col">Role</th><th scope="col">Age group</th><th scope="col">Serving</th><th scope="col">Activity</th><th scope="col">Visibility</th><th scope="col">Status</th></tr></thead><tbody><?php foreach ($members as $row): ?><tr><td><strong><?= e((string)$row['display_name']) ?></strong></td><td><?= e(str_replace('_', ' ', (string)$row['role'])) ?></td><td><?= e((string)$row['age_group']) ?></td><td><?= e((string)$row['serving_multiplier']) ?>×</td><td><?= e(str_replace('_', ' ', (string)($row['activity_level'] ?? 'not set'))) ?></td><td><?= e((string)($row['wellness_visibility'] ?? 'private')) ?></td><td><?= e((string)$row['status']) ?><?php if ($canManageMembers && $row['role'] !== 'owner' && (int)$row['id'] !== $memberId): ?><form method="post" style="display:inline;margin-left:8px"><input type="hidden" name="csrf_token" value="<?= e($token) ?>"><input type="hidden" name="action" value="toggle_member"><input type="hidden" name="id" value="<?= (int)$row['id'] ?>"><button class="button secondary" type="submit">Toggle</button></form><?php endif; ?></td></tr><?php endforeach; ?></tbody></table></div></article><?php if ($canManageMembers): ?><article class="panel"><h2>Add family profile</h2><form method="post" class="form-grid"><input type="hidden" name="csrf_token" value="<?= e($token) ?>"><input type="hidden" name="action" value="add_member"><label>Name<input class="search-field" name="display_name" maxlength="120" required></label><label>Age group<select name="age_group"><option>adult</option><option>teen</option><option>child</option><option>guest</option></select></label><label>Role<select name="role"><option value="adult_member">Adult member</option><option value="administrator">Administrator</option><option value="youth_member">Youth member</option><option value="guest_helper">Guest helper</option></select></label><label>Serving multiplier<input class="search-field" type="number" step="0.05" min="0.1" max="5" name="serving_multiplier" value="1"></label><label>Dietary pattern<input class="search-field" name="dietary_pattern" maxlength="120"></label><label>Allergen notes<textarea name="allergen_notes" maxlength="5000"></textarea></label><label>Activity<select name="activity_level"><option value="not_set">Not set</option><option value="mostly_sedentary">Mostly sedentary</option><option value="lightly_active">Lightly active</option><option value="moderately_active">Moderately active</option><option value="very_active">Very active</option><option value="physically_demanding">Physically demanding</option></select></label><label>Height<input class="search-field" type="number" step="0.01" min="0" name="height_value"><select name="height_unit"><option value="in">in</option><option value="cm">cm</option></select></label><label>Weight<input class="search-field" type="number" step="0.01" min="0" name="weight_value"><select name="weight_unit"><option value="lb">lb</option><option value="kg">kg</option></select></label><label>Wellness visibility<select name="wellness_visibility"><option value="private">Private</option><option value="authorized_adults">Authorized adults</option><option value="household_planning">Planning without measurements</option></select></label><p class="page-description">Measurements are optional and are not used for medical, diagnostic, calorie, or weight-loss guidance.</p><button class="button primary" type="submit">Add family member</button></form></article><?php endif; ?></section>
-<?php elseif ($section === 'storage'): ?><section class="content-grid"><article class="panel span-2"><h2>Storage locations</h2><div class="table-wrap" tabindex="0"><table><thead><tr><th scope="col">Name</th><th scope="col">Parent</th><th scope="col">Type</th><th scope="col">Capacity</th><th scope="col">Environment</th><th scope="col">Items</th></tr></thead><tbody><?php foreach ($locations as $row): ?><tr><td><strong><?= e((string)$row['name']) ?></strong></td><td><?= e((string)($row['parent_name'] ?? '—')) ?></td><td><?= e((string)$row['location_type']) ?></td><td><?= e((string)($row['capacity_value'] ?? '—')) ?> <?= e((string)($row['capacity_unit'] ?? '')) ?></td><td><?= $row['target_temperature'] !== null ? e((string)$row['target_temperature']) . '°' : '—' ?> / <?= $row['target_humidity'] !== null ? e((string)$row['target_humidity']) . '%' : '—' ?></td><td><?= (int)$row['item_count'] ?></td></tr><?php endforeach; ?></tbody></table></div></article><?php if ($canManageStorage): ?><article class="panel"><h2>Add storage location</h2><form method="post" class="form-grid"><input type="hidden" name="csrf_token" value="<?= e($token) ?>"><input type="hidden" name="action" value="add_location"><label>Name<input class="search-field" name="name" maxlength="140" required></label><label>Parent<select name="parent_id"><option value="">Top level</option><?php foreach ($locations as $row): ?><option value="<?= (int)$row['id'] ?>"><?= e((string)$row['name']) ?></option><?php endforeach; ?></select></label><label>Type<input class="search-field" name="location_type" maxlength="80" value="shelf" required></label><label>Capacity<input class="search-field" type="number" step="0.01" min="0" name="capacity_value"></label><label>Unit<input class="search-field" name="capacity_unit" maxlength="30" value="items"></label><label>Temperature<input class="search-field" type="number" step="0.1" min="-100" max="250" name="target_temperature"></label><label>Humidity %<input class="search-field" type="number" step="0.1" min="0" max="100" name="target_humidity"></label><label>Notes<textarea name="notes" maxlength="5000"></textarea></label><button class="button primary" type="submit">Add location</button></form></article><?php endif; ?></section>
-<?php elseif ($section === 'inventory'): ?><section class="content-grid"><article class="panel span-2"><h2>Inventory</h2><div class="table-wrap" tabindex="0"><table><thead><tr><th scope="col">Item</th><th scope="col">Category</th><th scope="col">Location</th><th scope="col">Quantity</th><th scope="col">Reorder</th><th scope="col">Best use</th><th scope="col">Adjust</th></tr></thead><tbody><?php foreach ($inventory as $row): ?><tr><td><strong><?= e((string)$row['name']) ?></strong></td><td><?= e((string)($row['category_name'] ?? '—')) ?></td><td><?= e((string)($row['location_name'] ?? 'Unassigned')) ?></td><td><?= e((string)$row['current_quantity']) ?> <?= e((string)$row['unit']) ?></td><td><?= e((string)($row['reorder_level'] ?? '—')) ?></td><td><?= e((string)($row['best_use_date'] ?? '—')) ?></td><td><?php if ($canManageInventory): ?><form method="post" style="display:flex;gap:6px"><input type="hidden" name="csrf_token" value="<?= e($token) ?>"><input type="hidden" name="action" value="adjust_inventory"><input type="hidden" name="id" value="<?= (int)$row['id'] ?>"><label class="visually-hidden" for="delta-<?= (int)$row['id'] ?>">Adjustment for <?= e((string)$row['name']) ?></label><input id="delta-<?= (int)$row['id'] ?>" class="search-field" style="width:90px" type="number" step="0.0001" name="delta" required><button class="button secondary" type="submit">Post</button></form><?php else: ?>—<?php endif; ?></td></tr><?php endforeach; ?></tbody></table></div></article><?php if ($canManageInventory): ?><article class="panel"><h2>Add inventory</h2><form method="post" class="form-grid"><input type="hidden" name="csrf_token" value="<?= e($token) ?>"><input type="hidden" name="action" value="add_inventory"><label>Name<input class="search-field" name="name" maxlength="180" required></label><label>Type<select name="item_type"><option value="ingredient">Ingredient</option><option value="prepared_food">Prepared food</option><option value="preserved_food">Preserved food</option><option value="seed">Seed</option><option value="supply">Supply</option></select></label><label>Quantity<input class="search-field" type="number" step="0.0001" min="0" name="quantity" required></label><label>Unit<input class="search-field" name="unit" maxlength="30" value="each" required></label><label>Category<select name="category_id"><option value="">Uncategorized</option><?php foreach ($categories as $row): ?><option value="<?= (int)$row['id'] ?>"><?= e((string)$row['name']) ?></option><?php endforeach; ?></select></label><label>Location<select name="storage_location_id"><option value="">Unassigned</option><?php foreach ($locations as $row): ?><option value="<?= (int)$row['id'] ?>"><?= e((string)$row['name']) ?></option><?php endforeach; ?></select></label><label>Reorder level<input class="search-field" type="number" step="0.0001" min="0" name="reorder_level"></label><label>Target level<input class="search-field" type="number" step="0.0001" min="0" name="target_stock_level"></label><label>Purchase cost<input class="search-field" type="number" step="0.01" min="0" name="purchase_cost"></label><label>Best-use date<input class="search-field" type="date" name="best_use_date"></label><label>Notes<textarea name="notes" maxlength="5000"></textarea></label><button class="button primary" type="submit">Add item and ledger event</button></form></article><?php endif; ?></section>
-<?php else: ?><article class="panel"><h2>Food lifecycle ledger</h2><div class="table-wrap" tabindex="0"><table><thead><tr><th scope="col">Occurred</th><th scope="col">Item</th><th scope="col">Event</th><th scope="col">Quantity</th><th scope="col">Member</th><th scope="col">Notes</th></tr></thead><tbody><?php foreach ($ledger as $row): ?><tr><td><?= e((string)$row['occurred_at']) ?></td><td><strong><?= e((string)($row['item_name'] ?? 'Deleted item')) ?></strong></td><td><?= e(str_replace('_', ' ', (string)$row['event_type'])) ?></td><td><?= e((string)$row['quantity']) ?> <?= e((string)$row['unit']) ?></td><td><?= e((string)($row['member_name'] ?? 'System')) ?></td><td><?= e((string)($row['notes'] ?? '')) ?></td></tr><?php endforeach; ?></tbody></table></div></article><?php endif; ?>
-</main></body></html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="theme-color" content="#080705">
+    <title><?= e($currentMeta['title']) ?> · Homestead</title>
+    <link rel="stylesheet" href="assets/css/app.css">
+    <script src="assets/js/homestead-pantry.js?v=20260727-1" defer></script>
+</head>
+<body>
+<a class="skip-link" href="#main-content">Skip to <?= e(strtolower($currentMeta['title'])) ?></a>
+<main id="main-content" class="page-container homestead-operations">
+    <header class="operations-hero<?= $section === 'inventory' ? ' operations-hero--pantry' : '' ?>">
+        <div class="operations-hero__copy">
+            <p class="operations-kicker"><?= e($currentMeta['eyebrow']) ?></p>
+            <h1><?= e($currentMeta['title']) ?></h1>
+            <p><?= e($currentMeta['description']) ?></p>
+        </div>
+        <?php if ($section === 'inventory'): ?>
+            <div class="operations-hero__image" aria-hidden="true"></div>
+        <?php endif; ?>
+    </header>
+
+    <?php foreach ($flashes as $message): ?>
+        <div role="status" class="operations-alert operations-alert--<?= $message['type'] === 'error' ? 'warning' : 'success' ?>"><?= e((string)$message['message']) ?></div>
+    <?php endforeach; ?>
+
+    <nav class="operations-tabs" aria-label="Household operations sections">
+        <a class="<?= $section === 'family' ? 'is-active' : '' ?>" href="?section=family">Family</a>
+        <?php if ($canViewStorage): ?><a class="<?= $section === 'storage' ? 'is-active' : '' ?>" href="?section=storage">Storage</a><?php endif; ?>
+        <?php if ($canViewInventory): ?>
+            <a class="<?= $section === 'inventory' ? 'is-active' : '' ?>" href="?section=inventory">Inventory</a>
+            <a class="<?= $section === 'ledger' ? 'is-active' : '' ?>" href="?section=ledger">Food ledger</a>
+        <?php endif; ?>
+    </nav>
+
+    <?php if ($section === 'inventory'): ?>
+        <section class="pantry-metrics" aria-label="Pantry inventory summary">
+            <article class="pantry-metric">
+                <span>Total items</span>
+                <strong><?= number_format($inventoryCount) ?></strong>
+                <small>$<?= number_format($inventoryValue, 2) ?> recorded value</small>
+            </article>
+            <article class="pantry-metric pantry-metric--attention">
+                <span>Low stock alerts</span>
+                <strong><?= number_format(count($lowStockItems)) ?></strong>
+                <a href="#inventory-table">View low stock →</a>
+            </article>
+            <article class="pantry-metric">
+                <span>Expiring soon</span>
+                <strong><?= number_format(count($expiringSoonItems)) ?></strong>
+                <small>Within 30 days</small>
+            </article>
+            <article class="pantry-metric">
+                <span>Recently added</span>
+                <strong><?= number_format(count($recentInventory)) ?></strong>
+                <small>Latest active records</small>
+            </article>
+        </section>
+
+        <div class="pantry-layout">
+            <section class="pantry-main-card" aria-labelledby="inventory-heading">
+                <div class="pantry-card-heading">
+                    <div>
+                        <p class="operations-kicker">Household stock</p>
+                        <h2 id="inventory-heading">Inventory</h2>
+                    </div>
+                    <?php if ($canManageInventory): ?>
+                        <details class="pantry-add-drawer">
+                            <summary>Add inventory</summary>
+                            <div class="pantry-add-drawer__panel">
+                                <form method="post" class="operations-form operations-form--grid">
+                                    <input type="hidden" name="csrf_token" value="<?= e($token) ?>">
+                                    <input type="hidden" name="action" value="add_inventory">
+                                    <label><span>Name</span><input name="name" maxlength="180" required></label>
+                                    <label><span>Type</span><select name="item_type"><option value="ingredient">Ingredient</option><option value="prepared_food">Prepared food</option><option value="preserved_food">Preserved food</option><option value="seed">Seed</option><option value="supply">Supply</option></select></label>
+                                    <label><span>Quantity</span><input type="number" step="0.0001" min="0" name="quantity" required></label>
+                                    <label><span>Unit</span><input name="unit" maxlength="30" value="each" required></label>
+                                    <label><span>Category</span><select name="category_id"><option value="">Uncategorized</option><?php foreach ($categories as $row): ?><option value="<?= (int)$row['id'] ?>"><?= e((string)$row['name']) ?></option><?php endforeach; ?></select></label>
+                                    <label><span>Location</span><select name="storage_location_id"><option value="">Unassigned</option><?php foreach ($locations as $row): ?><option value="<?= (int)$row['id'] ?>"><?= e((string)$row['name']) ?></option><?php endforeach; ?></select></label>
+                                    <label><span>Reorder level</span><input type="number" step="0.0001" min="0" name="reorder_level"></label>
+                                    <label><span>Target level</span><input type="number" step="0.0001" min="0" name="target_stock_level"></label>
+                                    <label><span>Purchase cost</span><input type="number" step="0.01" min="0" name="purchase_cost"></label>
+                                    <label><span>Best-use date</span><input type="date" name="best_use_date"></label>
+                                    <label class="operations-form__wide"><span>Notes</span><textarea name="notes" maxlength="5000"></textarea></label>
+                                    <button class="operations-button operations-button--primary operations-form__wide" type="submit">Add item and ledger event</button>
+                                </form>
+                            </div>
+                        </details>
+                    <?php endif; ?>
+                </div>
+
+                <div class="pantry-category-tabs" role="group" aria-label="Filter inventory by category">
+                    <button class="is-active" type="button" data-pantry-filter="all">All items</button>
+                    <?php foreach (array_slice(array_keys($categoryUsage), 0, 5) as $categoryName): ?>
+                        <button type="button" data-pantry-filter="<?= e(strtolower($categoryName)) ?>"><?= e($categoryName) ?></button>
+                    <?php endforeach; ?>
+                </div>
+
+                <div class="pantry-search-row">
+                    <label class="pantry-search">
+                        <span class="visually-hidden">Search inventory</span>
+                        <span aria-hidden="true">⌕</span>
+                        <input type="search" placeholder="Search inventory..." data-pantry-search>
+                    </label>
+                    <span class="pantry-result-count" data-pantry-count><?= number_format(count($inventoryRows)) ?> items</span>
+                </div>
+
+                <div class="pantry-table-wrap" id="inventory-table" tabindex="0">
+                    <table class="pantry-table">
+                        <thead><tr><th scope="col">Item</th><th scope="col">Location</th><th scope="col">Quantity</th><th scope="col">Status</th><th scope="col">Reorder level</th><th scope="col">Adjust</th></tr></thead>
+                        <tbody>
+                        <?php if ($inventoryRows === []): ?><tr><td colspan="6" class="pantry-empty">No inventory records yet.</td></tr><?php endif; ?>
+                        <?php foreach ($inventoryRows as $row):
+                            $quantity = (float)$row['current_quantity'];
+                            $isLow = $row['reorder_level'] !== null && $quantity <= (float)$row['reorder_level'];
+                            $isActive = (string)$row['status'] === 'active';
+                            $statusLabel = !$isActive ? ucfirst((string)$row['status']) : ($isLow ? 'Low' : 'Good');
+                            $statusClass = !$isActive ? 'is-muted' : ($isLow ? 'is-low' : 'is-good');
+                            $categoryKey = strtolower(trim((string)($row['category_name'] ?? 'Uncategorized')) ?: 'uncategorized');
+                            $searchText = strtolower(implode(' ', [(string)$row['name'], (string)($row['category_name'] ?? ''), (string)($row['location_name'] ?? ''), $statusLabel]));
+                        ?>
+                            <tr data-inventory-row data-category="<?= e($categoryKey) ?>" data-search="<?= e($searchText) ?>">
+                                <td><span class="pantry-item-mark" aria-hidden="true">▦</span><span><strong><?= e((string)$row['name']) ?></strong><small><?= e((string)($row['category_name'] ?? 'Uncategorized')) ?></small></span></td>
+                                <td><span class="pantry-location-pin" aria-hidden="true">⌖</span><?= e((string)($row['location_name'] ?? 'Unassigned')) ?></td>
+                                <td><strong><?= e((string)$row['current_quantity']) ?></strong> <?= e((string)$row['unit']) ?></td>
+                                <td><span class="pantry-status <?= $statusClass ?>"><?= e($statusLabel) ?></span><?php if ($row['best_use_date']): ?><small class="pantry-best-use">Best use <?= e((string)$row['best_use_date']) ?></small><?php endif; ?></td>
+                                <td><?= e((string)($row['reorder_level'] ?? '—')) ?><?= $row['reorder_level'] !== null ? ' ' . e((string)$row['unit']) : '' ?></td>
+                                <td>
+                                <?php if ($canManageInventory && $isActive): ?>
+                                    <form method="post" class="pantry-adjust-form">
+                                        <input type="hidden" name="csrf_token" value="<?= e($token) ?>">
+                                        <input type="hidden" name="action" value="adjust_inventory">
+                                        <input type="hidden" name="id" value="<?= (int)$row['id'] ?>">
+                                        <label class="visually-hidden" for="delta-<?= (int)$row['id'] ?>">Adjustment for <?= e((string)$row['name']) ?></label>
+                                        <input id="delta-<?= (int)$row['id'] ?>" type="number" step="0.0001" name="delta" placeholder="±" required>
+                                        <button type="submit">Post</button>
+                                    </form>
+                                <?php else: ?>—<?php endif; ?>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <aside class="pantry-insights" aria-label="Inventory insights">
+                <article class="pantry-insight-card pantry-value-card">
+                    <p class="operations-kicker">Inventory overview</p>
+                    <h2>Recorded value</h2>
+                    <strong>$<?= number_format($inventoryValue, 2) ?></strong>
+                    <div class="pantry-sparkline" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+                    <small>Based on recorded quantities and purchase costs.</small>
+                </article>
+
+                <article class="pantry-insight-card">
+                    <div class="pantry-card-heading"><div><p class="operations-kicker">Stock mix</p><h2>Inventory usage</h2></div></div>
+                    <div class="pantry-usage-list">
+                        <?php if ($categoryUsage === []): ?><p class="pantry-empty">Add categorized items to see the stock mix.</p><?php endif; ?>
+                        <?php foreach ($categoryUsage as $categoryName => $count): $percentage = $inventoryCount > 0 ? (int)round(($count / $inventoryCount) * 100) : 0; ?>
+                            <div><span><strong><?= e($categoryName) ?></strong><em><?= $percentage ?>%</em></span><i><b style="width:<?= $percentage ?>%"></b></i></div>
+                        <?php endforeach; ?>
+                    </div>
+                </article>
+
+                <article class="pantry-insight-card">
+                    <p class="operations-kicker">Replenishment</p>
+                    <h2>Shopping suggestions</h2>
+                    <div class="pantry-suggestion-list">
+                        <?php if ($shoppingSuggestions === []): ?><p class="pantry-empty">Nothing is currently at or below its reorder level.</p><?php endif; ?>
+                        <?php foreach ($shoppingSuggestions as $item):
+                            $needed = max(0.0, (float)$item['reorder_level'] - (float)$item['current_quantity']);
+                        ?>
+                            <div><span><strong><?= e((string)$item['name']) ?></strong><small><?= e(number_format($needed > 0 ? $needed : 1, 2, '.', '')) ?> <?= e((string)$item['unit']) ?></small></span><a href="#inventory-table" aria-label="Review <?= e((string)$item['name']) ?> inventory">+</a></div>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php if ($canViewPlanning): ?><a class="operations-button operations-button--secondary operations-button--full" href="phase7.php">View planning & shopping</a><?php endif; ?>
+                </article>
+            </aside>
+        </div>
+
+        <section class="pantry-locations-card">
+            <div class="pantry-card-heading">
+                <div><p class="operations-kicker">Organization</p><h2>Storage locations</h2></div>
+                <?php if ($canViewStorage): ?><a href="?section=storage">View all locations →</a><?php endif; ?>
+            </div>
+            <div class="pantry-location-grid">
+                <?php if ($locationCards === []): ?><p class="pantry-empty">No storage locations have been created.</p><?php endif; ?>
+                <?php foreach ($locationCards as $location): ?>
+                    <article><span aria-hidden="true">▤</span><strong><?= e((string)$location['name']) ?></strong><small><?= (int)$location['item_count'] ?> items</small></article>
+                <?php endforeach; ?>
+            </div>
+        </section>
+
+    <?php elseif ($section === 'storage'): ?>
+        <div class="operations-two-column">
+            <section class="operations-card operations-card--wide">
+                <div class="pantry-card-heading"><div><p class="operations-kicker">Configured spaces</p><h2>Storage locations</h2></div><strong><?= count($locations) ?> locations</strong></div>
+                <div class="storage-card-grid">
+                    <?php if ($locations === []): ?><p class="pantry-empty">No storage locations have been created.</p><?php endif; ?>
+                    <?php foreach ($locations as $row): ?>
+                        <article class="storage-card">
+                            <span class="storage-card__icon" aria-hidden="true">▤</span>
+                            <div><h3><?= e((string)$row['name']) ?></h3><p><?= e((string)($row['parent_name'] ?? 'Top level')) ?> · <?= e((string)$row['location_type']) ?></p></div>
+                            <strong><?= (int)$row['item_count'] ?> items</strong>
+                            <dl><div><dt>Capacity</dt><dd><?= e((string)($row['capacity_value'] ?? '—')) ?> <?= e((string)($row['capacity_unit'] ?? '')) ?></dd></div><div><dt>Temperature</dt><dd><?= $row['target_temperature'] !== null ? e((string)$row['target_temperature']) . '°' : '—' ?></dd></div><div><dt>Humidity</dt><dd><?= $row['target_humidity'] !== null ? e((string)$row['target_humidity']) . '%' : '—' ?></dd></div></dl>
+                        </article>
+                    <?php endforeach; ?>
+                </div>
+            </section>
+            <?php if ($canManageStorage): ?>
+                <aside class="operations-card">
+                    <p class="operations-kicker">New space</p><h2>Add storage location</h2>
+                    <form method="post" class="operations-form">
+                        <input type="hidden" name="csrf_token" value="<?= e($token) ?>"><input type="hidden" name="action" value="add_location">
+                        <label><span>Name</span><input name="name" maxlength="140" required></label>
+                        <label><span>Parent</span><select name="parent_id"><option value="">Top level</option><?php foreach ($locations as $row): ?><option value="<?= (int)$row['id'] ?>"><?= e((string)$row['name']) ?></option><?php endforeach; ?></select></label>
+                        <label><span>Type</span><input name="location_type" maxlength="80" value="shelf" required></label>
+                        <div class="operations-form__pair"><label><span>Capacity</span><input type="number" step="0.01" min="0" name="capacity_value"></label><label><span>Unit</span><input name="capacity_unit" maxlength="30" value="items"></label></div>
+                        <div class="operations-form__pair"><label><span>Temperature</span><input type="number" step="0.1" min="-100" max="250" name="target_temperature"></label><label><span>Humidity %</span><input type="number" step="0.1" min="0" max="100" name="target_humidity"></label></div>
+                        <label><span>Notes</span><textarea name="notes" maxlength="5000"></textarea></label>
+                        <button class="operations-button operations-button--primary" type="submit">Add location</button>
+                    </form>
+                </aside>
+            <?php endif; ?>
+        </div>
+
+    <?php elseif ($section === 'family'): ?>
+        <div class="operations-two-column">
+            <section class="operations-card operations-card--wide">
+                <div class="pantry-card-heading"><div><p class="operations-kicker">Household roster</p><h2>Family members</h2></div><strong><?= count($members) ?> profiles</strong></div>
+                <div class="family-card-grid">
+                    <?php foreach ($members as $row): ?>
+                        <article class="family-card">
+                            <span class="family-card__avatar" aria-hidden="true"><?= e(strtoupper(substr((string)$row['display_name'], 0, 1))) ?></span>
+                            <div><h3><?= e((string)$row['display_name']) ?></h3><p><?= e(ucwords(str_replace('_', ' ', (string)$row['role']))) ?> · <?= e((string)$row['age_group']) ?></p><small><?= e(str_replace('_', ' ', (string)($row['activity_level'] ?? 'not set'))) ?> · <?= e((string)($row['wellness_visibility'] ?? 'private')) ?></small></div>
+                            <span class="pantry-status <?= (string)$row['status'] === 'active' ? 'is-good' : 'is-muted' ?>"><?= e(ucfirst((string)$row['status'])) ?></span>
+                            <?php if ($canManageMembers && $row['role'] !== 'owner' && (int)$row['id'] !== $memberId): ?><form method="post"><input type="hidden" name="csrf_token" value="<?= e($token) ?>"><input type="hidden" name="action" value="toggle_member"><input type="hidden" name="id" value="<?= (int)$row['id'] ?>"><button class="operations-button operations-button--secondary" type="submit">Toggle status</button></form><?php endif; ?>
+                        </article>
+                    <?php endforeach; ?>
+                </div>
+            </section>
+            <?php if ($canManageMembers): ?>
+                <aside class="operations-card">
+                    <p class="operations-kicker">Household profile</p><h2>Add family member</h2>
+                    <form method="post" class="operations-form">
+                        <input type="hidden" name="csrf_token" value="<?= e($token) ?>"><input type="hidden" name="action" value="add_member">
+                        <label><span>Name</span><input name="display_name" maxlength="120" required></label>
+                        <div class="operations-form__pair"><label><span>Age group</span><select name="age_group"><option>adult</option><option>teen</option><option>child</option><option>guest</option></select></label><label><span>Role</span><select name="role"><option value="adult_member">Adult member</option><option value="administrator">Administrator</option><option value="youth_member">Youth member</option><option value="guest_helper">Guest helper</option></select></label></div>
+                        <label><span>Serving multiplier</span><input type="number" step="0.05" min="0.1" max="5" name="serving_multiplier" value="1"></label>
+                        <label><span>Dietary pattern</span><input name="dietary_pattern" maxlength="120"></label>
+                        <label><span>Allergen notes</span><textarea name="allergen_notes" maxlength="5000"></textarea></label>
+                        <label><span>Activity</span><select name="activity_level"><option value="not_set">Not set</option><option value="mostly_sedentary">Mostly sedentary</option><option value="lightly_active">Lightly active</option><option value="moderately_active">Moderately active</option><option value="very_active">Very active</option><option value="physically_demanding">Physically demanding</option></select></label>
+                        <div class="operations-form__pair"><label><span>Height</span><input type="number" step="0.01" min="0" name="height_value"><select name="height_unit"><option value="in">in</option><option value="cm">cm</option></select></label><label><span>Weight</span><input type="number" step="0.01" min="0" name="weight_value"><select name="weight_unit"><option value="lb">lb</option><option value="kg">kg</option></select></label></div>
+                        <label><span>Wellness visibility</span><select name="wellness_visibility"><option value="private">Private</option><option value="authorized_adults">Authorized adults</option><option value="household_planning">Planning without measurements</option></select></label>
+                        <p class="operations-note">Measurements are optional and are not used for medical, diagnostic, calorie, or weight-loss guidance.</p>
+                        <button class="operations-button operations-button--primary" type="submit">Add family member</button>
+                    </form>
+                </aside>
+            <?php endif; ?>
+        </div>
+
+    <?php else: ?>
+        <section class="operations-card operations-card--ledger">
+            <div class="pantry-card-heading"><div><p class="operations-kicker">Immutable history</p><h2>Food lifecycle ledger</h2></div><strong>Latest <?= count($ledger) ?> events</strong></div>
+            <div class="pantry-table-wrap" tabindex="0">
+                <table class="pantry-table pantry-table--ledger"><thead><tr><th scope="col">Occurred</th><th scope="col">Item</th><th scope="col">Event</th><th scope="col">Quantity</th><th scope="col">Member</th><th scope="col">Notes</th></tr></thead><tbody>
+                <?php if ($ledger === []): ?><tr><td colspan="6" class="pantry-empty">No food-ledger activity yet.</td></tr><?php endif; ?>
+                <?php foreach ($ledger as $row): ?><tr><td><?= e((string)$row['occurred_at']) ?></td><td><strong><?= e((string)($row['item_name'] ?? 'Deleted item')) ?></strong></td><td><span class="pantry-status is-muted"><?= e(str_replace('_', ' ', (string)$row['event_type'])) ?></span></td><td><?= e((string)$row['quantity']) ?> <?= e((string)$row['unit']) ?></td><td><?= e((string)($row['member_name'] ?? 'System')) ?></td><td><?= e((string)($row['notes'] ?? '')) ?></td></tr><?php endforeach; ?>
+                </tbody></table>
+            </div>
+        </section>
+    <?php endif; ?>
+</main>
+</body>
+</html>
