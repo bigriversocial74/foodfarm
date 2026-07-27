@@ -70,6 +70,11 @@ jobs:
           echo "$changed" | grep -Fx 'login.php'
           echo "$changed" | grep -Fx 'tests/session_cookie_policy_test.php'
           echo "$changed" | grep -Fx '.github/workflows/login-session-hardening.yml'
-          test "$(echo "$changed" | wc -l)" = "5"
+          echo "$changed" | grep -Fx '.github/workflows/login-session-fix-build.yml'
+          echo "$changed" | grep -Fx '.release-fix/login-session/chunk-00'
+          echo "$changed" | grep -Fx '.release-fix/login-session/chunk-01'
+          echo "$changed" | grep -Fx '.release-fix/login-session/chunk-02'
+          echo "$changed" | grep -Fx '.release-fix/login-session/chunk-03'
+          test "$(echo "$changed" | wc -l)" = "10"
           git commit -m "Fix login session persistence and CSRF feedback"
           git push origin HEAD:${{ github.head_ref }}
