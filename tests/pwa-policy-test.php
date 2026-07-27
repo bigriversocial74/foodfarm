@@ -102,10 +102,8 @@ $appShell = (string)file_get_contents($root . '/assets/css/app-shell.css');
 $assert(!str_contains($appShell, 'url("/assets/'), 'Shell CSS imports must resolve relative to the shell stylesheet.');
 
 $bootstrap = (string)file_get_contents($root . '/app/bootstrap.php');
-$assert(str_contains($bootstrap, 'HOMESTEAD_BASE_PATH'), 'Bootstrap must expose the deployment base path.');
-$assert(str_contains($bootstrap, "PHP_SAPI !== 'cli'"), 'HTTP base-path detection must be separated from CLI fallback behavior.');
-$assert(str_contains($bootstrap, "\$_SERVER['SCRIPT_NAME']"), 'HTTP base-path detection must follow the live script path.');
-$assert(str_contains($bootstrap, '$configuredBasePath'), 'Configured base URL must remain available as the CLI fallback.');
-$assert(str_contains($bootstrap, '$rewriteRootUrls'), 'Bootstrap must rewrite root-relative rendered URLs for subdirectory installs.');
+$assert(str_contains($bootstrap, "'assets/css/' . \$uiStylesheet"), 'Injected workflow stylesheets must resolve relative to the deployed page.');
+$assert(str_contains($bootstrap, "'assets/css/app-shell.css'"), 'Injected shell stylesheet must resolve relative to the deployed page.');
+$assert(!str_contains($bootstrap, 'HOMESTEAD_BASE_PATH'), 'Static asset repair must not alter application redirect or session runtime behavior.');
 
 echo "Homestead PWA policy test passed.\n";
