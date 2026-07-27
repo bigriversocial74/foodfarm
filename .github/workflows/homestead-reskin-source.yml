@@ -1,9 +1,11 @@
 name: Homestead Reskin Source
 
 on:
-  push:
+  pull_request:
     branches:
-      - fix/homestead-planning-reskin-20260727
+      - main
+    paths:
+      - '.github/workflows/homestead-reskin-source.yml'
 
 permissions:
   contents: read
