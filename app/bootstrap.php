@@ -82,7 +82,7 @@ $uiRoutes = [
     'phase3.php' => ['class' => 'ui-access', 'stylesheet' => 'intelligence-pages.css'],
     'phase5.php' => ['class' => 'ui-kits', 'stylesheet' => 'intelligence-pages.css'],
     'starter-kit-lifecycle.php' => ['class' => 'ui-kits', 'stylesheet' => 'intelligence-pages.css'],
-    'phase7.php' => ['class' => 'ui-planning', 'stylesheet' => 'intelligence-pages.css'],
+    'phase7.php' => ['class' => 'ui-planning', 'stylesheet' => 'homestead-planning.css'],
     'shopping-list.php' => ['class' => 'ui-shopping', 'stylesheet' => 'homestead-list.css'],
     'phase8.php' => ['class' => 'ui-forecast', 'stylesheet' => 'intelligence-pages.css'],
     'phase9.php' => ['class' => 'ui-finance', 'stylesheet' => 'intelligence-pages.css'],
