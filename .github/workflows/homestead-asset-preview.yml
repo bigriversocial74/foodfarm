@@ -9,39 +9,56 @@ on:
       - .github/workflows/homestead-asset-preview.yml
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   sheet-04-preview:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out branch
+      - name: Check out rebuild branch
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
 
       - name: Install Pillow
         run: python -m pip install --disable-pip-version-check Pillow
 
-      - name: Emit Sheet 4 preview
+      - name: Export Sheet 4 preview text
         shell: bash
         run: |
+          mkdir -p .homestead-preview
           python - <<'PY'
           from base64 import b64encode
           from io import BytesIO
+          from pathlib import Path
           from PIL import Image
 
           source = Image.open('homestead_4.png')
           source.load()
-          print(f'H4_SOURCE_META:{source.width}x{source.height}:{source.mode}:{source.format}')
-
           preview = source.convert('RGB')
           preview.thumbnail((1600, 1600), Image.Resampling.LANCZOS)
+
           buffer = BytesIO()
-          preview.save(buffer, format='JPEG', quality=78, optimize=True)
+          preview.save(buffer, format='JPEG', quality=82, optimize=True)
           encoded = b64encode(buffer.getvalue()).decode('ascii')
 
-          print(f'H4_PREVIEW_META:{preview.width}x{preview.height}:JPEG:{len(buffer.getvalue())}')
-          print('BEGIN_H4_PREVIEW_BASE64')
-          for index in range(0, len(encoded), 1000):
-              print(f'H4B64:{index // 1000:05d}:{encoded[index:index + 1000]}')
-          print('END_H4_PREVIEW_BASE64')
+          output = Path('.homestead-preview/sheet-04-preview.b64.txt')
+          with output.open('w', encoding='utf-8', newline='\n') as handle:
+              handle.write(f'META source={source.width}x{source.height} mode={source.mode} format={source.format} preview={preview.width}x{preview.height} bytes={len(buffer.getvalue())}\n')
+              for index in range(0, len(encoded), 4000):
+                  handle.write(encoded[index:index + 4000] + '\n')
+          print(output.read_text(encoding='utf-8').splitlines()[0])
           PY
+
+      - name: Commit temporary preview text
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .homestead-preview/sheet-04-preview.b64.txt
+          if git diff --cached --quiet; then
+            echo "Preview text is unchanged."
+            exit 0
+          fi
+          git commit -m "Export temporary Sheet 4 preview"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
