@@ -1,0 +1,35 @@
+name: Homestead Reskin Source
+
+on:
+  push:
+    branches:
+      - fix/homestead-planning-reskin-20260727
+
+permissions:
+  contents: read
+
+jobs:
+  export-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source branch
+        uses: actions/checkout@v4
+
+      - name: Confirm expected baseline
+        run: |
+          test -f phase7.php
+          test -f app/bootstrap.php
+          test -f app/PlanningAutomationService.php
+          test -f assets/css/intelligence-pages.css
+
+      - name: Upload application source
+        uses: actions/upload-artifact@v4
+        with:
+          name: homestead-reskin-source
+          retention-days: 1
+          include-hidden-files: true
+          path: |
+            .
+            !.git/**
+            !storage/**
+            !config.php
