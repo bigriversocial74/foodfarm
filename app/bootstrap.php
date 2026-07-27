@@ -32,15 +32,25 @@ if (!in_array($timezone, timezone_identifiers_list(), true)) {
 date_default_timezone_set($timezone);
 
 $configuredBaseUrl = trim((string)($config['app']['base_url'] ?? ''));
-$basePath = '';
+$configuredBasePath = '';
 if ($configuredBaseUrl !== '') {
     $parsedBasePath = parse_url($configuredBaseUrl, PHP_URL_PATH);
     if (!is_string($parsedBasePath)) {
         http_response_code(503);
         exit('Homestead base URL configuration is invalid.');
     }
-    $trimmedBasePath = trim($parsedBasePath, '/');
-    $basePath = $trimmedBasePath === '' ? '' : '/' . $trimmedBasePath;
+    $trimmedConfiguredPath = trim($parsedBasePath, '/');
+    $configuredBasePath = $trimmedConfiguredPath === '' ? '' : '/' . $trimmedConfiguredPath;
+}
+
+$basePath = $configuredBasePath;
+if (PHP_SAPI !== 'cli') {
+    $scriptName = str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? $_SERVER['PHP_SELF'] ?? ''));
+    if ($scriptName !== '' && str_starts_with($scriptName, '/')) {
+        $scriptDirectory = str_replace('\\', '/', dirname($scriptName));
+        $trimmedScriptDirectory = trim($scriptDirectory, '/.');
+        $basePath = $trimmedScriptDirectory === '' ? '' : '/' . $trimmedScriptDirectory;
+    }
 }
 if ($basePath !== '' && !preg_match('#^/(?:[A-Za-z0-9._~-]+/?)*$#', $basePath)) {
     http_response_code(503);
