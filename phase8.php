@@ -214,7 +214,7 @@ $formatQuantity = static fn(mixed $value): string => number_format((float)$value
         <div class="forecast-primary">
             <section class="forecast-panel" id="forecast-projections">
                 <div class="forecast-panel__heading forecast-panel__heading--toolbar">
-                    <div><p class="forecast-kicker">Pantry demand model</p><h2>Coverage outlook</h2></div>
+                    <div><p class="forecast-kicker">Coverage outlook</p><h2>Item projections</h2></div>
                     <label class="forecast-search"><span>⌕</span><input type="search" placeholder="Search projections" data-forecast-search></label>
                 </div>
                 <div class="forecast-tabs" role="tablist" aria-label="Projection filters">
@@ -277,7 +277,7 @@ $formatQuantity = static fn(mixed $value): string => number_format((float)$value
             </section>
 
             <section class="forecast-panel" id="forecast-trends">
-                <div class="forecast-panel__heading"><div><p class="forecast-kicker">Forecast history</p><h2>Resilience trend</h2></div><span>Last <?= count($trends) ?> snapshots</span></div>
+                <div class="forecast-panel__heading"><div><p class="forecast-kicker">Resilience trend</p><h2>Snapshot trend</h2></div><span>Last <?= count($trends) ?> snapshots</span></div>
                 <div class="forecast-trends">
                     <?php if ($trends === []): ?><div class="forecast-empty"><strong>No trend history yet</strong><p>Completed snapshots will build a longitudinal resilience record.</p></div><?php endif; ?>
                     <?php foreach (array_reverse($trends) as $trend): ?>
