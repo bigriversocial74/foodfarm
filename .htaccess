@@ -10,6 +10,25 @@ Options -Indexes
     Require all denied
 </FilesMatch>
 
+<IfModule mod_mime.c>
+    AddType application/manifest+json .webmanifest
+    AddType application/javascript .js
+    AddType image/svg+xml .svg
+</IfModule>
+
 <IfModule mod_headers.c>
     Header always unset X-Powered-By
+
+    <Files "service-worker.js">
+        Header always set Cache-Control "no-cache, no-store, must-revalidate"
+        Header always set Service-Worker-Allowed "/"
+    </Files>
+
+    <Files "manifest.webmanifest">
+        Header always set Cache-Control "no-cache, max-age=0"
+    </Files>
+
+    <FilesMatch "^(?!service-worker\.js$).+\.(?:css|js|svg|png|jpg|jpeg|webp|gif|ico|woff|woff2)$">
+        Header set Cache-Control "public, max-age=604800, immutable"
+    </FilesMatch>
 </IfModule>
