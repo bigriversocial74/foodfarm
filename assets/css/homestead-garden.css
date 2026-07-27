@@ -1,0 +1,166 @@
+:root {
+    --garden-bg: #090806;
+    --garden-panel: rgba(14, 13, 10, .94);
+    --garden-panel-2: rgba(20, 18, 13, .92);
+    --garden-line: rgba(171, 125, 63, .30);
+    --garden-line-soft: rgba(255, 255, 255, .08);
+    --garden-gold: #c4934f;
+    --garden-gold-light: #e4c18a;
+    --garden-cream: #efe3cf;
+    --garden-muted: #a99f90;
+    --garden-green: #86a84d;
+    --garden-amber: #c4a34e;
+    --garden-red: #c86a4a;
+}
+
+body.ui-grow {
+    background:
+        radial-gradient(circle at 75% 8%, rgba(98, 115, 45, .11), transparent 26%),
+        radial-gradient(circle at 18% 28%, rgba(145, 95, 34, .09), transparent 30%),
+        var(--garden-bg);
+    color: var(--garden-cream);
+}
+
+body.ui-grow .app-main { background: transparent; }
+body.ui-grow .page-container.garden-page { max-width: none; width: 100%; padding: 0 22px 42px; }
+body.ui-grow h1, body.ui-grow h2, body.ui-grow h3 { color: var(--garden-cream); font-family: Georgia, 'Times New Roman', serif; }
+body.ui-grow .eyebrow { color: var(--garden-gold); letter-spacing: .17em; text-transform: uppercase; font-size: .72rem; }
+body.ui-grow a { color: inherit; }
+
+.garden-hero {
+    position: relative;
+    min-height: 240px;
+    margin: 0 -22px 18px;
+    display: grid;
+    grid-template-columns: minmax(420px, .95fr) 1.25fr;
+    overflow: hidden;
+    border-bottom: 1px solid var(--garden-line);
+    background:
+        linear-gradient(90deg, rgba(8,7,5,.98) 0%, rgba(9,8,6,.94) 42%, rgba(9,8,6,.28) 76%, rgba(9,8,6,.58) 100%),
+        linear-gradient(180deg, transparent 65%, rgba(8,7,5,.95));
+}
+.garden-hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(0deg, rgba(255,255,255,.012) 0 1px, transparent 1px 4px);
+    pointer-events: none;
+}
+.garden-hero-copy { position: relative; z-index: 2; padding: 34px 24px 26px 42px; display: flex; flex-direction: column; justify-content: center; }
+.garden-hero-copy h1 { margin: 4px 0 9px; font-size: clamp(2.4rem, 4vw, 4.1rem); line-height: .98; font-weight: 500; }
+.garden-hero-copy > p:not(.eyebrow) { max-width: 650px; color: #c8bcaa; line-height: 1.65; margin: 0; }
+.garden-hero-image {
+    min-height: 240px;
+    background-image:
+        linear-gradient(90deg, rgba(9,8,6,.94), rgba(9,8,6,.1) 44%, rgba(9,8,6,.28)),
+        url('../images/homestead/sheet-04/garden-monitoring-wide.png');
+    background-size: cover;
+    background-position: center;
+    filter: saturate(.84) contrast(1.04) brightness(.75);
+}
+.garden-tabs { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 20px; }
+.garden-tabs a { text-decoration: none; border: 1px solid var(--garden-line); border-radius: 999px; padding: 8px 14px; color: #c6baa8; font-size: .84rem; background: rgba(8,7,5,.52); transition: .2s ease; }
+.garden-tabs a:hover, .garden-tabs a.active { color: #11100d; background: var(--garden-gold-light); border-color: var(--garden-gold-light); }
+.garden-flash { margin: 0 0 16px; }
+
+.garden-metrics { display: grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap: 12px; margin-bottom: 14px; }
+.garden-metrics article {
+    min-height: 138px; padding: 16px 16px 10px; border: 1px solid var(--garden-line); border-radius: 9px;
+    background: linear-gradient(145deg, rgba(22,20,15,.96), rgba(10,9,7,.96)); position: relative; overflow: hidden;
+    box-shadow: inset 0 1px rgba(255,255,255,.025), 0 10px 30px rgba(0,0,0,.16);
+}
+.garden-metrics article::after { content:''; position:absolute; inset:0; background: radial-gradient(circle at 20% 10%, rgba(196,147,79,.06), transparent 42%); pointer-events:none; }
+.garden-metrics .metric-icon { float:left; width:34px; height:34px; border:1px solid var(--garden-line); border-radius:50%; display:grid; place-items:center; color:var(--garden-gold); margin-right:10px; }
+.garden-metrics div { display:flex; flex-direction:column; gap:4px; }
+.garden-metrics small { color:#d0c4b3; font-size:.78rem; }
+.garden-metrics strong { font-family:Georgia,serif; font-size:1.72rem; font-weight:500; }
+.garden-metrics em { color:var(--garden-green); font-style:normal; font-size:.72rem; }
+.garden-metrics svg { position:absolute; left:14px; right:14px; bottom:8px; width:calc(100% - 28px); height:26px; }
+.garden-metrics path { fill:none; stroke:#78853c; stroke-width:1.6; vector-effect:non-scaling-stroke; }
+
+.garden-overview-grid { display:grid; grid-template-columns:minmax(0,1.65fr) minmax(300px,.85fr); gap:14px; }
+.garden-panel { border:1px solid var(--garden-line); border-radius:9px; background:linear-gradient(145deg, rgba(17,15,11,.97), rgba(10,9,7,.97)); box-shadow:inset 0 1px rgba(255,255,255,.025); overflow:hidden; }
+.garden-panel .panel-heading { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; padding:16px 18px 13px; border-bottom:1px solid var(--garden-line-soft); }
+.garden-panel .panel-heading h2 { margin:0; font-size:1.25rem; font-weight:500; }
+.garden-panel .panel-heading p { margin:0 0 4px; }
+.garden-panel .panel-heading > span, .garden-panel .panel-heading > a { color:var(--garden-gold); font-size:.74rem; text-decoration:none; }
+.live-dot::before { content:'●'; color:var(--garden-green); margin-right:6px; }
+.grow-room-photo { min-height:410px; position:relative; background:
+    linear-gradient(180deg, rgba(8,7,5,.16), rgba(8,7,5,.55)),
+    url('../images/homestead/sheet-04/indoor-grow-racks.png') center/cover no-repeat;
+}
+.zone-float { position:absolute; width:min(190px,42%); padding:11px 13px; border:1px solid var(--garden-line); border-radius:8px; background:rgba(10,9,7,.88); backdrop-filter:blur(7px); box-shadow:0 10px 22px rgba(0,0,0,.35); display:flex; flex-direction:column; gap:4px; }
+.zone-float strong { font-size:.82rem; color:#e2d6c3; }
+.zone-float span { font-size:.74rem; color:#b8ac9b; }
+.zone-float em { color:var(--garden-green); font-style:normal; font-size:.69rem; }
+.zone-1 { left:18px; top:18px; }.zone-2 { right:18px; top:18px; }.zone-3 { left:18px; bottom:18px; }.zone-4 { right:18px; bottom:18px; }
+.garden-empty-overlay { position:absolute; inset:0; display:grid; place-content:center; text-align:center; background:rgba(8,7,5,.46); }
+.garden-empty-overlay span { color:var(--garden-muted); margin-top:5px; }
+.grow-room-totals { display:grid; grid-template-columns:repeat(4,1fr); padding:15px 10px; }
+.grow-room-totals div { text-align:center; padding:4px 10px; border-right:1px solid var(--garden-line-soft); }
+.grow-room-totals div:last-child { border-right:0; }
+.grow-room-totals strong { display:block; font:500 1.45rem Georgia,serif; color:var(--garden-gold-light); }
+.grow-room-totals span { display:block; color:var(--garden-muted); font-size:.7rem; margin-top:3px; }
+.garden-side-stack { display:grid; gap:14px; align-content:start; }
+.schedule-list, .alert-list { padding:8px 14px 12px; }
+.schedule-list > div { display:grid; grid-template-columns:30px minmax(0,1fr) auto; column-gap:8px; align-items:center; padding:9px 0; border-bottom:1px solid var(--garden-line-soft); }
+.schedule-list > div:last-child { border-bottom:0; }
+.schedule-list strong { font-size:.78rem; }.schedule-list small { grid-column:2; color:var(--garden-muted); font-size:.68rem; }.schedule-list em { grid-column:3; grid-row:1/3; color:var(--garden-green); font-style:normal; font-size:.68rem; text-align:right; }
+.schedule-icon { grid-row:1/3; width:26px; height:26px; border-radius:50%; border:1px solid var(--garden-line); color:var(--garden-gold); display:grid; place-items:center; }
+.alert-list > div { display:flex; gap:9px; padding:9px 0; border-bottom:1px solid var(--garden-line-soft); }
+.alert-list > div:last-child { border-bottom:0; }.alert-list > div > span { color:var(--garden-amber); }.alert-list p { margin:0; }.alert-list strong,.alert-list small { display:block; }.alert-list strong { font-size:.76rem; }.alert-list small { color:var(--garden-muted); font-size:.67rem; margin-top:3px; }
+.empty-state { color:var(--garden-muted); margin:14px 0; }
+
+.garden-lower-grid { display:grid; grid-template-columns:1.15fr .95fr; gap:14px; margin-top:14px; }
+.plant-table { padding:4px 14px 13px; overflow-x:auto; }
+.plant-row { min-width:720px; display:grid; grid-template-columns:1.4fr .8fr .8fr 1fr .85fr; gap:10px; align-items:center; padding:9px 2px; border-bottom:1px solid var(--garden-line-soft); font-size:.73rem; }
+.plant-row:last-child { border-bottom:0; }.plant-head { color:#928879; text-transform:uppercase; letter-spacing:.06em; font-size:.62rem; }
+.plant-row > span:first-child { display:grid; grid-template-columns:34px 1fr; column-gap:8px; align-items:center; }.plant-row > span:first-child .plant-thumb { grid-row:1/3; width:32px; height:32px; border-radius:7px; background:url('../images/homestead/sheet-04/basil-grow-light-closeup.png') center/cover; border:1px solid var(--garden-line); }.plant-row b,.plant-row small { display:block; }.plant-row small { color:var(--garden-muted); font-size:.64rem; margin-top:2px; }.health-state { color:var(--garden-green); }
+.progress-track { display:inline-block; width:76%; height:5px; background:#2a2820; border-radius:999px; vertical-align:middle; overflow:hidden; }.progress-track i { display:block; height:100%; background:linear-gradient(90deg,#6e863f,#9cad5b); border-radius:inherit; }
+.history-card { padding-bottom:12px; }.history-legend { display:flex; gap:18px; padding:12px 18px 2px; color:var(--garden-muted); font-size:.68rem; }.history-legend span::before { content:''; display:inline-block; width:12px; height:3px; margin-right:6px; border-radius:99px; background:var(--garden-gold); vertical-align:middle; }.history-legend span:nth-child(2)::before { background:#749246; }.history-legend span:nth-child(3)::before { background:#715298; }
+.history-chart { width:100%; height:220px; padding:0 10px; }.chart-grid path { fill:none; stroke:rgba(255,255,255,.06); stroke-width:1; }.history-chart > path { fill:none; stroke-width:2.2; vector-effect:non-scaling-stroke; }.chart-temp { stroke:var(--garden-gold); }.chart-humidity { stroke:#749246; }.chart-vpd { stroke:#715298; }
+.history-averages { display:grid; grid-template-columns:repeat(3,1fr); border-top:1px solid var(--garden-line-soft); padding-top:12px; }.history-averages div { text-align:center; border-right:1px solid var(--garden-line-soft); }.history-averages div:last-child { border-right:0; }.history-averages strong { display:block; font:500 1.15rem Georgia,serif; color:var(--garden-gold-light); }.history-averages span { color:var(--garden-muted); font-size:.65rem; }
+.garden-tip { margin-top:14px; min-height:92px; display:grid; grid-template-columns:58px 1fr auto; align-items:center; gap:14px; padding:14px 22px; border:1px solid var(--garden-line); border-radius:9px; background:
+    linear-gradient(90deg, rgba(12,10,7,.96), rgba(12,10,7,.68)),
+    url('../images/homestead/sheet-04/basil-grow-light-closeup.png') right 18%/420px auto no-repeat; }
+.garden-tip > span { width:52px; height:52px; border:1px solid var(--garden-gold); border-radius:50%; display:grid; place-items:center; color:var(--garden-gold-light); font-size:1.5rem; }.garden-tip strong { font:500 1rem Georgia,serif; }.garden-tip p { color:var(--garden-muted); margin:5px 0 0; font-size:.76rem; }.garden-tip a { text-decoration:none; border:1px solid var(--garden-line); border-radius:999px; padding:9px 14px; color:var(--garden-gold-light); background:rgba(8,7,5,.68); font-size:.72rem; }
+
+.garden-workspace { display:grid; grid-template-columns:minmax(0,1.65fr) minmax(290px,.75fr); gap:14px; margin-bottom:14px; }.garden-workspace .span-2 { min-width:0; }.garden-form-stack { display:grid; gap:14px; align-content:start; }
+.zone-card-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; padding:14px; }.zone-card { border:1px solid var(--garden-line-soft); border-radius:8px; padding:14px; background:rgba(255,255,255,.018); }.zone-card > div:first-child { display:flex; gap:10px; align-items:center; }.zone-symbol { width:34px; height:34px; border:1px solid var(--garden-line); border-radius:50%; display:grid; place-items:center; color:var(--garden-gold); }.zone-card h3 { font-size:1rem; margin:0; }.zone-card p { color:var(--garden-muted); margin:3px 0 0; font-size:.68rem; }.zone-card dl,.reading-grid dl { display:grid; grid-template-columns:repeat(2,1fr); gap:7px; margin:14px 0 10px; }.zone-card dl div,.reading-grid dl div { border:1px solid var(--garden-line-soft); border-radius:6px; padding:7px; }.zone-card dt,.reading-grid dt { color:var(--garden-muted); font-size:.6rem; }.zone-card dd,.reading-grid dd { margin:3px 0 0; color:var(--garden-gold-light); font-size:.78rem; }.zone-card > small { color:var(--garden-muted); font-size:.62rem; }
+.garden-form { padding:14px; display:grid; gap:11px; }.garden-form label { color:#c8bcaa; font-size:.71rem; display:grid; gap:5px; }.garden-form input,.garden-form select,.garden-form textarea { width:100%; min-width:0; border:1px solid var(--garden-line-soft); border-radius:6px; background:#0c0b09; color:var(--garden-cream); padding:9px 10px; font:inherit; }.garden-form textarea { min-height:82px; resize:vertical; }.garden-form input:focus,.garden-form select:focus,.garden-form textarea:focus { outline:1px solid var(--garden-gold); border-color:var(--garden-gold); }.form-pair { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }.garden-form .button.primary { background:linear-gradient(#d4a45e,#ad7837); color:#16110a; border:0; font-weight:700; }.form-note { color:var(--garden-muted); font-size:.68rem; line-height:1.5; margin:0; }.check-row { grid-template-columns:auto 1fr !important; align-items:center; }.check-row input { width:auto; }
+.stage-form { display:flex; gap:5px; }.stage-form select { min-width:115px; background:#0d0c09; color:var(--garden-cream); border:1px solid var(--garden-line-soft); border-radius:5px; padding:6px; }.stage-form button { border:1px solid var(--garden-line); background:transparent; color:var(--garden-gold-light); border-radius:5px; padding:5px 7px; font-size:.65rem; }
+.reading-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; padding:14px; }.reading-grid article { border:1px solid var(--garden-line-soft); border-radius:7px; padding:11px; }.reading-grid article > strong,.reading-grid article > small { display:block; }.reading-grid article > small { color:var(--garden-muted); font-size:.62rem; margin-top:3px; }
+.harvest-card-list { display:grid; gap:8px; padding:14px; }.harvest-card-list article { display:grid; grid-template-columns:minmax(220px,1.4fr) .5fr .6fr 1fr; align-items:center; gap:12px; padding:11px; border:1px solid var(--garden-line-soft); border-radius:7px; background:rgba(255,255,255,.015); }.harvest-card-list article > div { display:flex; align-items:center; gap:9px; }.harvest-icon { width:34px; height:34px; border:1px solid var(--garden-line); border-radius:50%; display:grid; place-items:center; color:var(--garden-gold); }.harvest-card-list h3 { margin:0; font-size:.92rem; }.harvest-card-list p { margin:3px 0 0; color:var(--garden-muted); font-size:.66rem; }.harvest-card-list > article > strong { color:var(--garden-gold-light); }.harvest-card-list > article > span { color:var(--garden-green); font-size:.72rem; }.harvest-card-list > article > small { color:var(--garden-muted); font-size:.63rem; }
+
+@media (max-width: 1180px) {
+    .garden-metrics { grid-template-columns:repeat(3,minmax(0,1fr)); }
+    .garden-overview-grid,.garden-lower-grid,.garden-workspace { grid-template-columns:1fr; }
+    .garden-side-stack { grid-template-columns:repeat(3,minmax(0,1fr)); }
+    .garden-form-stack { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media (max-width: 820px) {
+    body.ui-grow .page-container.garden-page { padding:0 12px 28px; }
+    .garden-hero { margin:0 -12px 14px; grid-template-columns:1fr; min-height:360px; }
+    .garden-hero-copy { padding:26px 20px 18px; }
+    .garden-hero-image { min-height:170px; }
+    .garden-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .garden-side-stack,.garden-form-stack { grid-template-columns:1fr; }
+    .zone-card-grid,.reading-grid { grid-template-columns:1fr; }
+    .grow-room-totals { grid-template-columns:repeat(2,1fr); }
+    .grow-room-totals div:nth-child(2) { border-right:0; }
+    .grow-room-totals div:nth-child(-n+2) { border-bottom:1px solid var(--garden-line-soft); padding-bottom:10px; margin-bottom:10px; }
+    .harvest-card-list article { grid-template-columns:1fr 1fr; }
+    .harvest-card-list article > small { grid-column:1/-1; }
+    .garden-tip { grid-template-columns:48px 1fr; }
+    .garden-tip a { grid-column:1/-1; text-align:center; }
+}
+@media (max-width: 540px) {
+    .garden-metrics { grid-template-columns:1fr; }
+    .garden-metrics article { min-height:118px; }
+    .grow-room-photo { min-height:430px; }
+    .zone-float { width:calc(100% - 28px); left:14px !important; right:auto !important; }
+    .zone-1 { top:14px; }.zone-2 { top:112px; }.zone-3 { bottom:112px; }.zone-4 { bottom:14px; }
+    .form-pair { grid-template-columns:1fr; }
+    .harvest-card-list article { grid-template-columns:1fr; }
+    .history-chart { height:180px; }
+}

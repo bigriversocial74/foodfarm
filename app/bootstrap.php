@@ -77,7 +77,7 @@ $uiRoutes = [
     'dashboard.php' => ['class' => 'ui-dashboard', 'stylesheet' => 'homestead-dashboard.css'],
     'phase2.php' => ['class' => 'ui-household', 'stylesheet' => 'homestead-pantry.css'],
     'phase4.php' => ['class' => 'ui-recipes', 'stylesheet' => 'homestead-recipes.css'],
-    'phase6.php' => ['class' => 'ui-grow', 'stylesheet' => 'core-pages.css'],
+    'phase6.php' => ['class' => 'ui-grow', 'stylesheet' => 'homestead-garden.css'],
     'prepared-food.php' => ['class' => 'ui-preserve', 'stylesheet' => 'core-pages.css'],
     'phase3.php' => ['class' => 'ui-access', 'stylesheet' => 'intelligence-pages.css'],
     'phase5.php' => ['class' => 'ui-kits', 'stylesheet' => 'intelligence-pages.css'],
@@ -157,7 +157,7 @@ if (is_array($uiRoute)) {
                 $safeStylesheet = htmlspecialchars($stylesheetPath, ENT_QUOTES, 'UTF-8');
                 $html = str_ireplace(
                     '</head>',
-                    '<link rel="stylesheet" href="' . $safeStylesheet . '?v=20260727-3"></head>',
+                    '<link rel="stylesheet" href="' . $safeStylesheet . '?v=20260727-4"></head>',
                     $html
                 );
             }
@@ -305,7 +305,7 @@ if (is_array($uiRoute)) {
 
         $shellClose = '</div></div>'
             . '<button class="homestead-shell__backdrop" type="button" data-shell-menu-close aria-label="Close navigation"></button>'
-            . '<script src="assets/js/homestead-app-shell.js?v=20260727-3" defer></script>';
+            . '<script src="assets/js/homestead-app-shell.js?v=20260727-4" defer></script>';
 
         $html = (string)preg_replace_callback(
             '/<body\b[^>]*>/i',
