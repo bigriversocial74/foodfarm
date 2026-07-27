@@ -1,0 +1,65 @@
+name: Homestead Kit Lifecycle Reskin Build
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/homestead-kit-lifecycle-reskin-build.yml'
+      - '.reskin/kit-lifecycle/**'
+
+permissions:
+  contents: write
+
+jobs:
+  build-lifecycle:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out lifecycle branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Validate lifecycle package
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f .reskin/kit-lifecycle/package.tar.gz
+          test "$(wc -c < .reskin/kit-lifecycle/package.tar.gz)" = "12452"
+          echo "693b6723dc87387ab716c66f26e6a90ec01cb322968b769b0dc111bad9c20ebe  .reskin/kit-lifecycle/package.tar.gz" | sha256sum -c -
+          rm -rf /tmp/lifecycle-build
+          mkdir -p /tmp/lifecycle-build
+          tar -xzf .reskin/kit-lifecycle/package.tar.gz -C /tmp/lifecycle-build
+          php -l /tmp/lifecycle-build/starter-kit-lifecycle.php
+          php -l /tmp/lifecycle-build/app/bootstrap.php
+          node --check /tmp/lifecycle-build/assets/js/homestead-kit-lifecycle.js
+          for action in duplicate_version retire_version retire_kit; do
+            grep -q "'$action'" /tmp/lifecycle-build/starter-kit-lifecycle.php
+          done
+          grep -q 'Starter Kit Lifecycle' /tmp/lifecycle-build/starter-kit-lifecycle.php
+          grep -q 'Release lineage' /tmp/lifecycle-build/starter-kit-lifecycle.php
+          grep -q 'Duplicate into draft' /tmp/lifecycle-build/starter-kit-lifecycle.php
+          grep -q 'Immutable protection' /tmp/lifecycle-build/starter-kit-lifecycle.php
+          grep -q "starter-kit-lifecycle.php'.*homestead-kit-lifecycle.css" /tmp/lifecycle-build/app/bootstrap.php
+          ! grep -Eiq '\b(CREATE|ALTER|DROP)[[:space:]]+TABLE\b' /tmp/lifecycle-build/starter-kit-lifecycle.php
+          ! grep -E 'href="/|src="/' /tmp/lifecycle-build/starter-kit-lifecycle.php
+
+      - name: Commit lifecycle rebuild
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp /tmp/lifecycle-build/starter-kit-lifecycle.php starter-kit-lifecycle.php
+          cp /tmp/lifecycle-build/app/bootstrap.php app/bootstrap.php
+          cp /tmp/lifecycle-build/assets/css/homestead-kit-lifecycle.css assets/css/homestead-kit-lifecycle.css
+          cp /tmp/lifecycle-build/assets/js/homestead-kit-lifecycle.js assets/js/homestead-kit-lifecycle.js
+          rm -f .github/workflows/homestead-kit-lifecycle-reskin-build.yml
+          rm -rf .reskin/kit-lifecycle
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          changed="$(git diff --cached --name-only)"
+          echo "$changed"
+          ! echo "$changed" | grep -E '^(database/|app/(StarterKitAdminService|StarterKitService|Auth|Database|.*Service)\.php)'
+          git commit -m "Reskin Homestead starter-kit lifecycle"
+          git push origin HEAD:${{ github.head_ref }}
