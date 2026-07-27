@@ -12,17 +12,17 @@ declare(strict_types=1);
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="description" content="Homestead is a household food system for growing, storing, cooking, preserving, planning, and coordinating real food.">
     <title>Homestead · Your Household Food System</title>
-    <link rel="manifest" href="/manifest.webmanifest">
-    <link rel="icon" href="/assets/icons/homestead-icon.svg" type="image/svg+xml">
-    <link rel="apple-touch-icon" href="/assets/icons/homestead-icon.svg">
-    <link rel="stylesheet" href="/assets/css/app.css">
-    <script src="/assets/js/pwa.js?v=20260727" defer></script>
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" href="assets/icons/homestead-icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="assets/icons/homestead-icon.svg">
+    <link rel="stylesheet" href="assets/css/app.css?v=20260727-2">
+    <script src="assets/js/pwa.js?v=20260727-2" defer></script>
 </head>
 <body>
 <a class="skip-link" href="#main-content">Skip to main content</a>
 <div class="landing-shell">
     <nav class="landing-nav" aria-label="Primary navigation">
-        <a class="landing-brand" href="/" aria-label="Homestead home">
+        <a class="landing-brand" href="./" aria-label="Homestead home">
             <span class="landing-brand-mark" aria-hidden="true">H</span>
             <span><strong>Homestead</strong><small>Household food system</small></span>
         </a>
@@ -30,7 +30,7 @@ declare(strict_types=1);
             <a href="#system">The system</a>
             <a href="#lifecycle">Food lifecycle</a>
             <a href="#household">Household planning</a>
-            <a class="button primary" href="/login.php">Sign in</a>
+            <a class="button primary" href="login.php">Sign in</a>
         </div>
     </nav>
 
@@ -41,7 +41,7 @@ declare(strict_types=1);
                 <h1>Grow it. Store it. Cook it. Preserve it.</h1>
                 <p class="page-description">Homestead connects pantry inventory, recipes, family meal planning, garden activity, preservation, shopping, nutrition planning, household tasks, and food costs in one dependable system.</p>
                 <div class="hero-actions">
-                    <a class="button primary" href="/login.php">Open Homestead</a>
+                    <a class="button primary" href="login.php">Open Homestead</a>
                     <a class="button secondary" href="#system">Explore the system</a>
                     <button class="button secondary" type="button" data-homestead-install hidden>Install Homestead</button>
                 </div>
@@ -131,7 +131,7 @@ declare(strict_types=1);
             <p class="eyebrow">Homestead household access</p>
             <h2>Bring the whole food cycle into one place.</h2>
             <p class="page-description" style="margin:16px auto 24px">Sign in to access your household inventory, family records, recipes, garden, plans, alerts, and operating history.</p>
-            <a class="button primary" href="/login.php">Sign in to Homestead</a>
+            <a class="button primary" href="login.php">Sign in to Homestead</a>
         </section>
     </main>
 
