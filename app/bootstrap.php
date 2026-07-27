@@ -73,15 +73,26 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
 $requestPath = (string)(parse_url((string)($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH) ?? '');
 $routeName = basename($requestPath);
 
-$uiRouteClasses = [
-    'dashboard.php' => 'ui-dashboard',
-    'phase2.php' => 'ui-household',
-    'phase4.php' => 'ui-recipes',
-    'phase6.php' => 'ui-grow',
-    'prepared-food.php' => 'ui-preserve',
+$uiRoutes = [
+    'dashboard.php' => ['class' => 'ui-dashboard', 'stylesheet' => 'core-pages.css'],
+    'phase2.php' => ['class' => 'ui-household', 'stylesheet' => 'core-pages.css'],
+    'phase4.php' => ['class' => 'ui-recipes', 'stylesheet' => 'core-pages.css'],
+    'phase6.php' => ['class' => 'ui-grow', 'stylesheet' => 'core-pages.css'],
+    'prepared-food.php' => ['class' => 'ui-preserve', 'stylesheet' => 'core-pages.css'],
+    'phase3.php' => ['class' => 'ui-access', 'stylesheet' => 'intelligence-pages.css'],
+    'phase5.php' => ['class' => 'ui-kits', 'stylesheet' => 'intelligence-pages.css'],
+    'starter-kit-lifecycle.php' => ['class' => 'ui-kits', 'stylesheet' => 'intelligence-pages.css'],
+    'phase7.php' => ['class' => 'ui-planning', 'stylesheet' => 'intelligence-pages.css'],
+    'phase8.php' => ['class' => 'ui-forecast', 'stylesheet' => 'intelligence-pages.css'],
+    'phase9.php' => ['class' => 'ui-finance', 'stylesheet' => 'intelligence-pages.css'],
+    'phase10.php' => ['class' => 'ui-nutrition', 'stylesheet' => 'intelligence-pages.css'],
+    'phase11.php' => ['class' => 'ui-alerts', 'stylesheet' => 'intelligence-pages.css'],
+    'account.php' => ['class' => 'ui-account', 'stylesheet' => 'intelligence-pages.css'],
 ];
-$uiPageClass = $uiRouteClasses[$routeName] ?? null;
-if ($uiPageClass !== null) {
+$uiRoute = $uiRoutes[$routeName] ?? null;
+if (is_array($uiRoute)) {
+    $uiPageClass = (string)$uiRoute['class'];
+    $uiStylesheet = (string)$uiRoute['stylesheet'];
     $sectionClass = '';
     if ($routeName === 'phase2.php') {
         $section = (string)($_GET['section'] ?? 'family');
@@ -96,15 +107,17 @@ if ($uiPageClass !== null) {
     }
     $uiPageClass .= $sectionClass;
 
-    ob_start(static function (string $html) use ($uiPageClass): string {
+    ob_start(static function (string $html) use ($uiPageClass, $uiStylesheet): string {
         if (!str_contains(strtolower($html), '<!doctype html')) {
             return $html;
         }
 
-        if (!str_contains($html, '/assets/css/core-pages.css')) {
+        $stylesheetPath = '/assets/css/' . $uiStylesheet;
+        if (!str_contains($html, $stylesheetPath)) {
+            $safeStylesheet = htmlspecialchars($stylesheetPath, ENT_QUOTES, 'UTF-8');
             $html = str_ireplace(
                 '</head>',
-                '<link rel="stylesheet" href="/assets/css/core-pages.css?v=20260726"></head>',
+                '<link rel="stylesheet" href="' . $safeStylesheet . '?v=20260726"></head>',
                 $html
             );
         }
