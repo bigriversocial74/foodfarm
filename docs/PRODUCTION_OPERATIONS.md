@@ -74,7 +74,7 @@ Add `--keep-database` only when an operator needs to inspect the restored copy m
 4. Upload the exact release commit or release archive.
 5. Preserve the production `config.php`; never replace it with `config-example.php`.
 6. Import only the documented migrations that have not already been applied, in repository order.
-7. Confirm file ownership and server rules protect `app/`, `bin/`, `database/`, `docs/`, `tests/`, configuration files, backups, and logs.
+7. Confirm file ownership and server rules protect `app/`, `bin/`, `database/`, `docs/`, `tests/`, configuration files, backups, and logs. Apache deployments use the repository `.htaccess`; Nginx deployments can include `deploy/nginx-homestead-security.conf.example` inside the HTTPS server block after adapting host-specific paths.
 8. Run the production preflight.
 9. Restart PHP workers or clear opcode caches when the hosting environment requires it.
 
