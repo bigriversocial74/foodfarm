@@ -258,18 +258,109 @@ $environmentStatus = static function (?float $value, ?float $minimum, ?float $ma
     }
     return 'Optimal';
 };
+
+$preservationMethodLabels = [
+    'water_bath' => 'Water Bath Canning',
+    'pressure_canning' => 'Pressure Canning',
+    'dehydrating' => 'Dehydrating',
+    'fermenting' => 'Fermenting',
+    'pickling' => 'Pickling',
+    'freezing' => 'Freezing',
+    'vacuum_sealing' => 'Vacuum Sealing',
+    'dry_storage' => 'Dry Storage',
+];
+$preservationMethodGroups = [
+    'canning' => ['water_bath', 'pressure_canning', 'pickling'],
+    'dehydrating' => ['dehydrating', 'dry_storage', 'vacuum_sealing'],
+    'fermenting' => ['fermenting'],
+];
+$preservationMethodCounts = [];
+$preservationStatusCounts = [];
+$preservationLocationCounts = [];
+$expiringPreserves = 0;
+$totalPreservedUnits = 0.0;
+$today = new DateTimeImmutable('today');
+$expiringThreshold = $today->modify('+30 days');
+foreach ($preservationBatches as $batch) {
+    $method = (string)$batch['method'];
+    $status = (string)$batch['status'];
+    $location = trim((string)($batch['location_name'] ?? '')) ?: 'Unassigned';
+    $preservationMethodCounts[$method] = ($preservationMethodCounts[$method] ?? 0) + 1;
+    $preservationStatusCounts[$status] = ($preservationStatusCounts[$status] ?? 0) + 1;
+    $preservationLocationCounts[$location] = ($preservationLocationCounts[$location] ?? 0) + 1;
+    if ($status === 'stored' && is_numeric($batch['yield_quantity'] ?? null)) {
+        $totalPreservedUnits += (float)$batch['yield_quantity'];
+    }
+    $bestUse = trim((string)($batch['best_use_date'] ?? ''));
+    if ($bestUse !== '') {
+        $bestUseDate = DateTimeImmutable::createFromFormat('!Y-m-d', $bestUse);
+        if ($bestUseDate && $bestUseDate >= $today && $bestUseDate <= $expiringThreshold) {
+            $expiringPreserves++;
+        }
+    }
+}
+$preservationGroupCount = static function (array $methods) use ($preservationMethodCounts): int {
+    $count = 0;
+    foreach ($methods as $method) {
+        $count += (int)($preservationMethodCounts[$method] ?? 0);
+    }
+    return $count;
+};
+$selectedPreservationId = max(0, (int)($_GET['batch_id'] ?? 0));
+$selectedPreservationBatch = null;
+foreach ($preservationBatches as $batch) {
+    if ($selectedPreservationId === 0 || (int)$batch['id'] === $selectedPreservationId) {
+        $selectedPreservationBatch = $batch;
+        if ($selectedPreservationId !== 0) {
+            break;
+        }
+    }
+}
+$preservationSafetySource = '';
+if (is_array($selectedPreservationBatch)) {
+    $safetyData = json_decode((string)($selectedPreservationBatch['safety_data'] ?? ''), true);
+    if (is_array($safetyData)) {
+        $preservationSafetySource = trim((string)($safetyData['source'] ?? ''));
+    }
+}
+$preservationImageFor = static function (string $method): string {
+    return match ($method) {
+        'dehydrating', 'dry_storage', 'vacuum_sealing' => 'assets/images/homestead/sheet-05/dehydrated-food-jars.png',
+        'fermenting' => 'assets/images/homestead/sheet-05/fermentation-crock.png',
+        'pickling' => 'assets/images/homestead/sheet-05/labeled-pickle-jar.png',
+        default => 'assets/images/homestead/sheet-05/preservation-jars-wide.png',
+    };
+};
 ?><!doctype html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="theme-color" content="#090806">
-    <title>Garden Monitoring · Homestead</title>
+    <title><?= $section === 'preservation' ? 'Preservation Tracking' : 'Garden Monitoring' ?> · Homestead</title>
     <link rel="stylesheet" href="assets/css/app.css">
 </head>
 <body>
 <a class="skip-link" href="#main-content">Skip to garden operations</a>
 <main id="main-content" class="page-container garden-page">
+<?php if ($section === 'preservation'): ?>
+<header class="preserve-hero">
+    <div class="preserve-hero-copy">
+        <p class="eyebrow">Batch records · shelf-life intelligence</p>
+        <h1>Preservation Tracking</h1>
+        <p>Track each canning, dehydrating, fermenting, freezing, and dry-storage batch from preparation through safe household use.</p>
+        <nav class="garden-tabs preserve-tabs" aria-label="Garden and preservation sections">
+            <?php if ($canViewGarden): ?>
+                <a href="phase6.php?section=overview">Overview</a>
+                <a href="phase6.php?section=garden">Garden</a>
+                <a href="phase6.php?section=harvests">Harvests</a>
+            <?php endif; ?>
+            <a class="active" href="phase6.php?section=preservation">Preservation</a>
+        </nav>
+    </div>
+    <div class="preserve-hero-image" role="img" aria-label="Shelves of preserved vegetables in glass jars"></div>
+</header>
+<?php else: ?>
 <header class="garden-hero">
     <div class="garden-hero-copy">
         <p class="eyebrow">Living systems · field to pantry</p>
@@ -281,11 +372,12 @@ $environmentStatus = static function (?float $value, ?float $minimum, ?float $ma
                 <a class="<?= $section === 'garden' ? 'active' : '' ?>" href="phase6.php?section=garden">Garden</a>
                 <a class="<?= $section === 'harvests' ? 'active' : '' ?>" href="phase6.php?section=harvests">Harvests</a>
             <?php endif; ?>
-            <?php if ($canViewPreservation): ?><a class="<?= $section === 'preservation' ? 'active' : '' ?>" href="phase6.php?section=preservation">Preservation</a><?php endif; ?>
+            <?php if ($canViewPreservation): ?><a href="phase6.php?section=preservation">Preservation</a><?php endif; ?>
         </nav>
     </div>
     <div class="garden-hero-image" role="img" aria-label="Indoor garden monitoring racks"></div>
 </header>
+<?php endif; ?>
 
 <?php foreach ($flashes as $message): ?>
     <div role="status" class="status status-<?= $message['type'] === 'error' ? 'warning' : 'good' ?> garden-flash"><?= e((string)$message['message']) ?></div>
@@ -341,9 +433,106 @@ $environmentStatus = static function (?float $value, ?float $minimum, ?float $ma
 <section class="garden-workspace"><article class="garden-panel span-2"><div class="panel-heading"><div><p class="eyebrow">Field-to-pantry history</p><h2>Harvest Records</h2></div><span><?= count($harvests) ?> recorded</span></div><div class="harvest-card-list"><?php if ($harvests === []): ?><p class="empty-state">No harvests recorded.</p><?php endif; ?><?php foreach ($harvests as $row): ?><article><div><span class="harvest-icon">♧</span><div><h3><?= e((string)$row['crop_name']) ?></h3><p><?= e((string)($row['variety'] ?? '')) ?> · <?= e((string)$row['zone_name']) ?></p></div></div><strong><?= e((string)$row['quantity']) ?> <?= e((string)$row['unit']) ?></strong><span><?= e((string)$row['destination']) ?></span><small><?= e((string)$row['harvested_at']) ?> · <?= $row['inventory_name'] ? 'Inventory: ' . e((string)$row['inventory_name']) : ($row['preservation_name'] ? 'Batch: ' . e((string)$row['preservation_name']) : 'Ledger only') ?></small></article><?php endforeach; ?></div></article><?php if ($canRecordHarvest): ?><aside class="garden-form-stack"><article class="garden-panel"><div class="panel-heading"><h2>Record Harvest</h2></div><form method="post" class="garden-form"><input type="hidden" name="csrf_token" value="<?= e($csrf) ?>"><input type="hidden" name="action" value="record_harvest"><input type="hidden" name="action_key" value="<?= e((string)$_SESSION['harvest_action_key']) ?>"><label>Planting<select name="planting_id" required><option value="">Choose planting</option><?php foreach ($plantings as $planting): if ((string)$planting['growth_stage'] === 'failed') continue; ?><option value="<?= (int)$planting['id'] ?>"><?= e((string)$planting['crop_name']) ?> · <?= e((string)$planting['zone_name']) ?> · <?= e(str_replace('_',' ',(string)$planting['growth_stage'])) ?></option><?php endforeach; ?></select></label><div class="form-pair"><label>Quantity<input type="number" step="0.0001" min="0.0001" name="quantity" required></label><label>Unit<input name="unit" maxlength="30" placeholder="lb, oz, each" required></label></div><label>Grade<input name="grade" maxlength="60"></label><label>Harvested at<input type="datetime-local" name="harvested_at" value="<?= e(date('Y-m-d\TH:i')) ?>"></label><label>Destination<select name="destination"><option value="inventory">Inventory</option><option value="preservation">Preservation queue</option><option value="recipe">Immediate recipe use</option><option value="donation">Donation</option><option value="compost">Compost</option></select></label><label>Existing inventory<select name="inventory_item_id"><option value="">Create a new inventory item</option><?php foreach ($inventoryItems as $item): ?><option value="<?= (int)$item['id'] ?>"><?= e((string)$item['name']) ?> · <?= e((string)$item['current_quantity']) ?> <?= e((string)$item['unit']) ?></option><?php endforeach; ?></select></label><label>New inventory name<input name="new_inventory_name" maxlength="180" placeholder="Defaults to crop name"></label><label>Storage location<select name="storage_location_id"><option value="">Unassigned</option><?php foreach ($locations as $location): ?><option value="<?= (int)$location['id'] ?>"><?= e((string)$location['name']) ?></option><?php endforeach; ?></select></label><label>Best-use date<input type="date" name="best_use_date"></label><label>Preservation method<select name="preservation_method"><option value="">Only needed for preservation queue</option><?php foreach (['water_bath','pressure_canning','dehydrating','fermenting','pickling','freezing','vacuum_sealing','dry_storage'] as $method): ?><option value="<?= $method ?>"><?= e(ucwords(str_replace('_',' ',$method))) ?></option><?php endforeach; ?></select></label><label class="check-row"><input type="checkbox" name="mark_complete" value="1"> Mark planting completed</label><label>Notes<textarea name="notes" maxlength="5000"></textarea></label><button class="button primary" type="submit">Post harvest</button></form></article></aside><?php endif; ?></section>
 
 <?php else: ?>
-<section class="garden-workspace"><article class="garden-panel span-2"><div class="panel-heading"><div><p class="eyebrow">Preservation operations</p><h2>Preservation Batches</h2></div><span><?= count($preservationBatches) ?> batches</span></div><div class="harvest-card-list preservation-list"><?php if ($preservationBatches === []): ?><p class="empty-state">No preservation batches yet.</p><?php endif; ?><?php foreach ($preservationBatches as $batch): ?><article><div><span class="harvest-icon">◉</span><div><h3><?= e((string)$batch['name']) ?></h3><p><?= e(ucwords(str_replace('_',' ',(string)$batch['method']))) ?> · <?= e((string)$batch['status']) ?></p></div></div><strong><?= e((string)($batch['yield_quantity'] ?? '—')) ?> <?= e((string)($batch['yield_unit'] ?? '')) ?></strong><span><?= e((string)($batch['location_name'] ?? 'Unassigned')) ?></span><small>Best use <?= e((string)($batch['best_use_date'] ?? '—')) ?> · <?= $batch['source_harvest_id'] ? 'Harvest #' . (int)$batch['source_harvest_id'] : ((int)$batch['input_count'] . ' inventory inputs') ?></small></article><?php endforeach; ?></div></article><?php if ($canManagePreservation): ?><aside class="garden-form-stack"><article class="garden-panel"><div class="panel-heading"><h2>Complete Preservation Batch</h2></div><form method="post" class="garden-form"><input type="hidden" name="csrf_token" value="<?= e($csrf) ?>"><input type="hidden" name="action" value="complete_preservation"><input type="hidden" name="action_key" value="<?= e((string)$_SESSION['preservation_action_key']) ?>"><label>Planned batch<select name="preservation_batch_id"><option value="">Create a new batch</option><?php foreach ($plannedBatches as $batch): ?><option value="<?= (int)$batch['id'] ?>"><?= e((string)$batch['name']) ?> · <?= e(str_replace('_',' ',(string)$batch['method'])) ?></option><?php endforeach; ?></select></label><label>Batch name<input name="name" maxlength="180" required></label><label>Method<select name="method" required><option value="">Choose method</option><?php foreach (['water_bath','pressure_canning','dehydrating','fermenting','pickling','freezing','vacuum_sealing','dry_storage'] as $method): ?><option value="<?= $method ?>"><?= e(ucwords(str_replace('_',' ',$method))) ?></option><?php endforeach; ?></select></label><label>Input inventory<select name="input_inventory_item_id" required><option value="">Choose input</option><?php foreach ($inventoryItems as $item): ?><option value="<?= (int)$item['id'] ?>"><?= e((string)$item['name']) ?> · <?= e((string)$item['current_quantity']) ?> <?= e((string)$item['unit']) ?></option><?php endforeach; ?></select></label><div class="form-pair"><label>Input quantity<input type="number" step="0.0001" min="0.0001" name="input_quantity" required></label><label>Input unit<input name="input_unit" maxlength="30" required></label></div><label>Output item name<input name="output_name" maxlength="180" required></label><div class="form-pair"><label>Output quantity<input type="number" step="0.0001" min="0.0001" name="output_quantity" required></label><label>Output unit<input name="output_unit" maxlength="30" placeholder="jars, lb, bags" required></label></div><label>Storage location<select name="storage_location_id"><option value="">Unassigned</option><?php foreach ($locations as $location): ?><option value="<?= (int)$location['id'] ?>"><?= e((string)$location['name']) ?></option><?php endforeach; ?></select></label><label>Best-use date<input type="date" name="best_use_date"></label><label>Safety source or reference<input name="safety_source" maxlength="1000" placeholder="Authoritative recipe, publication, or process reference"></label><label>Batch notes<textarea name="notes" maxlength="5000"></textarea></label><p class="form-note">Homestead records the process followed. It does not certify food safety; use authoritative, method-specific guidance.</p><button class="button primary" type="submit">Complete and stock batch</button></form></article></aside><?php endif; ?></section>
+<section class="preserve-metrics" aria-label="Preservation summary">
+    <article><span class="preserve-metric-icon">▣</span><div><small>Canning batches</small><strong><?= $preservationGroupCount($preservationMethodGroups['canning']) ?></strong><em><?= (int)($preservationStatusCounts['stored'] ?? 0) ?> stored batches</em></div></article>
+    <article><span class="preserve-metric-icon">▤</span><div><small>Dehydrator runs</small><strong><?= $preservationGroupCount($preservationMethodGroups['dehydrating']) ?></strong><em><?= e(number_format($totalPreservedUnits, 1)) ?> recorded units</em></div></article>
+    <article><span class="preserve-metric-icon">◉</span><div><small>Fermentation projects</small><strong><?= $preservationGroupCount($preservationMethodGroups['fermenting']) ?></strong><em><?= (int)($preservationStatusCounts['planned'] ?? 0) + (int)($preservationStatusCounts['prepared'] ?? 0) ?> active or planned</em></div></article>
+    <article class="preserve-warning-metric"><span class="preserve-metric-icon">△</span><div><small>Expiring preserves</small><strong><?= $expiringPreserves ?></strong><em>Within 30 days</em></div></article>
+</section>
+
+<section class="preserve-browser garden-panel">
+    <div class="preserve-browser-tabs" role="tablist" aria-label="Preservation method groups">
+        <button class="active" type="button" data-preserve-method="all">All batches</button>
+        <button type="button" data-preserve-method="canning">Canning</button>
+        <button type="button" data-preserve-method="dehydrating">Dehydrating</button>
+        <button type="button" data-preserve-method="fermenting">Fermenting</button>
+    </div>
+    <div class="preserve-filters">
+        <label class="preserve-search"><span aria-hidden="true">⌕</span><span class="visually-hidden">Search preservation batches</span><input type="search" placeholder="Search batches…" data-preserve-search></label>
+        <label><span class="visually-hidden">Method</span><select data-preserve-select="method"><option value="all">All methods</option><?php foreach ($preservationMethodLabels as $method => $label): ?><option value="<?= e($method) ?>"><?= e($label) ?></option><?php endforeach; ?></select></label>
+        <label><span class="visually-hidden">Status</span><select data-preserve-select="status"><option value="all">All statuses</option><?php foreach (array_keys($preservationStatusCounts) as $status): ?><option value="<?= e($status) ?>"><?= e(ucwords(str_replace('_', ' ', $status))) ?></option><?php endforeach; ?></select></label>
+        <label><span class="visually-hidden">Location</span><select data-preserve-select="location"><option value="all">All locations</option><?php foreach (array_keys($preservationLocationCounts) as $location): ?><option value="<?= e(strtolower($location)) ?>"><?= e($location) ?></option><?php endforeach; ?></select></label>
+        <button class="preserve-filter-reset" type="button" data-preserve-reset>Reset filters</button>
+    </div>
+    <div class="preserve-table-wrap" tabindex="0">
+        <table class="preserve-table">
+            <thead><tr><th>Batch name</th><th>Method</th><th>Date</th><th>Yield</th><th>Status</th><th>Shelf-life</th><th></th></tr></thead>
+            <tbody>
+            <?php if ($preservationBatches === []): ?><tr><td colspan="7" class="empty-state">No preservation batches yet.</td></tr><?php endif; ?>
+            <?php foreach ($preservationBatches as $batch):
+                $method = (string)$batch['method'];
+                $status = (string)$batch['status'];
+                $location = trim((string)($batch['location_name'] ?? '')) ?: 'Unassigned';
+                $methodGroup = in_array($method, $preservationMethodGroups['canning'], true) ? 'canning' : (in_array($method, $preservationMethodGroups['dehydrating'], true) ? 'dehydrating' : (in_array($method, $preservationMethodGroups['fermenting'], true) ? 'fermenting' : 'other'));
+                $recordDate = (string)($batch['completed_at'] ?? $batch['started_at'] ?? $batch['created_at'] ?? '');
+                $bestUse = trim((string)($batch['best_use_date'] ?? ''));
+                $expiryClass = '';
+                if ($bestUse !== '') {
+                    $bestUseObject = DateTimeImmutable::createFromFormat('!Y-m-d', $bestUse);
+                    if ($bestUseObject && $bestUseObject < $today) $expiryClass = 'expired';
+                    elseif ($bestUseObject && $bestUseObject <= $expiringThreshold) $expiryClass = 'expiring';
+                }
+            ?>
+                <tr data-preserve-row data-name="<?= e(strtolower((string)$batch['name'])) ?>" data-method="<?= e($method) ?>" data-group="<?= e($methodGroup) ?>" data-status="<?= e($status) ?>" data-location="<?= e(strtolower($location)) ?>">
+                    <td><a class="preserve-batch-name" href="phase6.php?section=preservation&amp;batch_id=<?= (int)$batch['id'] ?>"><img src="<?= e($preservationImageFor($method)) ?>" alt=""><span><strong><?= e((string)$batch['name']) ?></strong><small><?= e($location) ?></small></span></a></td>
+                    <td><?= e($preservationMethodLabels[$method] ?? ucwords(str_replace('_', ' ', $method))) ?></td>
+                    <td><?= $recordDate !== '' ? e(date('M j, Y', strtotime($recordDate))) : '—' ?></td>
+                    <td><?= e((string)($batch['yield_quantity'] ?? '—')) ?> <?= e((string)($batch['yield_unit'] ?? '')) ?></td>
+                    <td><span class="preserve-status status-<?= e($status) ?>">● <?= e(ucwords(str_replace('_', ' ', $status))) ?></span></td>
+                    <td><span class="shelf-life <?= e($expiryClass) ?>"><?= $bestUse !== '' ? e(date('M j, Y', strtotime($bestUse))) : 'Ongoing' ?></span></td>
+                    <td><a class="preserve-row-action" href="phase6.php?section=preservation&amp;batch_id=<?= (int)$batch['id'] ?>" aria-label="View <?= e((string)$batch['name']) ?>">•••</a></td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+    <div class="preserve-table-footer"><span data-preserve-count><?= count($preservationBatches) ?> batches shown</span><a href="phase6.php?section=harvests">Review source harvests →</a></div>
+</section>
+
+<?php if (is_array($selectedPreservationBatch)):
+    $selectedMethod = (string)$selectedPreservationBatch['method'];
+    $selectedStatus = (string)$selectedPreservationBatch['status'];
+    $selectedStart = (string)($selectedPreservationBatch['started_at'] ?? $selectedPreservationBatch['created_at'] ?? '');
+    $selectedCompleted = (string)($selectedPreservationBatch['completed_at'] ?? '');
+?>
+<section class="preserve-detail garden-panel">
+    <div class="preserve-detail-photo"><img src="<?= e($preservationImageFor($selectedMethod)) ?>" alt="<?= e((string)$selectedPreservationBatch['name']) ?> preservation batch"></div>
+    <div class="preserve-detail-content">
+        <header><div><p class="eyebrow">Selected batch</p><h2><?= e((string)$selectedPreservationBatch['name']) ?> <span class="preserve-status status-<?= e($selectedStatus) ?>">● <?= e(ucwords(str_replace('_', ' ', $selectedStatus))) ?></span></h2><p><?= e($preservationMethodLabels[$selectedMethod] ?? ucwords(str_replace('_', ' ', $selectedMethod))) ?><?= $selectedStart !== '' ? ' · Batch from ' . e(date('M j, Y', strtotime($selectedStart))) : '' ?></p></div><?php if ($canManagePreservation): ?><a class="button secondary" href="#complete-preservation">Complete a batch</a><?php endif; ?></header>
+        <div class="preserve-detail-grid">
+            <dl><h3>Overview</h3><div><dt>Yield</dt><dd><?= e((string)($selectedPreservationBatch['yield_quantity'] ?? '—')) ?> <?= e((string)($selectedPreservationBatch['yield_unit'] ?? '')) ?></dd></div><div><dt>Status</dt><dd><?= e(ucwords(str_replace('_', ' ', $selectedStatus))) ?></dd></div><div><dt>Best by</dt><dd><?= !empty($selectedPreservationBatch['best_use_date']) ? e(date('M j, Y', strtotime((string)$selectedPreservationBatch['best_use_date']))) : 'Ongoing' ?></dd></div></dl>
+            <dl><h3>Storage</h3><div><dt>Location</dt><dd><?= e((string)($selectedPreservationBatch['location_name'] ?? 'Unassigned')) ?></dd></div><div><dt>Output item</dt><dd><?= e((string)($selectedPreservationBatch['output_item_name'] ?? 'Not stocked')) ?></dd></div><div><dt>Inputs</dt><dd><?= (int)$selectedPreservationBatch['input_count'] ?></dd></div></dl>
+            <dl><h3>Batch record</h3><div><dt>Started by</dt><dd><?= e((string)($selectedPreservationBatch['started_by'] ?? 'Household')) ?></dd></div><div><dt>Source</dt><dd><?= $selectedPreservationBatch['source_harvest_id'] ? 'Harvest #' . (int)$selectedPreservationBatch['source_harvest_id'] : 'Inventory' ?></dd></div><div><dt>Completed</dt><dd><?= $selectedCompleted !== '' ? e(date('M j, Y g:i A', strtotime($selectedCompleted))) : 'In progress' ?></dd></div></dl>
+            <div class="preserve-notes"><h3>Label &amp; notes</h3><strong><?= e((string)$selectedPreservationBatch['name']) ?></strong><p><?= e((string)($selectedPreservationBatch['notes'] ?? 'No notes recorded.')) ?></p><?php if ($preservationSafetySource !== ''): ?><small>Safety reference: <?= e($preservationSafetySource) ?></small><?php endif; ?></div>
+        </div>
+        <div class="preserve-timeline"><h3>Batch timeline</h3><div><span class="done"><i>✣</i><strong>Prepared</strong><small><?= $selectedStart !== '' ? e(date('M j, Y', strtotime($selectedStart))) : 'Recorded' ?></small></span><span class="<?= $selectedStart !== '' ? 'done' : '' ?>"><i>♨</i><strong>Processed</strong><small><?= $selectedStart !== '' ? e(date('g:i A', strtotime($selectedStart))) : 'Pending' ?></small></span><span class="<?= $selectedCompleted !== '' ? 'done' : '' ?>"><i>◌</i><strong>Cooling</strong><small><?= $selectedCompleted !== '' ? e(date('M j, Y', strtotime($selectedCompleted))) : 'Pending' ?></small></span><span class="<?= $selectedCompleted !== '' ? 'done' : '' ?>"><i>◇</i><strong>Labeled</strong><small><?= $selectedCompleted !== '' ? 'Batch record complete' : 'Pending' ?></small></span><span class="<?= $selectedStatus === 'stored' ? 'done' : '' ?>"><i>▣</i><strong>Stored</strong><small><?= $selectedStatus === 'stored' ? e((string)($selectedPreservationBatch['location_name'] ?? 'Stored')) : 'Pending' ?></small></span></div></div>
+    </div>
+</section>
+<?php endif; ?>
+
+<?php if ($canManagePreservation): ?>
+<section id="complete-preservation" class="preserve-complete garden-panel">
+    <div class="panel-heading"><div><p class="eyebrow">Harvest to shelf</p><h2>Complete Preservation Batch</h2></div><span><?= count($plannedBatches) ?> planned</span></div>
+    <form method="post" class="garden-form preserve-form">
+        <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>"><input type="hidden" name="action" value="complete_preservation"><input type="hidden" name="action_key" value="<?= e((string)$_SESSION['preservation_action_key']) ?>">
+        <label>Planned batch<select name="preservation_batch_id"><option value="">Create a new batch</option><?php foreach ($plannedBatches as $batch): ?><option value="<?= (int)$batch['id'] ?>"><?= e((string)$batch['name']) ?> · <?= e(str_replace('_',' ',(string)$batch['method'])) ?></option><?php endforeach; ?></select></label>
+        <label>Batch name<input name="name" maxlength="180" required></label>
+        <label>Method<select name="method" required><option value="">Choose method</option><?php foreach ($preservationMethodLabels as $method => $label): ?><option value="<?= e($method) ?>"><?= e($label) ?></option><?php endforeach; ?></select></label>
+        <label>Input inventory<select name="input_inventory_item_id" required><option value="">Choose input</option><?php foreach ($inventoryItems as $item): ?><option value="<?= (int)$item['id'] ?>"><?= e((string)$item['name']) ?> · <?= e((string)$item['current_quantity']) ?> <?= e((string)$item['unit']) ?></option><?php endforeach; ?></select></label>
+        <div class="form-pair"><label>Input quantity<input type="number" step="0.0001" min="0.0001" name="input_quantity" required></label><label>Input unit<input name="input_unit" maxlength="30" required></label></div>
+        <label>Output item name<input name="output_name" maxlength="180" required></label>
+        <div class="form-pair"><label>Output quantity<input type="number" step="0.0001" min="0.0001" name="output_quantity" required></label><label>Output unit<input name="output_unit" maxlength="30" placeholder="jars, lb, bags" required></label></div>
+        <label>Storage location<select name="storage_location_id"><option value="">Unassigned</option><?php foreach ($locations as $location): ?><option value="<?= (int)$location['id'] ?>"><?= e((string)$location['name']) ?></option><?php endforeach; ?></select></label>
+        <label>Best-use date<input type="date" name="best_use_date"></label>
+        <label class="preserve-form-wide">Safety source or reference<input name="safety_source" maxlength="1000" placeholder="Authoritative recipe, publication, or process reference"></label>
+        <label class="preserve-form-wide">Batch notes<textarea name="notes" maxlength="5000"></textarea></label>
+        <p class="form-note preserve-form-wide">Homestead records the process followed. It does not certify food safety; use authoritative, method-specific guidance.</p>
+        <button class="button primary preserve-form-wide" type="submit">Complete and stock batch</button>
+    </form>
+</section>
+<?php endif; ?>
 <?php endif; ?>
 </main>
-<script src="assets/js/homestead-garden.js" defer></script>
+<?php if ($section === 'preservation'): ?><script src="assets/js/homestead-preserve.js" defer></script><?php else: ?><script src="assets/js/homestead-garden.js" defer></script><?php endif; ?>
 </body>
 </html>

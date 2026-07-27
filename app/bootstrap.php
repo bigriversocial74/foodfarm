@@ -99,6 +99,10 @@ $shellRoutes = [
 ];
 
 $uiRoute = $uiRoutes[$routeName] ?? null;
+if ($routeName === 'phase6.php' && (string)($_GET['section'] ?? '') === 'preservation' && is_array($uiRoute)) {
+    $uiRoute['class'] = 'ui-preserve';
+    $uiRoute['stylesheet'] = 'homestead-preserve.css';
+}
 if (is_array($uiRoute)) {
     $uiPageClass = (string)$uiRoute['class'];
     $uiStylesheet = (string)$uiRoute['stylesheet'];
