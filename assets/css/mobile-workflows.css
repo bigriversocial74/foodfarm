@@ -1,0 +1,423 @@
+/* Mobile workflow ergonomics for authenticated Homestead pages. */
+@media (max-width: 900px) {
+    body.has-homestead-shell {
+        overflow-x: hidden;
+        padding-bottom: env(safe-area-inset-bottom, 0);
+    }
+
+    body.has-homestead-shell .homestead-appbar__inner {
+        padding-left: max(14px, env(safe-area-inset-left));
+        padding-right: max(14px, env(safe-area-inset-right));
+    }
+
+    body.has-homestead-shell .page-container {
+        width: 100%;
+        padding: 22px clamp(14px, 4vw, 24px) 40px;
+    }
+
+    body.has-homestead-shell .page-header {
+        min-height: 0;
+        padding: clamp(24px, 6vw, 34px);
+        margin-bottom: 18px;
+        border-radius: 24px;
+        align-items: flex-start;
+    }
+
+    body.has-homestead-shell .page-header::before {
+        inset: auto -24% -75% 24%;
+        opacity: .72;
+    }
+
+    body.has-homestead-shell .page-header::after {
+        width: 230px;
+        height: 230px;
+        right: -110px;
+        top: -125px;
+    }
+
+    body.has-homestead-shell .page-header h1 {
+        max-width: 16ch;
+        font-size: clamp(32px, 8vw, 46px);
+        line-height: 1.02;
+    }
+
+    body.has-homestead-shell .page-header .page-description {
+        max-width: 62ch;
+        font-size: 14px;
+        line-height: 1.62;
+    }
+
+    body.has-homestead-shell .metrics-grid,
+    body.has-homestead-shell .metrics-grid.compact {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+    }
+
+    body.has-homestead-shell .metric-card {
+        min-height: 108px;
+        padding: 17px;
+        border-radius: 17px;
+    }
+
+    body.has-homestead-shell .metric-card strong {
+        font-size: 25px;
+    }
+
+    body.has-homestead-shell .content-grid,
+    body.has-homestead-shell .overview-columns,
+    body.has-homestead-shell .member-grid,
+    body.has-homestead-shell .recipe-grid,
+    body.has-homestead-shell .zone-map {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 15px;
+    }
+
+    body.has-homestead-shell .span-2,
+    body.has-homestead-shell .span-3 {
+        grid-column: auto;
+    }
+
+    body.has-homestead-shell .panel {
+        border-radius: 18px;
+    }
+
+    body.has-homestead-shell .homestead-workflow-tabs {
+        top: 68px;
+        margin-inline: calc(clamp(14px, 4vw, 24px) * -1);
+        padding: 10px clamp(14px, 4vw, 24px);
+        border-radius: 0;
+        border-left: 0;
+        border-right: 0;
+        overflow-x: auto;
+        overscroll-behavior-inline: contain;
+        scroll-snap-type: x proximity;
+        scrollbar-width: none;
+    }
+
+    body.has-homestead-shell .homestead-workflow-tabs::-webkit-scrollbar {
+        display: none;
+    }
+
+    body.has-homestead-shell .homestead-workflow-tabs .button {
+        min-width: max-content;
+        min-height: 42px;
+        flex: 0 0 auto;
+        scroll-snap-align: start;
+    }
+
+    body.has-homestead-shell .table-wrap {
+        max-width: calc(100vw - 28px);
+        margin-inline: 0;
+        overscroll-behavior-inline: contain;
+        scroll-snap-type: x proximity;
+        -webkit-overflow-scrolling: touch;
+        box-shadow: inset -18px 0 18px -22px rgba(31, 75, 54, .55), 0 9px 28px rgba(35,59,43,.045);
+    }
+
+    body.has-homestead-shell .table-wrap table {
+        min-width: 700px;
+    }
+
+    body.has-homestead-shell .table-wrap th:first-child,
+    body.has-homestead-shell .table-wrap td:first-child {
+        position: sticky;
+        left: 0;
+        z-index: 1;
+        background: #fffefb;
+        box-shadow: 1px 0 0 var(--ops-line);
+    }
+
+    body.has-homestead-shell .table-wrap th:first-child {
+        z-index: 3;
+        background: #eef2eb;
+    }
+
+    body.has-homestead-shell .table-wrap tbody tr:nth-child(even) td:first-child {
+        background: #f7f9f4;
+    }
+
+    body.has-homestead-shell .table-wrap form {
+        min-width: max-content;
+    }
+
+    body.has-homestead-shell .member-footer,
+    body.has-homestead-shell .info-list > div,
+    body.has-homestead-shell .meal-days > div {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    body.has-homestead-shell .activity-row {
+        grid-template-columns: 36px minmax(0, 1fr);
+    }
+
+    body.has-homestead-shell .activity-meta {
+        grid-column: 2;
+        text-align: left;
+    }
+
+    body.has-homestead-shell .zone-card {
+        grid-template-columns: 74px minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 640px) {
+    body.has-homestead-shell .homestead-appbar {
+        padding-top: env(safe-area-inset-top, 0);
+    }
+
+    body.has-homestead-shell .homestead-appbar__inner {
+        min-height: 62px;
+    }
+
+    body.has-homestead-shell .homestead-mobile-menu__panel {
+        top: calc(70px + env(safe-area-inset-top, 0));
+        right: 8px;
+        bottom: max(8px, env(safe-area-inset-bottom));
+        left: 8px;
+        width: auto;
+        max-height: none;
+        border-radius: 20px;
+        padding: 14px 14px max(14px, env(safe-area-inset-bottom));
+        overscroll-behavior: contain;
+    }
+
+    body.has-homestead-shell .homestead-mobile-menu__panel nav {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 7px;
+    }
+
+    body.has-homestead-shell .homestead-mobile-menu__link,
+    body.has-homestead-shell .homestead-mobile-menu__signout {
+        min-height: 48px;
+        font-size: 13px;
+    }
+
+    body.has-homestead-shell .page-container {
+        padding: 16px 12px 34px;
+    }
+
+    body.has-homestead-shell .page-header {
+        padding: 23px 20px;
+        border-radius: 20px;
+    }
+
+    body.has-homestead-shell .page-header h1 {
+        font-size: clamp(30px, 10vw, 39px);
+    }
+
+    body.has-homestead-shell .page-header .eyebrow {
+        margin-bottom: 8px;
+        font-size: 10px;
+    }
+
+    body.has-homestead-shell .page-header .toolbar,
+    body.has-homestead-shell .page-header > div:last-child:not(:first-child) {
+        width: 100%;
+    }
+
+    body.has-homestead-shell .metrics-grid,
+    body.has-homestead-shell .metrics-grid.compact {
+        gap: 9px;
+    }
+
+    body.has-homestead-shell .metric-card {
+        min-height: 96px;
+        padding: 14px;
+    }
+
+    body.has-homestead-shell .metric-card p {
+        margin-bottom: 5px;
+        line-height: 1.3;
+    }
+
+    body.has-homestead-shell .metric-card strong {
+        font-size: 23px;
+    }
+
+    body.has-homestead-shell .panel {
+        padding: 17px;
+        border-radius: 17px;
+    }
+
+    body.has-homestead-shell .panel h2 {
+        font-size: 22px;
+    }
+
+    body.has-homestead-shell .panel-heading {
+        padding-bottom: 13px;
+        margin-bottom: 16px;
+    }
+
+    body.has-homestead-shell .homestead-workflow-tabs {
+        top: calc(62px + env(safe-area-inset-top, 0));
+        margin-inline: -12px;
+        padding-inline: 12px;
+    }
+
+    body.has-homestead-shell .form-grid,
+    body.has-homestead-shell .settings-form {
+        gap: 14px;
+    }
+
+    body.has-homestead-shell .search-field,
+    body.has-homestead-shell select,
+    body.has-homestead-shell textarea,
+    body.has-homestead-shell input[type="text"],
+    body.has-homestead-shell input[type="email"],
+    body.has-homestead-shell input[type="password"],
+    body.has-homestead-shell input[type="number"],
+    body.has-homestead-shell input[type="date"],
+    body.has-homestead-shell input[type="datetime-local"],
+    body.has-homestead-shell input[type="time"],
+    body.has-homestead-shell input[type="url"],
+    body.has-homestead-shell input[type="search"] {
+        min-height: 48px;
+        padding: 12px;
+        font-size: 16px;
+    }
+
+    body.has-homestead-shell textarea {
+        min-height: 128px;
+    }
+
+    body.has-homestead-shell .button,
+    body.has-homestead-shell button {
+        min-height: 46px;
+    }
+
+    body.has-homestead-shell .form-grid > .button,
+    body.has-homestead-shell .settings-form > .button {
+        width: 100%;
+        min-height: 50px;
+    }
+
+    body.has-homestead-shell .toolbar:not(.homestead-workflow-tabs) {
+        width: 100%;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    body.has-homestead-shell .toolbar:not(.homestead-workflow-tabs) > * {
+        min-width: 0;
+        width: 100%;
+    }
+
+    body.has-homestead-shell .table-wrap {
+        max-width: calc(100vw - 24px);
+        border-radius: 11px;
+    }
+
+    body.has-homestead-shell .table-wrap table {
+        min-width: 660px;
+    }
+
+    body.has-homestead-shell .table-wrap td,
+    body.has-homestead-shell .table-wrap th {
+        padding: 11px 9px;
+    }
+
+    body.has-homestead-shell .table-wrap form .search-field,
+    body.has-homestead-shell .table-wrap form select,
+    body.has-homestead-shell .table-wrap form input:not([type="hidden"]),
+    body.has-homestead-shell .table-wrap form .button {
+        min-height: 42px;
+    }
+
+    body.has-homestead-shell div.status[role="status"],
+    body.has-homestead-shell div.status[role="alert"] {
+        min-height: 52px;
+        padding: 14px !important;
+        border-radius: 13px;
+        font-size: 13px;
+    }
+
+    body.has-homestead-shell details:not(.homestead-mobile-menu) > summary {
+        min-height: 48px;
+        display: flex;
+        align-items: center;
+        padding: 13px 14px;
+    }
+
+    body.has-homestead-shell .quick-actions {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    body.has-homestead-shell .quick-action {
+        min-height: 50px;
+    }
+}
+
+@media (max-width: 420px) {
+    body.has-homestead-shell .homestead-appbar__brand-copy strong {
+        font-size: 15px;
+    }
+
+    body.has-homestead-shell .homestead-mobile-menu summary {
+        padding-inline: 10px;
+    }
+
+    body.has-homestead-shell .homestead-mobile-menu__panel nav {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    body.has-homestead-shell .metrics-grid,
+    body.has-homestead-shell .metrics-grid.compact {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    body.has-homestead-shell .metric-card {
+        min-height: 86px;
+    }
+
+    body.has-homestead-shell .toolbar:not(.homestead-workflow-tabs) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    body.has-homestead-shell .zone-card {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (hover: none) and (pointer: coarse) {
+    body.has-homestead-shell .button,
+    body.has-homestead-shell .homestead-appbar__link,
+    body.has-homestead-shell .homestead-mobile-menu__link,
+    body.has-homestead-shell summary,
+    body.has-homestead-shell input[type="checkbox"],
+    body.has-homestead-shell input[type="radio"] {
+        touch-action: manipulation;
+    }
+
+    body.has-homestead-shell a.panel:hover,
+    body.has-homestead-shell .metric-card:hover,
+    body.has-homestead-shell .button:hover,
+    body.has-homestead-shell .quick-action:hover {
+        transform: none;
+    }
+}
+
+@media (max-width: 900px) and (orientation: landscape) {
+    body.has-homestead-shell .homestead-mobile-menu__panel {
+        max-height: calc(100vh - 80px);
+    }
+
+    body.has-homestead-shell .page-header {
+        padding-block: 20px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    body.has-homestead-shell .homestead-workflow-tabs {
+        scroll-behavior: auto;
+    }
+}
+
+@media (forced-colors: active) and (max-width: 900px) {
+    body.has-homestead-shell .table-wrap th:first-child,
+    body.has-homestead-shell .table-wrap td:first-child {
+        border-right: 1px solid CanvasText;
+    }
+}
