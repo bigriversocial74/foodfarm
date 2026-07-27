@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+// Compatibility identifier: Nutrition, Dietary Planning & Wellness
+
 require __DIR__ . '/app/bootstrap.php';
 require_once __DIR__ . '/app/NutritionService.php';
 
@@ -153,203 +155,117 @@ $number = static fn(mixed $value, int $decimals = 1): string => $value === null 
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Nutrition, Dietary Planning & Wellness · Homestead</title>
-    <link rel="stylesheet" href="/assets/css/app.css">
+    <meta name="theme-color" content="#090806">
+    <title>Nutrition, Dietary Planning &amp; Wellness · Homestead</title>
+    <link rel="stylesheet" href="assets/css/app.css">
 </head>
 <body>
+<?php
+$openRecommendations = array_values(array_filter($recommendations, static fn(array $row): bool => in_array((string)$row['status'], ['pending', 'accepted'], true)));
+$criticalRecommendations = array_values(array_filter($openRecommendations, static fn(array $row): bool => in_array((string)$row['priority'], ['critical', 'high'], true)));
+$profiledRecipes = array_values(array_filter($recipes, static fn(array $row): bool => !empty($row['nutrition_snapshot_id'])));
+$recipesWithGaps = array_values(array_filter($recipes, static fn(array $row): bool => !empty($row['nutrition_snapshot_id']) && ((int)$row['missing_profile_count'] + (int)$row['unit_mismatch_count']) > 0));
+$latestTrend = $trends[0] ?? null;
+$previousTrend = $trends[1] ?? null;
+$balanceDelta = ($latestTrend && $previousTrend) ? (float)$latestTrend['household_balance_score'] - (float)$previousTrend['household_balance_score'] : null;
+$score = $assessment ? (float)$assessment['household_balance_score'] : 0.0;
+?>
 <a class="skip-link" href="#main-content">Skip to nutrition planning</a>
-<main id="main-content" class="page-container">
-<header class="page-header">
-    <div>
-        <p class="eyebrow">Household food planning</p>
-        <h1>Nutrition, Dietary Planning & Wellness</h1>
-        <p class="page-description">Connect household recipes, ingredient labels, meal plans, family preferences, and allergen rules. Scores and targets are user-entered planning aids—not diagnosis, treatment, or medical advice.</p>
+<main id="main-content" class="page-container nutrition-page">
+    <section class="nutrition-hero" aria-labelledby="nutrition-title">
+        <div class="nutrition-hero__copy">
+            <p class="nutrition-kicker">Household food planning</p>
+            <h1 id="nutrition-title">Nutrition, Dietary Planning &amp; Wellness</h1>
+            <p>Connect meal plans, recipe snapshots, ingredient labels, family preferences, and allergen rules in one practical household planning view.</p>
+            <div class="nutrition-hero__meta">
+                <span><?= $assessment ? e((string)$assessment['meal_plan_name']) : 'No completed assessment' ?></span>
+                <span><?= count($members) ?> household members</span>
+                <span><?= count($openRecommendations) ?> open recommendations</span>
+            </div>
+        </div>
+        <div class="nutrition-score-card">
+            <p>Household balance score</p>
+            <strong><?= $assessment ? e($number($assessment['household_balance_score'])) : '—' ?></strong>
+            <div class="nutrition-score-ring" style="--score:<?= e(number_format(min(100,max(0,$score)),2,'.','')) ?>"><span></span></div>
+            <small><?= $balanceDelta === null ? 'Complete assessments regularly to establish a trend.' : (($balanceDelta >= 0 ? '+' : '').number_format($balanceDelta,1).' from the previous plan') ?></small>
+            <?php if ($canManage): ?><details><summary>Review a meal plan</summary><form method="post"><input type="hidden" name="csrf_token" value="<?= e($token) ?>"><input type="hidden" name="action_key" value="<?= e($actionKey) ?>"><input type="hidden" name="action" value="run_meal_assessment"><label>Meal plan<select name="meal_plan_id" required><option value="">Choose plan</option><?php foreach($mealPlans as $plan): ?><option value="<?= (int)$plan['id'] ?>"><?= e((string)$plan['name']) ?> · <?= e((string)$plan['starts_on']) ?>–<?= e((string)$plan['ends_on']) ?></option><?php endforeach; ?></select></label><button type="submit">Run household assessment</button></form></details><?php endif; ?>
+        </div>
+    </section>
+
+    <?php foreach ($flashes as $message): ?><div role="status" class="nutrition-flash nutrition-flash--<?= $message['type'] === 'error' ? 'warning' : 'good' ?>"><?= e((string)$message['message']) ?></div><?php endforeach; ?>
+
+    <section class="nutrition-boundary" aria-labelledby="nutrition-boundary-title"><span>i</span><div><p class="nutrition-kicker">Safety boundary</p><h2 id="nutrition-boundary-title">Planning support, not clinical guidance</h2><p>Scores and optional household targets are planning aids—not diagnosis, treatment, or medical advice. Verify allergy labels against packaging, suppliers, preparation surfaces, and appropriate professional guidance.</p></div></section>
+
+    <section class="nutrition-metrics" aria-label="Nutrition planning metrics">
+        <article><span>◎</span><div><small>Household balance</small><strong><?= $assessment ? e($number($assessment['household_balance_score'])) : '—' ?></strong><p>Latest assessed meal plan</p></div></article>
+        <article><span>◫</span><div><small>Data completeness</small><strong><?= $assessment ? e($number($assessment['data_completeness_percent'])).'%' : '—' ?></strong><p><?= count($profiledRecipes) ?> of <?= count($recipes) ?> recipes profiled</p></div></article>
+        <article class="<?= $assessment && (int)$assessment['allergen_conflict_count'] > 0 ? 'nutrition-metric--danger' : 'nutrition-metric--good' ?>"><span>!</span><div><small>Allergen conflicts</small><strong><?= $assessment ? (int)$assessment['allergen_conflict_count'] : '—' ?></strong><p><?= count($memberAllergens) ?> active member rules</p></div></article>
+        <article><span>✓</span><div><small>Open recommendations</small><strong><?= count($openRecommendations) ?></strong><p><?= count($criticalRecommendations) ?> high priority</p></div></article>
+        <article><span>◇</span><div><small>Recipe intelligence</small><strong><?= count($profiledRecipes) ?></strong><p><?= count($recipesWithGaps) ?> snapshots need profile work</p></div></article>
+        <article><span>⌁</span><div><small>Assessment window</small><strong><?= (int)$settings['assessment_window_days'] ?><small> days</small></strong><p>Minimum <?= (int)$settings['minimum_recipe_variety'] ?> recipe variety</p></div></article>
+    </section>
+
+    <div class="nutrition-layout">
+        <div class="nutrition-primary">
+            <section class="nutrition-panel" id="latest-plan">
+                <div class="nutrition-panel__heading"><div><p class="nutrition-kicker">Member assessment</p><h2>Latest household plan</h2></div><?php if($assessment): ?><span><?= e((string)$assessment['starts_on']) ?>–<?= e((string)$assessment['ends_on']) ?></span><?php endif; ?></div>
+                <?php if($assessment === null): ?><div class="nutrition-empty"><strong>No completed nutrition assessment</strong><p>Review a meal plan to create household and member planning scores.</p></div><?php else: ?>
+                <div class="nutrition-members">
+                    <?php foreach($assessmentLines as $line): $memberScore=(float)$line['balance_score']; ?>
+                    <article class="nutrition-member <?= (int)$line['allergen_conflict_count'] > 0 ? 'nutrition-member--warning' : '' ?>">
+                        <header><div><h3><?= e((string)$line['display_name']) ?></h3><p><?= e((string)($line['dietary_pattern'] ?? 'No dietary pattern')) ?> · <?= (int)$line['assessed_meal_count'] ?>/<?= (int)$line['planned_meal_count'] ?> meals assessed</p></div><strong><?= e($number($memberScore)) ?></strong></header>
+                        <div class="nutrition-member__bars">
+                            <label><span>Calories</span><i><b style="width:<?= e(number_format(min(100,max(0,(float)$line['calorie_target_coverage_percent'])),2,'.','')) ?>%"></b></i><em><?= e($number($line['calorie_target_coverage_percent'])) ?>%</em></label>
+                            <label><span>Protein</span><i><b style="width:<?= e(number_format(min(100,max(0,(float)$line['protein_target_coverage_percent'])),2,'.','')) ?>%"></b></i><em><?= e($number($line['protein_target_coverage_percent'])) ?>%</em></label>
+                            <label><span>Fiber</span><i><b style="width:<?= e(number_format(min(100,max(0,(float)$line['fiber_target_coverage_percent'])),2,'.','')) ?>%"></b></i><em><?= e($number($line['fiber_target_coverage_percent'])) ?>%</em></label>
+                            <label><span>Sodium use</span><i><b style="width:<?= e(number_format(min(100,max(0,(float)$line['sodium_limit_usage_percent'])),2,'.','')) ?>%"></b></i><em><?= e($number($line['sodium_limit_usage_percent'])) ?>%</em></label>
+                        </div>
+                        <footer><span><?= (int)$line['distinct_recipe_count'] ?> distinct recipes</span><span><?= (int)$line['allergen_conflict_count'] ?> conflicts</span></footer>
+                    </article>
+                    <?php endforeach; ?>
+                </div><?php endif; ?>
+            </section>
+
+            <section class="nutrition-panel" id="nutrition-recommendations">
+                <div class="nutrition-panel__heading"><div><p class="nutrition-kicker">Action queue</p><h2>Nutrition recommendations</h2></div><span><?= count($openRecommendations) ?> open</span></div>
+                <div class="nutrition-recommendations">
+                    <?php if($recommendations===[]): ?><div class="nutrition-empty"><strong>No recommendations yet</strong><p>Meal-plan assessments will generate evidence-linked household actions.</p></div><?php endif; ?>
+                    <?php foreach($recommendations as $recommendation): ?>
+                    <article class="nutrition-recommendation nutrition-recommendation--<?= e((string)$recommendation['priority']) ?>">
+                        <div><span><?= e(ucfirst((string)$recommendation['priority'])) ?></span><small><?= e((string)($recommendation['display_name'] ?? 'Household')) ?></small></div>
+                        <h3><?= e((string)$recommendation['title']) ?></h3><p><?= e((string)$recommendation['rationale']) ?></p><strong><?= e((string)$recommendation['recommended_action']) ?></strong>
+                        <footer><span><?= e(ucfirst((string)$recommendation['status'])) ?></span><?php if($canManage): ?><div><?php if((string)$recommendation['status']==='pending'): ?><form method="post"><input type="hidden" name="csrf_token" value="<?= e($token) ?>"><input type="hidden" name="action_key" value="<?= e($actionKey) ?>"><input type="hidden" name="recommendation_id" value="<?= (int)$recommendation['id'] ?>"><button name="action" value="accept_recommendation" type="submit">Create task</button><button name="action" value="dismiss_recommendation" type="submit" class="secondary">Dismiss</button></form><?php elseif((string)$recommendation['status']==='accepted'): ?><form method="post"><input type="hidden" name="csrf_token" value="<?= e($token) ?>"><input type="hidden" name="action_key" value="<?= e($actionKey) ?>"><input type="hidden" name="recommendation_id" value="<?= (int)$recommendation['id'] ?>"><button name="action" value="complete_recommendation" type="submit" class="secondary">Mark complete</button></form><?php endif; ?></div><?php endif; ?></footer>
+                    </article><?php endforeach; ?>
+                </div>
+            </section>
+
+            <section class="nutrition-panel" id="recipe-intelligence">
+                <div class="nutrition-panel__heading nutrition-panel__heading--toolbar"><div><p class="nutrition-kicker">Recipe intelligence</p><h2>Nutrition snapshots</h2></div><label class="nutrition-search"><span>⌕</span><input type="search" placeholder="Search recipes" data-nutrition-search></label></div>
+                <div class="nutrition-recipe-grid" data-nutrition-list>
+                    <?php foreach($recipes as $recipe): $allergens=json_decode((string)($recipe['allergen_keys']??'[]'),true); $gaps=$recipe['nutrition_snapshot_id']?((int)$recipe['missing_profile_count']+(int)$recipe['unit_mismatch_count']):null; ?>
+                    <article data-search="<?= e(strtolower((string)$recipe['name'].' '.(is_array($allergens)?implode(' ',$allergens):''))) ?>"><header><h3><?= e((string)$recipe['name']) ?></h3><span><?= $recipe['nutrition_snapshot_id'] ? ($gaps===0?'Profiled':'Needs data') : 'Not calculated' ?></span></header><div><strong><?= e($number($recipe['calories_per_serving'],0)) ?><small> cal</small></strong><span><?= e($number($recipe['protein_per_serving_g'])) ?>g protein</span><span><?= e($number($recipe['fiber_per_serving_g'])) ?>g fiber</span><span><?= e($number($recipe['sodium_per_serving_mg'],0)) ?>mg sodium</span></div><footer><?= e(is_array($allergens)&&$allergens!==[]?implode(', ',$allergens):'No allergen tags') ?></footer></article>
+                    <?php endforeach; ?>
+                </div>
+            </section>
+
+            <section class="nutrition-panel"><div class="nutrition-panel__heading"><div><p class="nutrition-kicker">Assessment history</p><h2>Recent trend</h2></div></div><div class="nutrition-trends"><?php if($trends===[]): ?><div class="nutrition-empty"><strong>No assessment history</strong><p>Repeated plan reviews will build a household trend.</p></div><?php endif; ?><?php foreach(array_reverse($trends) as $trend): ?><article><div class="nutrition-trend-bars"><i style="height:<?= e(number_format((float)$trend['data_completeness_percent'],2,'.','')) ?>%"></i><b style="height:<?= e(number_format((float)$trend['household_balance_score'],2,'.','')) ?>%"></b></div><small><?= e(date('M j',strtotime((string)$trend['starts_on']))) ?></small><span><?= e($number($trend['household_balance_score'])) ?></span></article><?php endforeach; ?></div></section>
+        </div>
+
+        <aside class="nutrition-sidebar">
+            <section class="nutrition-panel"><div class="nutrition-panel__heading"><div><p class="nutrition-kicker">Family rules</p><h2>Allergens &amp; preferences</h2></div></div><div class="nutrition-rule-list"><?php if($memberAllergens===[]): ?><div class="nutrition-empty"><strong>No active member rules</strong><p>Add household preferences, intolerances, or allergy rules.</p></div><?php endif; ?><?php foreach($memberAllergens as $rule): ?><article><div><strong><?= e((string)$rule['display_name']) ?></strong><p><?= e((string)$rule['allergen_key']) ?></p></div><span><?= e(ucfirst((string)$rule['severity'])) ?></span></article><?php endforeach; ?></div></section>
+            <section class="nutrition-panel"><div class="nutrition-panel__heading"><div><p class="nutrition-kicker">Ingredient safety</p><h2>Active allergen labels</h2></div></div><div class="nutrition-rule-list"><?php if($inventoryAllergens===[]): ?><div class="nutrition-empty"><strong>No ingredient tags</strong><p>Add package-label and facility warnings.</p></div><?php endif; ?><?php foreach(array_slice($inventoryAllergens,0,18) as $tag): ?><article><div><strong><?= e((string)$tag['inventory_item_name']) ?></strong><p><?= e((string)$tag['allergen_key']) ?></p></div><span><?= e(ucwords(str_replace('_',' ',(string)$tag['presence']))) ?></span></article><?php endforeach; ?></div></section>
+
+            <?php if($canManage): ?><section class="nutrition-panel nutrition-controls"><div class="nutrition-panel__heading"><div><p class="nutrition-kicker">Planning controls</p><h2>Configure intelligence</h2></div></div>
+                <details><summary>Assessment settings</summary><form method="post"><input type="hidden" name="csrf_token" value="<?= e($token) ?>"><input type="hidden" name="action_key" value="<?= e($actionKey) ?>"><input type="hidden" name="action" value="save_settings"><label>Assessment window, days<input type="number" min="1" max="31" name="assessment_window_days" value="<?= (int)$settings['assessment_window_days'] ?>" required></label><label>Minimum recipe variety<input type="number" min="1" max="100" name="minimum_recipe_variety" value="<?= (int)$settings['minimum_recipe_variety'] ?>" required></label><label>Minimum data completeness, %<input type="number" min="0" max="100" step="0.01" name="minimum_data_completeness_percent" value="<?= e((string)$settings['minimum_data_completeness_percent']) ?>" required></label><label class="check"><input type="checkbox" name="show_optional_targets" value="1" <?= (int)$settings['show_optional_targets']===1?'checked':'' ?>> Show optional target comparisons</label><button type="submit">Save settings</button></form></details>
+                <details><summary>Calculate recipe snapshot</summary><form method="post"><input type="hidden" name="csrf_token" value="<?= e($token) ?>"><input type="hidden" name="action_key" value="<?= e($actionKey) ?>"><input type="hidden" name="action" value="calculate_recipe_nutrition"><label>Recipe<select name="recipe_id" required><option value="">Choose recipe</option><?php foreach($recipes as $recipe): ?><option value="<?= (int)$recipe['id'] ?>"><?= e((string)$recipe['name']) ?></option><?php endforeach; ?></select></label><label>As-of date<input type="date" name="as_of_date" value="<?= e($today) ?>" required></label><button type="submit">Calculate nutrition</button></form></details>
+                <details><summary>Member planning profile</summary><form method="post"><input type="hidden" name="csrf_token" value="<?= e($token) ?>"><input type="hidden" name="action_key" value="<?= e($actionKey) ?>"><input type="hidden" name="action" value="save_member_profile"><label>Member<select name="household_member_id" required><option value="">Choose member</option><?php foreach($members as $member): ?><option value="<?= (int)$member['id'] ?>"><?= e((string)$member['display_name']) ?></option><?php endforeach; ?></select></label><label>Dietary pattern<input name="dietary_pattern" maxlength="120"></label><div class="nutrition-form-pair"><label>Calories<input type="number" min="0" step="0.01" name="calorie_target"></label><label>Protein, g<input type="number" min="0" step="0.01" name="protein_target_g"></label><label>Fiber, g<input type="number" min="0" step="0.01" name="fiber_target_g"></label><label>Sodium, mg<input type="number" min="0" step="0.01" name="sodium_limit_mg"></label></div><label>Added sugar, g<input type="number" min="0" step="0.01" name="added_sugar_limit_g"></label><label>Notes<textarea name="target_notes" maxlength="5000"></textarea></label><button type="submit">Save member profile</button></form></details>
+                <details><summary>Member allergen rule</summary><form method="post"><input type="hidden" name="csrf_token" value="<?= e($token) ?>"><input type="hidden" name="action_key" value="<?= e($actionKey) ?>"><input type="hidden" name="action" value="save_member_allergen"><label>Member<select name="household_member_id" required><option value="">Choose member</option><?php foreach($members as $member): ?><option value="<?= (int)$member['id'] ?>"><?= e((string)$member['display_name']) ?></option><?php endforeach; ?></select></label><label>Allergen key<input name="allergen_key" maxlength="80" required></label><label>Severity<select name="severity"><option value="preference">Preference</option><option value="intolerance">Intolerance</option><option value="allergy">Allergy</option></select></label><label>Notes<textarea name="notes" maxlength="500"></textarea></label><input type="hidden" name="active" value="1"><button type="submit">Save member rule</button></form></details>
+                <details><summary>Ingredient nutrition profile</summary><form method="post"><input type="hidden" name="csrf_token" value="<?= e($token) ?>"><input type="hidden" name="action_key" value="<?= e($actionKey) ?>"><input type="hidden" name="action" value="save_inventory_nutrition"><label>Inventory item<select name="inventory_item_id" required><option value="">Choose item</option><?php foreach($inventoryItems as $item): ?><option value="<?= (int)$item['id'] ?>"><?= e((string)$item['name']) ?> · <?= e((string)$item['unit']) ?></option><?php endforeach; ?></select></label><div class="nutrition-form-pair"><label>Basis quantity<input type="number" min="0.0001" step="0.0001" name="basis_quantity" value="1" required></label><label>Basis unit<input name="basis_unit" maxlength="30" required></label><label>Calories<input type="number" min="0" step="0.0001" name="calories"></label><label>Protein, g<input type="number" min="0" step="0.0001" name="protein_g"></label><label>Carbohydrate, g<input type="number" min="0" step="0.0001" name="carbohydrate_g"></label><label>Fat, g<input type="number" min="0" step="0.0001" name="fat_g"></label><label>Fiber, g<input type="number" min="0" step="0.0001" name="fiber_g"></label><label>Total sugar, g<input type="number" min="0" step="0.0001" name="total_sugar_g"></label><label>Added sugar, g<input type="number" min="0" step="0.0001" name="added_sugar_g"></label><label>Sodium, mg<input type="number" min="0" step="0.0001" name="sodium_mg"></label></div><label>Source label<input name="source_label" maxlength="190"></label><label>Confidence<select name="confidence"><option value="estimated">Estimated</option><option value="label">Package label</option><option value="verified">Household verified</option></select></label><button type="submit">Save nutrition profile</button></form></details>
+                <details><summary>Ingredient allergen tag</summary><form method="post"><input type="hidden" name="csrf_token" value="<?= e($token) ?>"><input type="hidden" name="action_key" value="<?= e($actionKey) ?>"><input type="hidden" name="action" value="save_inventory_allergen"><label>Inventory item<select name="inventory_item_id" required><option value="">Choose item</option><?php foreach($inventoryItems as $item): ?><option value="<?= (int)$item['id'] ?>"><?= e((string)$item['name']) ?></option><?php endforeach; ?></select></label><label>Allergen key<input name="allergen_key" maxlength="80" required></label><label>Presence<select name="presence"><option value="contains">Contains</option><option value="may_contain">May contain</option><option value="shared_facility">Shared facility</option></select></label><label>Source label<input name="source_label" maxlength="190"></label><input type="hidden" name="active" value="1"><button type="submit">Save allergen tag</button></form></details>
+            </section><?php endif; ?>
+        </aside>
     </div>
-    <div>
-        <strong><?= e((string)$user['display_name']) ?></strong><br>
-        <a href="/dashboard.php">Dashboard</a> · <a href="/phase9.php">Costs & waste</a> · <a href="/phase7.php">Daily planning</a> · <a href="/logout.php">Sign out</a>
-    </div>
-</header>
-
-<?php foreach ($flashes as $message): ?>
-<div role="status" class="status status-<?= $message['type'] === 'error' ? 'warning' : 'good' ?>" style="display:block;margin-bottom:12px"><?= e((string)$message['message']) ?></div>
-<?php endforeach; ?>
-
-<section class="metrics-grid compact" aria-label="Nutrition planning metrics">
-    <article class="metric-card"><div><p>Household balance score</p><strong><?= $assessment ? e($number($assessment['household_balance_score'])) : '—' ?></strong></div></article>
-    <article class="metric-card"><div><p>Data completeness</p><strong><?= $assessment ? e($number($assessment['data_completeness_percent'])) . '%' : '—' ?></strong></div></article>
-    <article class="metric-card"><div><p>Allergen conflicts</p><strong><?= $assessment ? (int)$assessment['allergen_conflict_count'] : '—' ?></strong></div></article>
-    <article class="metric-card"><div><p>Open recommendations</p><strong><?= count(array_filter($recommendations, static fn(array $row): bool => in_array($row['status'], ['pending', 'accepted'], true))) ?></strong></div></article>
-</section>
-
-<section class="panel" style="margin-top:22px">
-    <p class="eyebrow">Safety boundary</p>
-    <h2>Planning support, not clinical guidance</h2>
-    <p class="page-description">Homestead stores household-entered label data and optional planning targets. Allergy tags must be verified against packaging, suppliers, preparation surfaces, and professional guidance appropriate to the household.</p>
-</section>
-
-<?php if ($canManage): ?>
-<section class="content-grid" style="margin-top:22px">
-    <article class="panel">
-        <p class="eyebrow">Assessment</p>
-        <h2>Review a meal plan</h2>
-        <form method="post" class="form-grid">
-            <input type="hidden" name="csrf_token" value="<?= e($token) ?>">
-            <input type="hidden" name="action_key" value="<?= e($actionKey) ?>">
-            <input type="hidden" name="action" value="run_meal_assessment">
-            <label>Meal plan<select name="meal_plan_id" required><option value="">Choose plan</option><?php foreach ($mealPlans as $plan): ?><option value="<?= (int)$plan['id'] ?>"><?= e((string)$plan['name']) ?> · <?= e((string)$plan['starts_on']) ?>–<?= e((string)$plan['ends_on']) ?> · <?= (int)$plan['meal_count'] ?> meals</option><?php endforeach; ?></select></label>
-            <button class="button primary" type="submit">Run household assessment</button>
-        </form>
-    </article>
-
-    <article class="panel">
-        <p class="eyebrow">Household settings</p>
-        <h2>Assessment thresholds</h2>
-        <form method="post" class="form-grid">
-            <input type="hidden" name="csrf_token" value="<?= e($token) ?>">
-            <input type="hidden" name="action_key" value="<?= e($actionKey) ?>">
-            <input type="hidden" name="action" value="save_settings">
-            <label>Assessment window, days<input class="search-field" type="number" min="1" max="31" name="assessment_window_days" value="<?= (int)$settings['assessment_window_days'] ?>" required></label>
-            <label>Minimum recipe variety<input class="search-field" type="number" min="1" max="100" name="minimum_recipe_variety" value="<?= (int)$settings['minimum_recipe_variety'] ?>" required></label>
-            <label>Minimum data completeness, %<input class="search-field" type="number" min="0" max="100" step="0.01" name="minimum_data_completeness_percent" value="<?= e((string)$settings['minimum_data_completeness_percent']) ?>" required></label>
-            <label><input type="checkbox" name="show_optional_targets" value="1" <?= (int)$settings['show_optional_targets'] === 1 ? 'checked' : '' ?>> Show optional target comparisons</label>
-            <button class="button primary" type="submit">Save assessment settings</button>
-        </form>
-    </article>
-
-    <article class="panel">
-        <p class="eyebrow">Recipe calculation</p>
-        <h2>Calculate nutrition snapshot</h2>
-        <form method="post" class="form-grid">
-            <input type="hidden" name="csrf_token" value="<?= e($token) ?>">
-            <input type="hidden" name="action_key" value="<?= e($actionKey) ?>">
-            <input type="hidden" name="action" value="calculate_recipe_nutrition">
-            <label>Recipe<select name="recipe_id" required><option value="">Choose recipe</option><?php foreach ($recipes as $recipe): ?><option value="<?= (int)$recipe['id'] ?>"><?= e((string)$recipe['name']) ?></option><?php endforeach; ?></select></label>
-            <label>As-of date<input class="search-field" type="date" name="as_of_date" value="<?= e($today) ?>" required></label>
-            <button class="button primary" type="submit">Calculate recipe nutrition</button>
-        </form>
-    </article>
-</section>
-
-<section class="content-grid" style="margin-top:22px">
-    <article class="panel">
-        <p class="eyebrow">Family profiles</p>
-        <h2>Optional planning targets</h2>
-        <form method="post" class="form-grid">
-            <input type="hidden" name="csrf_token" value="<?= e($token) ?>">
-            <input type="hidden" name="action_key" value="<?= e($actionKey) ?>">
-            <input type="hidden" name="action" value="save_member_profile">
-            <label>Member<select name="household_member_id" required><option value="">Choose member</option><?php foreach ($members as $member): ?><option value="<?= (int)$member['id'] ?>"><?= e((string)$member['display_name']) ?></option><?php endforeach; ?></select></label>
-            <label>Dietary pattern<input class="search-field" name="dietary_pattern" maxlength="120" placeholder="Household preference or pattern"></label>
-            <label>Daily calorie target<input class="search-field" type="number" min="0" step="0.01" name="calorie_target"></label>
-            <label>Daily protein target, g<input class="search-field" type="number" min="0" step="0.01" name="protein_target_g"></label>
-            <label>Daily fiber target, g<input class="search-field" type="number" min="0" step="0.01" name="fiber_target_g"></label>
-            <label>Daily sodium planning limit, mg<input class="search-field" type="number" min="0" step="0.01" name="sodium_limit_mg"></label>
-            <label>Daily added-sugar planning limit, g<input class="search-field" type="number" min="0" step="0.01" name="added_sugar_limit_g"></label>
-            <label>Notes<textarea name="target_notes" maxlength="5000"></textarea></label>
-            <button class="button primary" type="submit">Save member profile</button>
-        </form>
-    </article>
-
-    <article class="panel">
-        <p class="eyebrow">Allergen controls</p>
-        <h2>Member rule</h2>
-        <form method="post" class="form-grid">
-            <input type="hidden" name="csrf_token" value="<?= e($token) ?>">
-            <input type="hidden" name="action_key" value="<?= e($actionKey) ?>">
-            <input type="hidden" name="action" value="save_member_allergen">
-            <label>Member<select name="household_member_id" required><option value="">Choose member</option><?php foreach ($members as $member): ?><option value="<?= (int)$member['id'] ?>"><?= e((string)$member['display_name']) ?></option><?php endforeach; ?></select></label>
-            <label>Allergen key<input class="search-field" name="allergen_key" maxlength="80" placeholder="peanut, dairy, gluten" required></label>
-            <label>Severity<select name="severity"><option value="preference">Preference</option><option value="intolerance">Intolerance</option><option value="allergy">Allergy</option></select></label>
-            <label>Notes<textarea name="notes" maxlength="500"></textarea></label>
-            <input type="hidden" name="active" value="1">
-            <button class="button primary" type="submit">Save member rule</button>
-        </form>
-    </article>
-
-    <article class="panel">
-        <p class="eyebrow">Ingredient labels</p>
-        <h2>Nutrition profile</h2>
-        <form method="post" class="form-grid">
-            <input type="hidden" name="csrf_token" value="<?= e($token) ?>">
-            <input type="hidden" name="action_key" value="<?= e($actionKey) ?>">
-            <input type="hidden" name="action" value="save_inventory_nutrition">
-            <label>Inventory item<select name="inventory_item_id" required><option value="">Choose item</option><?php foreach ($inventoryItems as $item): ?><option value="<?= (int)$item['id'] ?>"><?= e((string)$item['name']) ?> · <?= e((string)$item['unit']) ?></option><?php endforeach; ?></select></label>
-            <label>Basis quantity<input class="search-field" type="number" min="0.0001" step="0.0001" name="basis_quantity" value="1" required></label>
-            <label>Basis unit<input class="search-field" name="basis_unit" maxlength="30" required></label>
-            <label>Calories<input class="search-field" type="number" min="0" step="0.0001" name="calories"></label>
-            <label>Protein, g<input class="search-field" type="number" min="0" step="0.0001" name="protein_g"></label>
-            <label>Carbohydrate, g<input class="search-field" type="number" min="0" step="0.0001" name="carbohydrate_g"></label>
-            <label>Fat, g<input class="search-field" type="number" min="0" step="0.0001" name="fat_g"></label>
-            <label>Fiber, g<input class="search-field" type="number" min="0" step="0.0001" name="fiber_g"></label>
-            <label>Total sugar, g<input class="search-field" type="number" min="0" step="0.0001" name="total_sugar_g"></label>
-            <label>Added sugar, g<input class="search-field" type="number" min="0" step="0.0001" name="added_sugar_g"></label>
-            <label>Sodium, mg<input class="search-field" type="number" min="0" step="0.0001" name="sodium_mg"></label>
-            <label>Source label<input class="search-field" name="source_label" maxlength="190"></label>
-            <label>Confidence<select name="confidence"><option value="estimated">Estimated</option><option value="label">Package label</option><option value="verified">Household verified</option></select></label>
-            <button class="button primary" type="submit">Save nutrition profile</button>
-        </form>
-    </article>
-
-    <article class="panel">
-        <p class="eyebrow">Ingredient safety</p>
-        <h2>Allergen tag</h2>
-        <form method="post" class="form-grid">
-            <input type="hidden" name="csrf_token" value="<?= e($token) ?>">
-            <input type="hidden" name="action_key" value="<?= e($actionKey) ?>">
-            <input type="hidden" name="action" value="save_inventory_allergen">
-            <label>Inventory item<select name="inventory_item_id" required><option value="">Choose item</option><?php foreach ($inventoryItems as $item): ?><option value="<?= (int)$item['id'] ?>"><?= e((string)$item['name']) ?></option><?php endforeach; ?></select></label>
-            <label>Allergen key<input class="search-field" name="allergen_key" maxlength="80" required></label>
-            <label>Presence<select name="presence"><option value="contains">Contains</option><option value="may_contain">May contain</option><option value="shared_facility">Shared facility</option></select></label>
-            <label>Source label<input class="search-field" name="source_label" maxlength="190"></label>
-            <input type="hidden" name="active" value="1">
-            <button class="button primary" type="submit">Save allergen tag</button>
-        </form>
-    </article>
-</section>
-<?php endif; ?>
-
-<section class="content-grid" style="margin-top:22px">
-    <article class="panel span-2">
-        <div class="panel-heading"><div><p class="eyebrow">Member assessment</p><h2>Latest household plan</h2></div></div>
-        <?php if ($assessment === null): ?><p>No completed nutrition assessment yet.</p><?php else: ?>
-        <p class="page-description"><?= e((string)$assessment['meal_plan_name']) ?> · <?= e((string)$assessment['starts_on']) ?>–<?= e((string)$assessment['ends_on']) ?></p>
-        <div class="table-wrap"><table><thead><tr><th>Member</th><th>Meals</th><th>Variety</th><th>Calories</th><th>Protein</th><th>Fiber</th><th>Sodium use</th><th>Conflicts</th><th>Score</th></tr></thead><tbody>
-        <?php foreach ($assessmentLines as $line): ?><tr><td><strong><?= e((string)$line['display_name']) ?></strong><br><small><?= e((string)($line['dietary_pattern'] ?? 'No pattern')) ?></small></td><td><?= (int)$line['assessed_meal_count'] ?>/<?= (int)$line['planned_meal_count'] ?></td><td><?= (int)$line['distinct_recipe_count'] ?></td><td><?= e($number($line['calorie_target_coverage_percent'])) ?>%</td><td><?= e($number($line['protein_target_coverage_percent'])) ?>%</td><td><?= e($number($line['fiber_target_coverage_percent'])) ?>%</td><td><?= e($number($line['sodium_limit_usage_percent'])) ?>%</td><td><?= (int)$line['allergen_conflict_count'] ?></td><td><?= e($number($line['balance_score'])) ?></td></tr><?php endforeach; ?>
-        </tbody></table></div><?php endif; ?>
-    </article>
-
-    <article class="panel">
-        <div class="panel-heading"><div><p class="eyebrow">Family rules</p><h2>Allergens & preferences</h2></div></div>
-        <?php if ($memberAllergens === []): ?><p>No active member rules.</p><?php else: ?><div class="table-wrap"><table><thead><tr><th>Member</th><th>Rule</th><th>Severity</th></tr></thead><tbody><?php foreach ($memberAllergens as $rule): ?><tr><td><?= e((string)$rule['display_name']) ?></td><td><?= e((string)$rule['allergen_key']) ?></td><td><?= e((string)$rule['severity']) ?></td></tr><?php endforeach; ?></tbody></table></div><?php endif; ?>
-    </article>
-</section>
-
-<section class="content-grid" style="margin-top:22px">
-    <article class="panel span-2">
-        <div class="panel-heading"><div><p class="eyebrow">Recipe intelligence</p><h2>Nutrition snapshots</h2></div></div>
-        <div class="table-wrap"><table><thead><tr><th>Recipe</th><th>Calories</th><th>Protein</th><th>Fiber</th><th>Sodium</th><th>Missing</th><th>Allergens</th></tr></thead><tbody>
-        <?php foreach ($recipes as $recipe): $allergens = json_decode((string)($recipe['allergen_keys'] ?? '[]'), true); ?><tr><td><?= e((string)$recipe['name']) ?></td><td><?= e($number($recipe['calories_per_serving'], 0)) ?></td><td><?= e($number($recipe['protein_per_serving_g'])) ?>g</td><td><?= e($number($recipe['fiber_per_serving_g'])) ?>g</td><td><?= e($number($recipe['sodium_per_serving_mg'], 0)) ?>mg</td><td><?= $recipe['nutrition_snapshot_id'] ? ((int)$recipe['missing_profile_count'] + (int)$recipe['unit_mismatch_count']) : '—' ?></td><td><?= e(is_array($allergens) && $allergens !== [] ? implode(', ', $allergens) : '—') ?></td></tr><?php endforeach; ?>
-        </tbody></table></div>
-    </article>
-
-    <article class="panel">
-        <div class="panel-heading"><div><p class="eyebrow">Ingredient tags</p><h2>Active allergen labels</h2></div></div>
-        <?php if ($inventoryAllergens === []): ?><p>No ingredient allergen tags.</p><?php else: ?><div class="table-wrap"><table><thead><tr><th>Item</th><th>Tag</th><th>Presence</th></tr></thead><tbody><?php foreach ($inventoryAllergens as $tag): ?><tr><td><?= e((string)$tag['inventory_item_name']) ?></td><td><?= e((string)$tag['allergen_key']) ?></td><td><?= e(str_replace('_', ' ', (string)$tag['presence'])) ?></td></tr><?php endforeach; ?></tbody></table></div><?php endif; ?>
-    </article>
-</section>
-
-<section class="panel" style="margin-top:22px">
-    <div class="panel-heading"><div><p class="eyebrow">Action queue</p><h2>Nutrition recommendations</h2></div></div>
-    <?php if ($recommendations === []): ?><p>No recommendations yet.</p><?php else: ?><div class="table-wrap"><table><thead><tr><th>Priority</th><th>Member</th><th>Recommendation</th><th>Status</th><th>Action</th></tr></thead><tbody>
-    <?php foreach ($recommendations as $recommendation): ?><tr><td><?= e((string)$recommendation['priority']) ?></td><td><?= e((string)($recommendation['display_name'] ?? 'Household')) ?></td><td><strong><?= e((string)$recommendation['title']) ?></strong><br><small><?= e((string)$recommendation['rationale']) ?></small><br><?= e((string)$recommendation['recommended_action']) ?></td><td><?= e((string)$recommendation['status']) ?></td><td><?php if ($canManage && $recommendation['status'] === 'pending'): ?><form method="post" class="toolbar"><input type="hidden" name="csrf_token" value="<?= e($token) ?>"><input type="hidden" name="action_key" value="<?= e($actionKey) ?>"><input type="hidden" name="recommendation_id" value="<?= (int)$recommendation['id'] ?>"><button class="button primary" name="action" value="accept_recommendation" type="submit">Create task</button><button class="button secondary" name="action" value="dismiss_recommendation" type="submit">Dismiss</button></form><?php elseif ($canManage && $recommendation['status'] === 'accepted'): ?><form method="post"><input type="hidden" name="csrf_token" value="<?= e($token) ?>"><input type="hidden" name="action_key" value="<?= e($actionKey) ?>"><input type="hidden" name="recommendation_id" value="<?= (int)$recommendation['id'] ?>"><button class="button secondary" name="action" value="complete_recommendation" type="submit">Mark complete</button></form><?php else: ?>—<?php endif; ?></td></tr><?php endforeach; ?>
-    </tbody></table></div><?php endif; ?>
-</section>
-
-<section class="panel" style="margin-top:22px">
-    <div class="panel-heading"><div><p class="eyebrow">Assessment history</p><h2>Recent trend</h2></div></div>
-    <?php if ($trends === []): ?><p>No assessment history.</p><?php else: ?><div class="table-wrap"><table><thead><tr><th>Window</th><th>Balance</th><th>Completeness</th><th>Conflicts</th><th>Recommendations</th></tr></thead><tbody><?php foreach ($trends as $trend): ?><tr><td><?= e((string)$trend['starts_on']) ?>–<?= e((string)$trend['ends_on']) ?></td><td><?= e($number($trend['household_balance_score'])) ?></td><td><?= e($number($trend['data_completeness_percent'])) ?>%</td><td><?= (int)$trend['allergen_conflict_count'] ?></td><td><?= (int)$trend['recommendation_count'] ?></td></tr><?php endforeach; ?></tbody></table></div><?php endif; ?>
-</section>
 </main>
+<script src="assets/js/homestead-nutrition.js" defer></script>
 </body>
 </html>
