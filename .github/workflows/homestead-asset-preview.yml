@@ -1,0 +1,47 @@
+name: Homestead Asset Preview
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - homestead_4.png
+      - .github/workflows/homestead-asset-preview.yml
+
+permissions:
+  contents: read
+
+jobs:
+  sheet-04-preview:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+
+      - name: Install Pillow
+        run: python -m pip install --disable-pip-version-check Pillow
+
+      - name: Emit Sheet 4 preview
+        shell: bash
+        run: |
+          python - <<'PY'
+          from base64 import b64encode
+          from io import BytesIO
+          from PIL import Image
+
+          source = Image.open('homestead_4.png')
+          source.load()
+          print(f'H4_SOURCE_META:{source.width}x{source.height}:{source.mode}:{source.format}')
+
+          preview = source.convert('RGB')
+          preview.thumbnail((1600, 1600), Image.Resampling.LANCZOS)
+          buffer = BytesIO()
+          preview.save(buffer, format='JPEG', quality=78, optimize=True)
+          encoded = b64encode(buffer.getvalue()).decode('ascii')
+
+          print(f'H4_PREVIEW_META:{preview.width}x{preview.height}:JPEG:{len(buffer.getvalue())}')
+          print('BEGIN_H4_PREVIEW_BASE64')
+          for index in range(0, len(encoded), 1000):
+              print(f'H4B64:{index // 1000:05d}:{encoded[index:index + 1000]}')
+          print('END_H4_PREVIEW_BASE64')
+          PY
