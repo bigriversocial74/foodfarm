@@ -4,9 +4,10 @@ set -euo pipefail
 base_url="${BASE_URL:-http://127.0.0.1:8080}"
 cookie_jar="$(mktemp)"
 login_page="$(mktemp)"
+family_page="$(mktemp)"
 logout_page="$(mktemp)"
 headers_file="$(mktemp)"
-trap 'rm -f "$cookie_jar" "$login_page" "$logout_page" "$headers_file"' EXIT
+trap 'rm -f "$cookie_jar" "$login_page" "$family_page" "$logout_page" "$headers_file"' EXIT
 
 fail() {
   echo "[FAIL] $1" >&2
@@ -62,6 +63,31 @@ for route in phase2.php phase3.php phase4.php phase5.php starter-kit-lifecycle.p
   [[ "$(status -b "$cookie_jar" "$base_url/$route")" == "200" ]] || fail "authenticated route $route unavailable"
 done
 pass "authenticated application routes respond"
+
+curl -sS -b "$cookie_jar" -c "$cookie_jar" "$base_url/phase2.php?section=family" > "$family_page"
+family_csrf="$(sed -n 's/.*name="csrf_token" value="\([^"]*\)".*/\1/p' "$family_page" | head -n1)"
+[[ "$family_csrf" =~ ^[a-f0-9]{64}$ ]] || fail "family member CSRF token missing"
+family_name="HTTP Family Member ${RANDOM}-$(date +%s)"
+family_headers="$(curl -sS -D - -o /dev/null -b "$cookie_jar" -c "$cookie_jar" \
+  --data-urlencode "csrf_token=$family_csrf" \
+  --data-urlencode "action=add_member" \
+  --data-urlencode "display_name=$family_name" \
+  --data-urlencode "age_group=adult" \
+  --data-urlencode "role=adult_member" \
+  --data-urlencode "serving_multiplier=1" \
+  --data-urlencode "dietary_pattern=" \
+  --data-urlencode "allergen_notes=" \
+  --data-urlencode "activity_level=not_set" \
+  --data-urlencode "height_value=" \
+  --data-urlencode "height_unit=in" \
+  --data-urlencode "weight_value=" \
+  --data-urlencode "weight_unit=lb" \
+  --data-urlencode "wellness_visibility=private" \
+  "$base_url/phase2.php?section=family")"
+grep -qi '^Location: /phase2.php?section=family' <<<"$family_headers" || fail "family member creation did not return to the Family route"
+curl -sS -b "$cookie_jar" "$base_url/phase2.php?section=family" > "$family_page"
+grep -Fq "$family_name" "$family_page" || fail "created family member was not rendered after redirect"
+pass "family member creation persists and returns to Family"
 
 [[ "$(status -b "$cookie_jar" "$base_url/api/phase5-health.php")" == "200" ]] || fail "platform administrator session could not access health endpoint"
 pass "platform administrator session can access health endpoint"
