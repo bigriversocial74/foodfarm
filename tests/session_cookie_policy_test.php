@@ -5,6 +5,7 @@ declare(strict_types=1);
 use function Homestead\csrf_is_valid;
 use function Homestead\request_uses_https;
 use function Homestead\resolve_app_base_path;
+use function Homestead\resolve_redirect_target;
 
 require dirname(__DIR__) . '/app/Support.php';
 
@@ -14,6 +15,14 @@ $assert = static function (bool $condition, string $message): void {
         exit(1);
     }
     echo "[PASS] {$message}\n";
+};
+$expectException = static function (callable $callback): bool {
+    try {
+        $callback();
+        return false;
+    } catch (Throwable) {
+        return true;
+    }
 };
 
 $config = ['app' => ['base_url' => 'https://example.test/foodfarm']];
@@ -45,6 +54,31 @@ $assert(
     'domain-root deployments keep the root cookie path'
 );
 
+$assert(
+    resolve_redirect_target('/phase2.php?section=family', ['REQUEST_URI' => '/phase2.php?section=family']) === '/phase2.php?section=family',
+    'domain-root post-submit redirects remain at the domain root'
+);
+$assert(
+    resolve_redirect_target('/phase2.php?section=family', ['REQUEST_URI' => '/foodfarm/phase2.php?section=family'], '/foodfarm') === '/foodfarm/phase2.php?section=family',
+    'same-route redirects preserve a deployed subfolder path'
+);
+$assert(
+    resolve_redirect_target('/login.php', ['REQUEST_URI' => '/foodfarm/phase2.php?section=family'], '/foodfarm') === '/foodfarm/login.php',
+    'cross-route redirects use the deployed application base path'
+);
+$assert(
+    resolve_redirect_target('/foodfarm/phase2.php?section=family', ['REQUEST_URI' => '/foodfarm/phase2.php'], '/foodfarm') === '/foodfarm/phase2.php?section=family',
+    'already-prefixed redirect targets are not double-prefixed'
+);
+$assert(
+    resolve_redirect_target('/phase4.php#meal-planning', ['REQUEST_URI' => '/foodfarm/phase4.php'], '/foodfarm') === '/foodfarm/phase4.php#meal-planning',
+    'same-route redirects retain fragments inside a deployed subfolder'
+);
+$assert(
+    $expectException(static fn() => resolve_redirect_target('//attacker.test/phase2.php', [], '/foodfarm')),
+    'protocol-relative redirect targets remain blocked'
+);
+
 $assert(request_uses_https($config, []) === true, 'configured HTTPS enables Secure cookies behind a proxy');
 $assert(request_uses_https(['app' => ['base_url' => 'http://example.test/foodfarm']], ['HTTPS' => 'on']) === true, 'direct HTTPS enables Secure cookies');
 $assert(request_uses_https(['app' => ['base_url' => 'http://example.test/foodfarm']], ['SERVER_PORT' => 443]) === true, 'HTTPS port enables Secure cookies');
@@ -60,4 +94,10 @@ $loginSource = (string)file_get_contents(dirname(__DIR__) . '/login.php');
 $assert(str_contains($loginSource, 'csrf_is_valid'), 'login handles an expired form session inside its styled error flow');
 $assert(!str_contains($loginSource, 'verify_csrf($_POST'), 'login no longer exits before rendering its error panel');
 
-echo "Session cookie and login CSRF policy test passed.\n";
+$supportSource = (string)file_get_contents(dirname(__DIR__) . '/app/Support.php');
+$assert(str_contains($supportSource, 'resolve_redirect_target'), 'redirects use the deployment-aware route resolver');
+
+$phase2Source = (string)file_get_contents(dirname(__DIR__) . '/phase2.php');
+$assert(str_contains($phase2Source, "redirect('/phase2.php?section=family')"), 'Phase 2 family writes use the centralized redirect helper');
+
+echo "Session, redirect, and login policy test passed.\n";
