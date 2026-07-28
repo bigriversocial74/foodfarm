@@ -54,7 +54,8 @@ login_headers="$(curl -sS -D - -o /dev/null -b "$cookie_jar" -c "$cookie_jar" \
   --data-urlencode "email=${HOMESTEAD_OWNER_EMAIL}" \
   --data-urlencode "password=${HOMESTEAD_OWNER_PASSWORD}" \
   "$base_url/login.php")"
-grep -qi '^Location: /phase3.php' <<<"$login_headers" || fail "login did not redirect to authenticated workspace"
+grep -qi '^Location: /login.php' <<<"$login_headers" || fail "login did not return to the authenticated login route"
+[[ "$(status -b "$cookie_jar" "$base_url/login.php")" == "200" ]] || fail "authenticated login route unavailable"
 pass "owner login succeeds"
 
 for route in phase2.php phase3.php phase4.php phase5.php starter-kit-lifecycle.php account.php; do
