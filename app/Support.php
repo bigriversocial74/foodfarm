@@ -114,12 +114,57 @@ function consume_flashes(): array
     return is_array($messages) ? $messages : [];
 }
 
-function redirect(string $url): never
+function resolve_redirect_target(string $url, array $server, string $basePath = ''): string
 {
     if (!str_starts_with($url, '/') || str_starts_with($url, '//') || preg_match('/[\x00-\x1F\x7F]/', $url)) {
         throw new RuntimeException('Unsafe redirect target.');
     }
-    header('Location: ' . $url, true, 303);
+
+    $parts = parse_url($url);
+    if ($parts === false || isset($parts['scheme'], $parts['host'], $parts['user'], $parts['pass'], $parts['port'])) {
+        throw new RuntimeException('Unsafe redirect target.');
+    }
+
+    $targetPath = (string)($parts['path'] ?? '/');
+    if (!str_starts_with($targetPath, '/') || str_starts_with($targetPath, '//')) {
+        throw new RuntimeException('Unsafe redirect target.');
+    }
+
+    $suffix = isset($parts['query']) ? '?' . $parts['query'] : '';
+    $suffix .= isset($parts['fragment']) ? '#' . $parts['fragment'] : '';
+    $normalizedBasePath = normalize_app_base_path($basePath);
+
+    $requestUri = (string)($server['REQUEST_URI'] ?? '');
+    if (!str_starts_with($requestUri, '//')) {
+        $requestPath = parse_url($requestUri, PHP_URL_PATH);
+        if (is_string($requestPath)) {
+            $requestPath = '/' . ltrim(str_replace('\\', '/', $requestPath), '/');
+            if (
+                $requestPath !== '/'
+                && !str_starts_with($requestPath, '//')
+                && preg_match('/[\x00-\x1F\x7F]/', $requestPath) !== 1
+                && ($requestPath === $targetPath || str_ends_with($requestPath, $targetPath))
+            ) {
+                return $requestPath . $suffix;
+            }
+        }
+    }
+
+    if (
+        $normalizedBasePath !== ''
+        && ($targetPath === $normalizedBasePath || str_starts_with($targetPath, $normalizedBasePath . '/'))
+    ) {
+        return $targetPath . $suffix;
+    }
+
+    return $normalizedBasePath . $targetPath . $suffix;
+}
+
+function redirect(string $url): never
+{
+    $basePath = defined('HOMESTEAD_BASE_PATH') ? (string)HOMESTEAD_BASE_PATH : '';
+    $target = resolve_redirect_target($url, $_SERVER, $basePath);
+    header('Location: ' . $target, true, 303);
     exit;
 }
 
