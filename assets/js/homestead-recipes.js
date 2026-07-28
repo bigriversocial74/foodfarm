@@ -10,6 +10,37 @@
     const filterPanel = document.querySelector('[data-recipe-filters]');
     let activeFilter = 'all';
 
+    const randomCompletionKey = () => {
+        const bytes = new Uint8Array(32);
+        window.crypto.getRandomValues(bytes);
+        return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+    };
+
+    const prepareRecipeCompletionForms = () => {
+        const forms = Array.from(document.querySelectorAll('form')).filter((form) => {
+            const action = form.querySelector('input[name="action"]');
+            return action?.value === 'complete_recipe';
+        });
+
+        forms.forEach((form) => {
+            let completionKey = form.querySelector('input[name="completion_key"]');
+            if (!completionKey) {
+                completionKey = document.createElement('input');
+                completionKey.type = 'hidden';
+                completionKey.name = 'completion_key';
+                form.prepend(completionKey);
+            }
+            if (!/^[a-f0-9]{64}$/.test(completionKey.value)) {
+                completionKey.value = randomCompletionKey();
+            }
+
+            const useByDate = form.querySelector('input[name="use_by_date"]');
+            if (useByDate) {
+                useByDate.required = true;
+            }
+        });
+    };
+
     const applyFilters = () => {
         const query = (searchInput?.value || '').trim().toLowerCase();
         let visibleCount = 0;
@@ -51,5 +82,6 @@
         filterToggle.setAttribute('aria-expanded', String(isHidden));
     });
 
+    prepareRecipeCompletionForms();
     applyFilters();
 })();
